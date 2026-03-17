@@ -16,6 +16,7 @@ import {
   Check,
   Pencil,
   ArrowRight,
+  Download,
 } from "lucide-react"
 
 export default function ComponentDetailPage() {
@@ -69,12 +70,20 @@ export default function ComponentDetailPage() {
             {component.description.oneliner}
           </p>
         </div>
-        <Link href={`/edit/${component.id}`}>
-          <Button variant="outline">
-            <Pencil className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <a href="/api/export/drawio" download="arch-components.xml">
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Draw.io
+            </Button>
+          </a>
+          <Link href={`/edit/${component.id}`}>
+            <Button variant="outline">
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Quick actions */}

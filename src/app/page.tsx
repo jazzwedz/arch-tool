@@ -12,7 +12,7 @@ import {
 import { ComponentCard } from "@/components/ComponentCard"
 import { COMPONENT_TYPES, COMPONENT_STATUSES, TYPE_LABELS } from "@/lib/constants"
 import type { Component } from "@/lib/types"
-import { Search, LayoutGrid, List, Plus } from "lucide-react"
+import { Search, LayoutGrid, List, Plus, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
@@ -22,6 +22,8 @@ export default function CatalogPage() {
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [ownerFilter, setOwnerFilter] = useState<string>("all")
+  const [tagFilter, setTagFilter] = useState<string>("all")
   const [view, setView] = useState<"grid" | "list">("grid")
 
   useEffect(() => {
@@ -31,6 +33,16 @@ export default function CatalogPage() {
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
+
+  const allOwners = useMemo(
+    () => Array.from(new Set(components.map((c) => c.owner).filter(Boolean))).sort(),
+    [components]
+  )
+
+  const allTags = useMemo(
+    () => Array.from(new Set(components.flatMap((c) => c.tags))).sort(),
+    [components]
+  )
 
   const filtered = useMemo(() => {
     return components.filter((c) => {
@@ -42,10 +54,12 @@ export default function CatalogPage() {
 
       const matchesType = typeFilter === "all" || c.type === typeFilter
       const matchesStatus = statusFilter === "all" || c.status === statusFilter
+      const matchesOwner = ownerFilter === "all" || c.owner === ownerFilter
+      const matchesTag = tagFilter === "all" || c.tags.includes(tagFilter)
 
-      return matchesSearch && matchesType && matchesStatus
+      return matchesSearch && matchesType && matchesStatus && matchesOwner && matchesTag
     })
-  }, [components, search, typeFilter, statusFilter])
+  }, [components, search, typeFilter, statusFilter, ownerFilter, tagFilter])
 
   return (
     <div className="space-y-6">
@@ -56,12 +70,20 @@ export default function CatalogPage() {
             {components.length} components registered
           </p>
         </div>
-        <Link href="/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Component
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <a href="/api/export/drawio" download="arch-components.xml">
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Download Draw.io Library
+            </Button>
+          </a>
+          <Link href="/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Component
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -100,6 +122,36 @@ export default function CatalogPage() {
             ))}
           </SelectContent>
         </Select>
+        {allOwners.length > 0 && (
+          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Owner" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All owners</SelectItem>
+              {allOwners.map((o) => (
+                <SelectItem key={o} value={o}>
+                  {o}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {allTags.length > 0 && (
+          <Select value={tagFilter} onValueChange={setTagFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Tag" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All tags</SelectItem>
+              {allTags.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex gap-1 border rounded-md p-1">
           <Button
             variant={view === "grid" ? "secondary" : "ghost"}
