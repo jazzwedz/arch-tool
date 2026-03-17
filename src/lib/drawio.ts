@@ -55,28 +55,19 @@ const connectorEntries = [
   },
 ]
 
-function htmlEncode(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
-
 function buildComponentXml(component: Component): string {
   const size = typeSizes[component.type]
   const style = typeStyles[component.type]
 
-  const raw =
+  return (
     `<mxGraphModel><root>` +
-    `<mxCell id="0"/><mxCell id="1" parent="0"/>` +
-    `<UserObject label="${component.id}" arch_id="${component.id}" arch_type="${component.type}" id="2">` +
-    `<mxCell style="${style}" vertex="1" parent="1">` +
-    `<mxGeometry height="${size.h}" width="${size.w}" as="geometry"/>` +
+    `<mxCell id='0'/><mxCell id='1' parent='0'/>` +
+    `<UserObject label='${component.id}' arch_id='${component.id}' arch_type='${component.type}' id='2'>` +
+    `<mxCell style='${style}' vertex='1' parent='1'>` +
+    `<mxGeometry height='${size.h}' width='${size.w}' as='geometry'/>` +
     `</mxCell></UserObject>` +
     `</root></mxGraphModel>`
-
-  return htmlEncode(raw)
+  )
 }
 
 export function generateMxLibrary(components: Component[]): string {
@@ -87,12 +78,6 @@ export function generateMxLibrary(components: Component[]): string {
     title: c.id,
   }))
 
-  // Connector entries also need HTML-encoded xml
-  const encodedConnectors = connectorEntries.map((e) => ({
-    ...e,
-    xml: htmlEncode(e.xml),
-  }))
-
-  const allEntries = [...componentEntries, ...encodedConnectors]
+  const allEntries = [...componentEntries, ...connectorEntries]
   return `<mxlibrary>${JSON.stringify(allEntries)}</mxlibrary>`
 }
