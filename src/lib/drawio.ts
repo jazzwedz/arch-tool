@@ -25,49 +25,56 @@ const typeSizes: Record<ComponentType, { w: number; h: number }> = {
 const connectorEntries = [
   {
     title: "REST",
-    xml: `<mxGraphModel><root><mxCell id='0'/><mxCell id='1' parent='0'/><mxCell id='2' parent='1' style='endArrow=block;endFill=1;strokeColor=#6c8ebf;fontSize=10;' value='REST' connector_type='rest' edge='1'><mxGeometry width='120' height='20' as='geometry'/></mxCell></root></mxGraphModel>`,
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;fontSize=10;" value="REST" connector_type="rest" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
   },
   {
     title: "Async",
-    xml: `<mxGraphModel><root><mxCell id='0'/><mxCell id='1' parent='0'/><mxCell id='2' parent='1' style='endArrow=block;endFill=0;dashed=1;strokeColor=#b85450;fontSize=10;' value='Async' connector_type='async' edge='1'><mxGeometry width='120' height='20' as='geometry'/></mxCell></root></mxGraphModel>`,
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=block;endFill=0;dashed=1;strokeColor=#b85450;fontSize=10;" value="Async" connector_type="async" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
   },
   {
     title: "DB",
-    xml: `<mxGraphModel><root><mxCell id='0'/><mxCell id='1' parent='0'/><mxCell id='2' parent='1' style='endArrow=ERmany;endFill=0;strokeColor=#d6b656;fontSize=10;' value='DB' connector_type='db' edge='1'><mxGeometry width='120' height='20' as='geometry'/></mxCell></root></mxGraphModel>`,
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=ERmany;endFill=0;strokeColor=#d6b656;fontSize=10;" value="DB" connector_type="db" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
   },
   {
     title: "gRPC",
-    xml: `<mxGraphModel><root><mxCell id='0'/><mxCell id='1' parent='0'/><mxCell id='2' parent='1' style='endArrow=block;endFill=1;strokeColor=#9673a6;fontSize=10;' value='gRPC' connector_type='grpc' edge='1'><mxGeometry width='120' height='20' as='geometry'/></mxCell></root></mxGraphModel>`,
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=block;endFill=1;strokeColor=#9673a6;fontSize=10;" value="gRPC" connector_type="grpc" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
   },
   {
     title: "File",
-    xml: `<mxGraphModel><root><mxCell id='0'/><mxCell id='1' parent='0'/><mxCell id='2' parent='1' style='endArrow=open;endFill=0;dashed=1;strokeColor=#999999;fontSize=10;' value='File' connector_type='file' edge='1'><mxGeometry width='120' height='20' as='geometry'/></mxCell></root></mxGraphModel>`,
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=open;endFill=0;dashed=1;strokeColor=#999999;fontSize=10;" value="File" connector_type="file" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
   },
   {
     title: "Human",
-    xml: `<mxGraphModel><root><mxCell id='0'/><mxCell id='1' parent='0'/><mxCell id='2' parent='1' style='endArrow=open;endFill=0;dashed=1;strokeColor=#d79b00;fontSize=10;' value='Human' connector_type='human' edge='1'><mxGeometry width='120' height='20' as='geometry'/></mxCell></root></mxGraphModel>`,
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=open;endFill=0;dashed=1;strokeColor=#d79b00;fontSize=10;" value="Human" connector_type="human" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
   },
 ]
+
+// Encode only < and > — Draw.io decodes these after XML parsing.
+// Double-quoted attribute values are left as-is; JSON.stringify escapes them to \".
+function encodeXml(str: string): string {
+  return str.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
 
 function buildComponentXml(component: Component): string {
   const size = typeSizes[component.type]
   const style = typeStyles[component.type]
 
-  return (
+  const raw =
     `<mxGraphModel><root>` +
-    `<mxCell id='0'/><mxCell id='1' parent='0'/>` +
-    `<UserObject label='${component.id}' arch_id='${component.id}' arch_type='${component.type}' id='2'>` +
-    `<mxCell style='${style}' vertex='1' parent='1'>` +
-    `<mxGeometry height='${size.h}' width='${size.w}' as='geometry'/>` +
+    `<mxCell id="0"/><mxCell id="1" parent="0"/>` +
+    `<UserObject label="${component.id}" arch_id="${component.id}" arch_type="${component.type}" id="2">` +
+    `<mxCell style="${style}" vertex="1" parent="1">` +
+    `<mxGeometry height="${size.h}" width="${size.w}" as="geometry"/>` +
     `</mxCell></UserObject>` +
     `</root></mxGraphModel>`
-  )
+
+  return encodeXml(raw)
 }
 
 export function generateMxLibrary(components: Component[]): string {
@@ -78,6 +85,11 @@ export function generateMxLibrary(components: Component[]): string {
     title: c.id,
   }))
 
-  const allEntries = [...componentEntries, ...connectorEntries]
+  const encodedConnectors = connectorEntries.map((e) => ({
+    ...e,
+    xml: encodeXml(e.xml),
+  }))
+
+  const allEntries = [...componentEntries, ...encodedConnectors]
   return `<mxlibrary>${JSON.stringify(allEntries)}</mxlibrary>`
 }
