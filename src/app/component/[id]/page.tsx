@@ -1,0 +1,274 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { TypeIcon } from "@/components/TypeIcon"
+import { StatusBadge } from "@/components/StatusBadge"
+import { TYPE_LABELS } from "@/lib/constants"
+import type { ComponentWithSha } from "@/lib/types"
+import {
+  ArrowLeft,
+  Copy,
+  Check,
+  Pencil,
+  ArrowRight,
+} from "lucide-react"
+
+export default function ComponentDetailPage() {
+  const { id } = useParams<{ id: string }>()
+  const router = useRouter()
+  const [component, setComponent] = useState<ComponentWithSha | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/components/${id}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("Not found")
+        return r.json()
+      })
+      .then(setComponent)
+      .catch(() => router.push("/"))
+      .finally(() => setLoading(false))
+  }, [id, router])
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  if (loading || !component) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        Loading component...
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <TypeIcon type={component.type} className="h-6 w-6" />
+            <h1 className="text-3xl font-bold">{component.name}</h1>
+            <StatusBadge status={component.status} />
+          </div>
+          <p className="text-muted-foreground mt-1">
+            {component.description.oneliner}
+          </p>
+        </div>
+        <Link href={`/edit/${component.id}`}>
+          <Button variant="outline">
+            <Pencil className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+        </Link>
+      </div>
+
+      {/* Quick actions */}
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => copyToClipboard(component.id, "id")}
+        >
+          {copiedField === "id" ? (
+            <Check className="h-3 w-3 mr-1" />
+          ) : (
+            <Copy className="h-3 w-3 mr-1" />
+          )}
+          Copy ID
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            copyToClipboard(component.description.technical, "technical")
+          }
+        >
+          {copiedField === "technical" ? (
+            <Check className="h-3 w-3 mr-1" />
+          ) : (
+            <Copy className="h-3 w-3 mr-1" />
+          )}
+          Copy Technical Desc
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            copyToClipboard(component.description.business, "business")
+          }
+        >
+          {copiedField === "business" ? (
+            <Check className="h-3 w-3 mr-1" />
+          ) : (
+            <Copy className="h-3 w-3 mr-1" />
+          )}
+          Copy Business Desc
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">ID</span>
+                <p className="font-mono">{component.id}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Type</span>
+                <p>{TYPE_LABELS[component.type]}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Owner</span>
+                <p>{component.owner}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Status</span>
+                <p>
+                  <StatusBadge status={component.status} />
+                </p>
+              </div>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Tags</span>
+              <div className="flex gap-1 flex-wrap mt-1">
+                {component.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Descriptions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Descriptions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <span className="text-sm text-muted-foreground font-medium">
+                Technical
+              </span>
+              <p className="text-sm mt-1">{component.description.technical}</p>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground font-medium">
+                Business
+              </span>
+              <p className="text-sm mt-1">{component.description.business}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Interfaces */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Interfaces</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {component.interfaces.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No interfaces defined.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {component.interfaces.map((iface, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 text-sm border-b last:border-0 pb-2"
+                  >
+                    <Badge
+                      variant={
+                        iface.direction === "provides" ? "default" : "outline"
+                      }
+                      className="text-xs w-20 justify-center"
+                    >
+                      {iface.direction}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {iface.type}
+                    </Badge>
+                    <span className="flex-1">{iface.description}</span>
+                    {iface.target && (
+                      <span className="text-muted-foreground font-mono text-xs">
+                        → {iface.target}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Dependencies */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Dependencies</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {component.dependencies.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No dependencies defined.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {component.dependencies.map((dep) => (
+                  <Link
+                    key={dep.id}
+                    href={`/component/${dep.id}`}
+                    className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
+                  >
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-mono">{dep.id}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {dep.connector}
+                    </Badge>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Risks */}
+        {component.risks && component.risks.length > 0 && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Risks</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                {component.risks.map((risk, i) => (
+                  <li key={i}>{risk}</li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}

@@ -1,101 +1,146 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useEffect, useState, useMemo } from "react"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { ComponentCard } from "@/components/ComponentCard"
+import { COMPONENT_TYPES, COMPONENT_STATUSES, TYPE_LABELS } from "@/lib/constants"
+import type { Component } from "@/lib/types"
+import { Search, LayoutGrid, List, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
+
+export default function CatalogPage() {
+  const [components, setComponents] = useState<Component[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [view, setView] = useState<"grid" | "list">("grid")
+
+  useEffect(() => {
+    fetch("/api/components")
+      .then((r) => r.json())
+      .then(setComponents)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
+
+  const filtered = useMemo(() => {
+    return components.filter((c) => {
+      const matchesSearch =
+        !search ||
+        c.id.toLowerCase().includes(search.toLowerCase()) ||
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.description.oneliner.toLowerCase().includes(search.toLowerCase())
+
+      const matchesType = typeFilter === "all" || c.type === typeFilter
+      const matchesStatus = statusFilter === "all" || c.status === statusFilter
+
+      return matchesSearch && matchesType && matchesStatus
+    })
+  }, [components, search, typeFilter, statusFilter])
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Component Catalog</h1>
+          <p className="text-muted-foreground mt-1">
+            {components.length} components registered
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        <Link href="/new">
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            New Component
+          </Button>
+        </Link>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by ID, name, or description..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            {COMPONENT_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>
+                {TYPE_LABELS[t]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {COMPONENT_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex gap-1 border rounded-md p-1">
+          <Button
+            variant={view === "grid" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setView("grid")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={view === "list" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => setView("list")}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-muted-foreground">
+          Loading components...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          {components.length === 0
+            ? "No components yet. Create your first one!"
+            : "No components match your filters."}
+        </div>
+      ) : view === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((c) => (
+            <ComponentCard key={c.id} component={c} />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((c) => (
+            <ComponentCard key={c.id} component={c} />
+          ))}
+        </div>
+      )}
     </div>
-  );
+  )
 }
