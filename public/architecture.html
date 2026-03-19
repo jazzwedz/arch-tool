@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>arch-tool — Architecture Diagrams</title>
+  <title>arch-tool — Architecture &amp; Migration Plan</title>
   <style>
     :root {
       --bg: #0f1117;
@@ -357,8 +357,8 @@
 <body>
 
 <header>
-  <h1>arch-tool — Architecture Diagrams</h1>
-  <p>Tech Stack · App/Component Architecture</p>
+  <h1>arch-tool — Architecture &amp; Migration Plan</h1>
+  <p>Tech Stack · App/Component Architecture · Enterprise Migration Plan · Deployment Requirements</p>
 </header>
 
 <!-- ══════════════════════════════════════
@@ -676,9 +676,351 @@
 
 </div><!-- .diagram-wrap -->
 
+<!-- ══════════════════════════════════════
+     MIGRATION PLAN — ENTERPRISE EDITION
+══════════════════════════════════════ -->
+<div class="section-title" style="margin-top:8px;">Migration Plan — Enterprise / Angular</div>
+<div class="diagram-wrap" style="margin-bottom:48px;">
+
+  <!-- HEADER NOTE -->
+  <div style="background:#1a1d27;border:1px solid #2e3350;border-radius:10px;padding:16px 20px;margin-bottom:28px;display:flex;gap:16px;align-items:flex-start;">
+    <span style="font-size:20px;flex-shrink:0;">📋</span>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:6px;">O čom je tento plán</div>
+      <div style="font-size:12px;color:#64748b;line-height:1.7;">
+        Aktuálna aplikácia beží ako <strong style="color:#93c5fd;">Next.js monolith</strong> (frontend + API v jednom) s dátami uloženými ako YAML súbory v GitHub.
+        Tento plán opisuje migráciu na <strong style="color:#86efac;">Angular (frontend)</strong> + <strong style="color:#fdba74;">REST API backend</strong> + <strong style="color:#c4b5fd;">PostgreSQL</strong>
+        — vhodné pre korporátne prostredie, interný Git a podnikové štandardy.
+        Backend je zatiaľ otvorená otázka — závislá od firemného stacku. <strong style="color:#fcd34d;">Technický owner vyberie variantu.</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- CURRENT VS TARGET -->
+  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:center;margin-bottom:32px;">
+
+    <!-- CURRENT -->
+    <div style="background:#22263a;border:1px solid #2e3350;border-radius:12px;padding:20px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;">Aktuálny stav (PoC)</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;"></span>
+          Next.js 14 — frontend + API v jednom
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+          GitHub.com ako dátové úložisko
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+          YAML súbory — jeden komponent / súbor
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
+          Žiadna autentifikácia
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;flex-shrink:0;"></span>
+          n8n + Claude pre doc generovanie
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0;"></span>
+          Railway (public cloud)
+        </div>
+      </div>
+    </div>
+
+    <!-- ARROW -->
+    <div style="text-align:center;padding:0 24px;">
+      <div style="font-size:28px;color:#6366f1;">→</div>
+      <div style="font-size:10px;color:#64748b;margin-top:4px;">migrácia</div>
+    </div>
+
+    <!-- TARGET -->
+    <div style="background:#22263a;border:1px solid #6366f1;border-radius:12px;padding:20px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#818cf8;text-transform:uppercase;margin-bottom:14px;">Cieľový stav (Enterprise)</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0;"></span>
+          Angular 17+ — dedikovaný frontend
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0;"></span>
+          REST API backend — firemný stack (viď varianty nižšie)
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#c084fc;flex-shrink:0;"></span>
+          PostgreSQL — relačná databáza
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+          SSO / LDAP / Azure AD autentifikácia
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+          Interný Git (GitLab / Azure DevOps)
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
+          On-prem / interný PaaS / Kubernetes
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TARGET ARCHITECTURE DIAGRAM -->
+  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">Cieľová architektúra</div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:32px;max-width:780px;margin-left:auto;margin-right:auto;">
+
+    <div style="width:100%;background:#1e3a5f;border:1px solid #3b82f6;border-radius:10px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:16px;">🌐</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#93c5fd;">Browser</div>
+          <div style="font-size:11px;color:#64748b;">Angular SPA — HTML/CSS/JS statické súbory</div>
+        </div>
+      </div>
+      <span style="font-size:10px;color:#3b82f6;background:#0f172a;padding:2px 8px;border-radius:4px;">port 80/443</span>
+    </div>
+
+    <div style="font-size:18px;color:#4b5563;">↕ HTTP/S REST</div>
+
+    <div style="width:100%;background:#431407;border:1px solid #f97316;border-radius:10px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:16px;">⚙️</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#fdba74;">REST API Backend</div>
+          <div style="font-size:11px;color:#64748b;">Všetky endpointy: /api/components · /api/generate · /api/export — viď varianty nižšie</div>
+        </div>
+      </div>
+      <span style="font-size:10px;color:#f97316;background:#0f172a;padding:2px 8px;border-radius:4px;">port 8080</span>
+    </div>
+
+    <div style="font-size:18px;color:#4b5563;">↕ SQL</div>
+
+    <div style="width:100%;background:#2e1065;border:1px solid #7c3aed;border-radius:10px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:16px;">🐘</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#c4b5fd;">PostgreSQL</div>
+          <div style="font-size:11px;color:#64748b;">Tabuľky: components · interfaces · dependencies · tags</div>
+        </div>
+      </div>
+      <span style="font-size:10px;color:#7c3aed;background:#0f172a;padding:2px 8px;border-radius:4px;">port 5432</span>
+    </div>
+
+  </div>
+
+  <!-- BACKEND OPTIONS -->
+  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">Backend varianty — na rozhodnutie technical ownera</div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:32px;">
+
+    <!-- NestJS -->
+    <div style="background:#22263a;border:1px solid #f97316;border-radius:10px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#fdba74;">NestJS</div>
+          <div style="font-size:11px;color:#64748b;">TypeScript · Node.js</div>
+        </div>
+        <span style="font-size:9px;background:#14532d;color:#86efac;padding:3px 8px;border-radius:4px;font-weight:700;">ODPORÚČANÉ</span>
+      </div>
+      <div style="font-size:11px;color:#e2e8f0;line-height:1.8;margin-bottom:10px;">
+        Rovnaký jazyk ako Angular (TypeScript). Rovnaký Dependency Injection vzor. Prirodzená dvojica — tím sa naučí oba frameworky súčasne.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="font-size:11px;color:#86efac;">✓ TypeScript end-to-end</div>
+        <div style="font-size:11px;color:#86efac;">✓ Angular-like DI pattern</div>
+        <div style="font-size:11px;color:#86efac;">✓ Prisma ORM integrácia</div>
+        <div style="font-size:11px;color:#fca5a5;">✗ Menej bežný v starých korporátoch</div>
+      </div>
+    </div>
+
+    <!-- Express.js -->
+    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#e2e8f0;">Express.js</div>
+          <div style="font-size:11px;color:#64748b;">JavaScript/TypeScript · Node.js</div>
+        </div>
+        <span style="font-size:9px;background:#1e3a5f;color:#93c5fd;padding:3px 8px;border-radius:4px;font-weight:700;">JEDNODUCHÝ</span>
+      </div>
+      <div style="font-size:11px;color:#e2e8f0;line-height:1.8;margin-bottom:10px;">
+        Minimalistický Node.js framework. Veľmi jednoduchá migrácia z Next.js API routes — takmer rovnaká syntax.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="font-size:11px;color:#86efac;">✓ Najrýchlejšia migrácia z Next.js</div>
+        <div style="font-size:11px;color:#86efac;">✓ Minimálna krivka učenia</div>
+        <div style="font-size:11px;color:#fca5a5;">✗ Menej štruktúry, viac manuálneho kódu</div>
+        <div style="font-size:11px;color:#fca5a5;">✗ Slabšie pre veľké tímy</div>
+      </div>
+    </div>
+
+    <!-- .NET Core -->
+    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#e2e8f0;">.NET / ASP.NET Core</div>
+          <div style="font-size:11px;color:#64748b;">C# · .NET 8+</div>
+        </div>
+        <span style="font-size:9px;background:#1a1040;color:#a5b4fc;padding:3px 8px;border-radius:4px;font-weight:700;">KORPORÁT</span>
+      </div>
+      <div style="font-size:11px;color:#e2e8f0;line-height:1.8;margin-bottom:10px;">
+        Najbežnejší enterprise backend v Microsoft ekosystéme. Ak firma používa Azure alebo C#, toto je prirodzená voľba.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="font-size:11px;color:#86efac;">✓ Enterprise štandard (Microsoft)</div>
+        <div style="font-size:11px;color:#86efac;">✓ Entity Framework ORM</div>
+        <div style="font-size:11px;color:#86efac;">✓ Azure AD integrácia out-of-box</div>
+        <div style="font-size:11px;color:#fca5a5;">✗ Iný jazyk ako Angular (C# vs TS)</div>
+      </div>
+    </div>
+
+    <!-- Spring Boot -->
+    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#e2e8f0;">Spring Boot</div>
+          <div style="font-size:11px;color:#64748b;">Java / Kotlin · JVM</div>
+        </div>
+        <span style="font-size:9px;background:#1a1040;color:#a5b4fc;padding:3px 8px;border-radius:4px;font-weight:700;">KORPORÁT</span>
+      </div>
+      <div style="font-size:11px;color:#e2e8f0;line-height:1.8;margin-bottom:10px;">
+        Dominantný backend v Java korporátoch. Ak firma má Java tím, je to najlepšia voľba z pohľadu údržby.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="font-size:11px;color:#86efac;">✓ Zrelý enterprise ekosystém</div>
+        <div style="font-size:11px;color:#86efac;">✓ JPA / Hibernate ORM</div>
+        <div style="font-size:11px;color:#86efac;">✓ Spring Security (SSO/OAuth2)</div>
+        <div style="font-size:11px;color:#fca5a5;">✗ Najväčší overhead pre malé projekty</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DB SCHEMA -->
+  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">PostgreSQL — navrhovaná schéma</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:32px;">
+    <div style="background:#0f172a;border:1px solid #2e1065;border-radius:10px;padding:16px;font-family:Consolas,monospace;font-size:11px;line-height:1.8;">
+      <div style="color:#94a3b8;margin-bottom:8px;font-family:'Segoe UI',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Tabuľka: components</div>
+      <div><span style="color:#c4b5fd;">id</span>          <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">PRIMARY KEY</span></div>
+      <div><span style="color:#c4b5fd;">name</span>        <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">NOT NULL</span></div>
+      <div><span style="color:#c4b5fd;">type</span>        <span style="color:#06b6d4;">component_type</span> <span style="color:#64748b;">ENUM</span></div>
+      <div><span style="color:#c4b5fd;">status</span>      <span style="color:#06b6d4;">component_status</span> <span style="color:#64748b;">ENUM</span></div>
+      <div><span style="color:#c4b5fd;">owner</span>       <span style="color:#06b6d4;">VARCHAR</span></div>
+      <div><span style="color:#c4b5fd;">desc_one</span>    <span style="color:#06b6d4;">TEXT</span> <span style="color:#64748b;">-- oneliner</span></div>
+      <div><span style="color:#c4b5fd;">desc_tech</span>   <span style="color:#06b6d4;">TEXT</span> <span style="color:#64748b;">-- technical</span></div>
+      <div><span style="color:#c4b5fd;">desc_biz</span>    <span style="color:#06b6d4;">TEXT</span> <span style="color:#64748b;">-- business</span></div>
+      <div><span style="color:#c4b5fd;">tags</span>        <span style="color:#06b6d4;">TEXT[]</span></div>
+      <div><span style="color:#c4b5fd;">risks</span>       <span style="color:#06b6d4;">TEXT[]</span></div>
+      <div><span style="color:#c4b5fd;">created_at</span>  <span style="color:#06b6d4;">TIMESTAMP</span></div>
+      <div><span style="color:#c4b5fd;">updated_at</span>  <span style="color:#06b6d4;">TIMESTAMP</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="background:#0f172a;border:1px solid #2e1065;border-radius:10px;padding:14px;font-family:Consolas,monospace;font-size:11px;line-height:1.8;">
+        <div style="color:#94a3b8;margin-bottom:6px;font-family:'Segoe UI',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">component_interfaces</div>
+        <div><span style="color:#c4b5fd;">id</span>             <span style="color:#06b6d4;">SERIAL PK</span></div>
+        <div><span style="color:#c4b5fd;">component_id</span>   <span style="color:#06b6d4;">VARCHAR FK</span></div>
+        <div><span style="color:#c4b5fd;">direction</span>      <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">-- provides/consumes</span></div>
+        <div><span style="color:#c4b5fd;">iface_type</span>     <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">-- REST/gRPC/queue</span></div>
+        <div><span style="color:#c4b5fd;">target</span>         <span style="color:#06b6d4;">VARCHAR</span></div>
+      </div>
+      <div style="background:#0f172a;border:1px solid #2e1065;border-radius:10px;padding:14px;font-family:Consolas,monospace;font-size:11px;line-height:1.8;">
+        <div style="color:#94a3b8;margin-bottom:6px;font-family:'Segoe UI',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">component_dependencies</div>
+        <div><span style="color:#c4b5fd;">component_id</span>   <span style="color:#06b6d4;">VARCHAR FK</span></div>
+        <div><span style="color:#c4b5fd;">depends_on</span>     <span style="color:#06b6d4;">VARCHAR FK</span></div>
+        <div><span style="color:#c4b5fd;">dep_type</span>       <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">-- hard/soft</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MIGRATION PHASES -->
+  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">Fázy migrácie</div>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:32px;">
+
+    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
+      <div style="min-width:36px;height:36px;background:#1e3a5f;border:2px solid #3b82f6;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#93c5fd;flex-shrink:0;">1</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#93c5fd;margin-bottom:4px;">Rozhodnutie o backende <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">1–2 dni</span></div>
+        <div style="font-size:11px;color:#64748b;line-height:1.7;">Technical owner vyberie backend variantu podľa firemného stacku. Zároveň: dostupnosť PostgreSQL instancie, interný Git server, CI/CD pipeline.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
+      <div style="min-width:36px;height:36px;background:#2e1065;border:2px solid #7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#c4b5fd;flex-shrink:0;">2</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#c4b5fd;margin-bottom:4px;">Backend + databáza <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">1 týždeň</span></div>
+        <div style="font-size:11px;color:#64748b;line-height:1.7;">PostgreSQL schéma + migrácie. REST API endpointy identické s aktuálnymi Next.js route handlers. ORM podľa zvoleného backendu (Prisma / EF Core / JPA).</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
+      <div style="min-width:36px;height:36px;background:#431407;border:2px solid #f97316;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fdba74;flex-shrink:0;">3</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fdba74;margin-bottom:4px;">Angular frontend <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">2–3 týždne</span></div>
+        <div style="font-size:11px;color:#64748b;line-height:1.7;">Angular 17+ projekt. Komponenty, routing, services. Tailwind CSS (funguje rovnako). UI library: Angular Material alebo PrimeNG (shadcn/Radix neexistuje pre Angular).</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
+      <div style="min-width:36px;height:36px;background:#14532d;border:2px solid #22c55e;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#86efac;flex-shrink:0;">4</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#86efac;margin-bottom:4px;">Auth + Korporátna integrácia <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">1 týždeň</span></div>
+        <div style="font-size:11px;color:#64748b;line-height:1.7;">SSO: Azure AD / Okta / LDAP podľa firemného štandardu. Secrets management (Vault / Key Vault). Interný Git namiesto github.com.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
+      <div style="min-width:36px;height:36px;background:#3b2504;border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fcd34d;flex-shrink:0;">5</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fcd34d;margin-bottom:4px;">Deploy + testing <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">1 týždeň</span></div>
+        <div style="font-size:11px;color:#64748b;line-height:1.7;">Docker build (frontend + backend separátne). Kubernetes / interný PaaS deployment. CI/CD pipeline (GitLab CI / Azure DevOps / Jenkins). E2E testy.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- EFFORT TABLE -->
+  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">Odhad náročnosti</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;text-align:center;">
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Solo developer</div>
+      <div style="font-size:28px;font-weight:700;color:#f97316;">6</div>
+      <div style="font-size:12px;color:#fdba74;margin-bottom:4px;">týždňov</div>
+      <div style="font-size:11px;color:#64748b;">sekvenčná práca</div>
+    </div>
+    <div style="background:#22263a;border:1px solid #6366f1;border-radius:10px;padding:16px;text-align:center;">
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px;">2 devs (FE + BE)</div>
+      <div style="font-size:28px;font-weight:700;color:#818cf8;">3–4</div>
+      <div style="font-size:12px;color:#a5b4fc;margin-bottom:4px;">týždne</div>
+      <div style="font-size:11px;color:#64748b;">paralelná práca</div>
+    </div>
+    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;text-align:center;">
+      <div style="font-size:11px;color:#64748b;margin-bottom:8px;">S Claude Code</div>
+      <div style="font-size:28px;font-weight:700;color:#22c55e;">↓50%</div>
+      <div style="font-size:12px;color:#86efac;margin-bottom:4px;">rýchlejšie</div>
+      <div style="font-size:11px;color:#64748b;">generovanie kódu + review</div>
+    </div>
+  </div>
+
+  <!-- WHAT STAYS THE SAME -->
+  <div style="margin-top:24px;background:#14532d22;border:1px solid #14532d;border-radius:10px;padding:16px 20px;">
+    <div style="font-size:12px;font-weight:600;color:#86efac;margin-bottom:10px;">✓ Čo sa NEMENÍ — rovnaké vo všetkých variantách</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">TypeScript</span>
+      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">Tailwind CSS</span>
+      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">REST API štruktúra (rovnaké endpointy)</span>
+      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">Dátový model (Component, Interface, Dependency...)</span>
+      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">Draw.io export</span>
+      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">Celková business logika</span>
+    </div>
+  </div>
+
+</div><!-- .diagram-wrap / migration plan -->
+
 <!-- DIAGRAM 3 — DEPLOYMENT REQUIREMENTS -->
+<div class="section-title">Diagram 3 — Deployment Requirements</div>
 <div class="diagram-wrap">
-  <div class="diagram-label">DIAGRAM 3 — DEPLOYMENT REQUIREMENTS</div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-top:1rem;">
 
@@ -792,8 +1134,8 @@
 </div><!-- .diagram-wrap -->
 
 <!-- DIAGRAM 4 — ENVIRONMENT CHECKS (PowerShell) -->
+<div class="section-title">Diagram 4 — Environment Checks (PowerShell)</div>
 <div class="diagram-wrap">
-  <div class="diagram-label">DIAGRAM 4 — ENVIRONMENT CHECKS (PowerShell)</div>
   <p style="font-size:0.78rem;color:#64748b;margin:0.5rem 0 1.25rem;">Každý príkaz vlož samostatne do PowerShell konzoly. Zelený výstup = OK, červený = treba doinštalovať.</p>
 
   <div style="display:flex;flex-direction:column;gap:1.25rem;">
