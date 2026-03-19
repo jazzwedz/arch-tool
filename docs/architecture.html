@@ -676,5 +676,120 @@
 
 </div><!-- .diagram-wrap -->
 
+<!-- DIAGRAM 3 — DEPLOYMENT REQUIREMENTS -->
+<div class="diagram-wrap">
+  <div class="diagram-label">DIAGRAM 3 — DEPLOYMENT REQUIREMENTS</div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-top:1rem;">
+
+    <!-- Runtime -->
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.25rem;">
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#94a3b8;margin-bottom:1rem;text-transform:uppercase;">Runtime</div>
+      <div style="display:flex;flex-direction:column;gap:0.6rem;">
+        <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:0.6rem 0.9rem;display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#60a5fa;font-weight:600;">Node.js</span>
+          <span style="font-size:0.72rem;color:#94a3b8;background:#1e3a5f;padding:2px 8px;border-radius:4px;">≥ 18, odp. 22+</span>
+        </div>
+        <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:0.6rem 0.9rem;display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#60a5fa;font-weight:600;">npm</span>
+          <span style="font-size:0.72rem;color:#94a3b8;background:#1e3a5f;padding:2px 8px;border-radius:4px;">≥ 9 (s Node.js)</span>
+        </div>
+        <div style="margin-top:0.5rem;font-size:0.72rem;color:#64748b;line-height:1.5;">
+          Žiadna DB · Žiadny Redis · Žiadny Docker<br>Len Node.js
+        </div>
+        <div style="margin-top:0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:0.75rem;">
+          <div style="font-size:0.68rem;color:#64748b;margin-bottom:0.4rem;">Build &amp; Start</div>
+          <code style="font-size:0.72rem;color:#86efac;display:block;line-height:1.8;">
+            npm install<br>
+            npm run build<br>
+            npm start
+          </code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Environment variables -->
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.25rem;">
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#94a3b8;margin-bottom:1rem;text-transform:uppercase;">Environment Variables</div>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;">
+        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <code style="color:#86efac;font-size:0.78rem;">GITHUB_TOKEN</code>
+            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
+          </div>
+          <div style="font-size:0.68rem;color:#64748b;">PAT s repo scope</div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <code style="color:#86efac;font-size:0.78rem;">GITHUB_OWNER</code>
+            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
+          </div>
+          <div style="font-size:0.68rem;color:#64748b;">vlastník GitHub repo</div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <code style="color:#86efac;font-size:0.78rem;">GITHUB_REPO</code>
+            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
+          </div>
+          <div style="font-size:0.68rem;color:#64748b;">repo s YAML komponentmi</div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <code style="color:#86efac;font-size:0.78rem;">GITHUB_BRANCH</code>
+            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
+          </div>
+          <div style="font-size:0.68rem;color:#64748b;">napr. main</div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #312e81;border-radius:8px;padding:0.6rem 0.9rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <code style="color:#a5b4fc;font-size:0.78rem;">N8N_ARCH_WEBHOOK_URL</code>
+            <span style="font-size:0.65rem;color:#64748b;font-weight:600;">voliteľné</span>
+          </div>
+          <div style="font-size:0.68rem;color:#64748b;">URL n8n webhooku pre doc gen</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- External dependencies -->
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.25rem;">
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#94a3b8;margin-bottom:1rem;text-transform:uppercase;">Externé závislosti</div>
+      <div style="display:flex;flex-direction:column;gap:0.6rem;">
+        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="color:#22c55e;font-weight:600;font-size:0.85rem;">GitHub repo</span>
+            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
+          </div>
+          <div style="font-size:0.68rem;color:#64748b;">Úložisko komponentov<br>(YAML súbory)</div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #312e81;border-radius:8px;padding:0.6rem 0.9rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="color:#8b5cf6;font-weight:600;font-size:0.85rem;">n8n instance</span>
+            <span style="font-size:0.65rem;color:#64748b;font-weight:600;">voliteľné</span>
+          </div>
+          <div style="font-size:0.68rem;color:#64748b;">Generovanie POC dokumentácie<br>(self-hosted alebo cloud)</div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #312e81;border-radius:8px;padding:0.6rem 0.9rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="color:#c084fc;font-weight:600;font-size:0.85rem;">Anthropic API</span>
+            <span style="font-size:0.65rem;color:#64748b;font-weight:600;">voliteľné</span>
+          </div>
+          <div style="font-size:0.68rem;color:#64748b;">LLM v n8n workflow<br>(nastavené v n8n, nie v app)</div>
+        </div>
+        <div style="margin-top:0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:0.75rem;">
+          <div style="font-size:0.68rem;color:#64748b;margin-bottom:0.5rem;">Kompatibilné platformy</div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">Railway</span>
+            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">Vercel</span>
+            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">Render</span>
+            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">Docker</span>
+            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">VPS</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- .diagram-wrap -->
+
 </body>
 </html>
