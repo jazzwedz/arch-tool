@@ -791,5 +791,117 @@
   </div>
 </div><!-- .diagram-wrap -->
 
+<!-- DIAGRAM 4 — ENVIRONMENT CHECKS (PowerShell) -->
+<div class="diagram-wrap">
+  <div class="diagram-label">DIAGRAM 4 — ENVIRONMENT CHECKS (PowerShell)</div>
+  <p style="font-size:0.78rem;color:#64748b;margin:0.5rem 0 1.25rem;">Každý príkaz vlož samostatne do PowerShell konzoly. Zelený výstup = OK, červený = treba doinštalovať.</p>
+
+  <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+    <!-- Node.js -->
+    <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;">
+      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3a5f;">
+        <span style="color:#60a5fa;font-weight:700;font-size:0.85rem;">① Node.js</span>
+        <span style="font-size:0.68rem;color:#ef4444;font-weight:600;">povinné · min. v18</span>
+      </div>
+      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Skontroluj verziu Node.js</span>
+$v = node --version 2&gt;&amp;1
+if ($LASTEXITCODE -eq 0) {
+    $major = [int]($v -replace 'v(\d+).*','$1')
+    if ($major -ge 18) { Write-Host "✅ Node.js $v (OK)" -ForegroundColor Green }
+    else { Write-Host "❌ Node.js $v — potrebuješ v18+" -ForegroundColor Red }
+} else { Write-Host "❌ Node.js nie je nainštalovaný — https://nodejs.org" -ForegroundColor Red }</code></pre>
+    </div>
+
+    <!-- npm -->
+    <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;">
+      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3a5f;">
+        <span style="color:#60a5fa;font-weight:700;font-size:0.85rem;">② npm</span>
+        <span style="font-size:0.68rem;color:#ef4444;font-weight:600;">povinné · min. v9</span>
+      </div>
+      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Skontroluj verziu npm</span>
+$v = npm --version 2&gt;&amp;1
+if ($LASTEXITCODE -eq 0) {
+    $major = [int]($v -split '\.')[0]
+    if ($major -ge 9) { Write-Host "✅ npm $v (OK)" -ForegroundColor Green }
+    else { Write-Host "❌ npm $v — potrebuješ v9+" -ForegroundColor Red }
+} else { Write-Host "❌ npm nie je nainštalovaný — príde s Node.js" -ForegroundColor Red }</code></pre>
+    </div>
+
+    <!-- GitHub token -->
+    <div style="background:#0f172a;border:1px solid #14532d;border-radius:10px;overflow:hidden;">
+      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #14532d;">
+        <span style="color:#22c55e;font-weight:700;font-size:0.85rem;">③ GitHub Token</span>
+        <span style="font-size:0.68rem;color:#ef4444;font-weight:600;">povinné · repo scope</span>
+      </div>
+      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Nastav token a otestuj GitHub API autentifikáciu</span>
+$token = $env:GITHUB_TOKEN  <span style="color:#64748b"># alebo vlož priamo: $token = "ghp_..."</span>
+$r = Invoke-RestMethod -Uri "https://api.github.com/user" `
+     -Headers @{ Authorization="token $token"; "User-Agent"="arch-tool-check" } `
+     -ErrorAction SilentlyContinue
+if ($r.login) { Write-Host "✅ GitHub Token OK — prihlásený ako: $($r.login)" -ForegroundColor Green }
+else { Write-Host "❌ GitHub Token neplatný alebo chýba GITHUB_TOKEN env var" -ForegroundColor Red }</code></pre>
+    </div>
+
+    <!-- GitHub repo access -->
+    <div style="background:#0f172a;border:1px solid #14532d;border-radius:10px;overflow:hidden;">
+      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #14532d;">
+        <span style="color:#22c55e;font-weight:700;font-size:0.85rem;">④ GitHub Repo prístup</span>
+        <span style="font-size:0.68rem;color:#ef4444;font-weight:600;">povinné · read+write</span>
+      </div>
+      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Skontroluj prístup k dátovému repozitáru</span>
+$token = $env:GITHUB_TOKEN
+$owner = $env:GITHUB_OWNER  <span style="color:#64748b"># alebo vlož priamo: $owner = "jazzwedz"</span>
+$repo  = $env:GITHUB_REPO   <span style="color:#64748b"># alebo vlož priamo: $repo  = "arch-data"</span>
+$r = Invoke-RestMethod -Uri "https://api.github.com/repos/$owner/$repo" `
+     -Headers @{ Authorization="token $token"; "User-Agent"="arch-tool-check" } `
+     -ErrorAction SilentlyContinue
+if ($r.full_name) {
+    $push = if ($r.permissions.push) {"✅ push"} else {"⚠️ len read"}
+    Write-Host "✅ Repo $($r.full_name) dostupný — oprávnenia: $push" -ForegroundColor Green
+} else { Write-Host "❌ Repo nedostupný — skontroluj GITHUB_OWNER, GITHUB_REPO, token scope" -ForegroundColor Red }</code></pre>
+    </div>
+
+    <!-- n8n webhook -->
+    <div style="background:#0f172a;border:1px solid #312e81;border-radius:10px;overflow:hidden;">
+      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #312e81;">
+        <span style="color:#a5b4fc;font-weight:700;font-size:0.85rem;">⑤ n8n Webhook</span>
+        <span style="font-size:0.68rem;color:#64748b;font-weight:600;">voliteľné</span>
+      </div>
+      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Otestuj dostupnosť n8n webhook URL</span>
+$url = $env:N8N_ARCH_WEBHOOK_URL  <span style="color:#64748b"># alebo vlož priamo: $url = "https://..."</span>
+if (-not $url) { Write-Host "⏭️  N8N_ARCH_WEBHOOK_URL nie je nastavené — doc generovanie nebude fungovať" -ForegroundColor Yellow }
+else {
+    try {
+        $r = Invoke-WebRequest -Uri $url -Method POST `
+             -Headers @{ "Content-Type"="application/json"; "X-N8N-Webhook-Secret"="arch-tool-secret-2024" } `
+             -Body '{"test":true}' -TimeoutSec 10 -ErrorAction Stop
+        Write-Host "✅ n8n webhook dostupný (HTTP $($r.StatusCode))" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ n8n webhook nedostupný — $($_.Exception.Message)" -ForegroundColor Red
+    }
+}</code></pre>
+    </div>
+
+    <!-- Build test -->
+    <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;overflow:hidden;">
+      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;">
+        <span style="color:#e2e8f0;font-weight:700;font-size:0.85rem;">⑥ Build test (voliteľné)</span>
+        <span style="font-size:0.68rem;color:#64748b;font-weight:600;">spusti v root priečinku projektu</span>
+      </div>
+      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Otestuj či sa projekt dá zbuildovať (spusti v koreňovom priečinku arch-tool)</span>
+Push-Location &lt;cesta-k-arch-tool&gt;  <span style="color:#64748b"># napr. Push-Location C:\SRDEV\arch-tool</span>
+npm install --silent
+if ($LASTEXITCODE -eq 0) { Write-Host "✅ npm install OK" -ForegroundColor Green }
+else { Write-Host "❌ npm install zlyhalo" -ForegroundColor Red; Pop-Location; return }
+npm run build 2&gt;&amp;1 | Select-Object -Last 5
+if ($LASTEXITCODE -eq 0) { Write-Host "✅ Build úspešný" -ForegroundColor Green }
+else { Write-Host "❌ Build zlyhal — skontroluj výstup vyššie" -ForegroundColor Red }
+Pop-Location</code></pre>
+    </div>
+
+  </div>
+</div><!-- .diagram-wrap -->
+
 </body>
 </html>
