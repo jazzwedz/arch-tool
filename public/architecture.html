@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>arch-tool — Architecture Diagrams</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --accent: #6366f1;
+      --accent2: #818cf8;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --cyan: #06b6d4;
+      --pink: #ec4899;
+      --orange: #f97316;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --label: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      padding: 40px 32px;
+      min-height: 100vh;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent2);
+      letter-spacing: -0.5px;
+    }
+    header p {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 14px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--label);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-size: 11px;
+      margin-bottom: 24px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    /* ── DIAGRAM WRAPPER ── */
+    .diagram-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 48px;
+      overflow-x: auto;
+    }
+
+    /* ══════════════════════════════════════════
+       DIAGRAM 1 — TECH STACK (vertical layers)
+    ══════════════════════════════════════════ */
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .layer {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 72px;
+    }
+
+    .layer-label {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #fff;
+      padding: 12px 10px;
+      min-width: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .layer-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 14px 20px;
+      background: var(--surface2);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .chip .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .chip-note {
+      font-size: 10px;
+      color: var(--muted);
+      margin-left: 2px;
+    }
+
+    /* layer colours */
+    .l-client    .layer-label { background: #374151; }
+    .l-frontend  .layer-label { background: #1d4ed8; }
+    .l-api       .layer-label { background: #0e7490; }
+    .l-data      .layer-label { background: #15803d; }
+    .l-ai        .layer-label { background: #7c3aed; }
+    .l-infra     .layer-label { background: #b45309; }
+
+    /* chip styles */
+    .chip-blue   { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+    .chip-blue   .dot { background: #3b82f6; }
+    .chip-cyan   { background: #0c3344; border-color: #06b6d4; color: #67e8f9; }
+    .chip-cyan   .dot { background: #06b6d4; }
+    .chip-green  { background: #14532d; border-color: #22c55e; color: #86efac; }
+    .chip-green  .dot { background: #22c55e; }
+    .chip-purple { background: #2e1065; border-color: #8b5cf6; color: #c4b5fd; }
+    .chip-purple .dot { background: #8b5cf6; }
+    .chip-orange { background: #431407; border-color: #f97316; color: #fdba74; }
+    .chip-orange .dot { background: #f97316; }
+    .chip-gray   { background: #1f2937; border-color: #4b5563; color: #9ca3af; }
+    .chip-gray   .dot { background: #9ca3af; }
+    .chip-pink   { background: #4a044e; border-color: #ec4899; color: #f9a8d4; }
+    .chip-pink   .dot { background: #ec4899; }
+    .chip-yellow { background: #3b2504; border-color: #f59e0b; color: #fcd34d; }
+    .chip-yellow .dot { background: #f59e0b; }
+
+    /* arrows between layers */
+    .layer-arrow {
+      text-align: center;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1;
+      margin: -4px 0;
+    }
+
+    /* ══════════════════════════════════════════
+       DIAGRAM 2 — APP / COMPONENT
+    ══════════════════════════════════════════ */
+    .app-diagram {
+      display: grid;
+      grid-template-columns: 220px 1fr 200px;
+      grid-template-rows: auto auto auto;
+      gap: 0;
+      max-width: 960px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .box-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .box-title .badge {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .route-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .route-item:last-child { border-bottom: none; }
+    .method {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .GET    { background: #14532d; color: #86efac; }
+    .POST   { background: #1e3a5f; color: #93c5fd; }
+    .route-path { font-family: 'Consolas', monospace; color: var(--label); flex: 1; }
+    .route-desc { color: var(--muted); font-size: 11px; }
+
+    .lib-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .lib-item:last-child { border-bottom: none; }
+    .lib-file { font-family: 'Consolas', monospace; color: var(--cyan); }
+    .lib-desc { color: var(--muted); font-size: 11px; }
+
+    /* grid layout for app diagram */
+    .col-pages   { grid-column: 1; grid-row: 1 / 4; margin-right: 16px; }
+    .col-api     { grid-column: 2; grid-row: 1; margin-bottom: 12px; }
+    .col-lib     { grid-column: 2; grid-row: 2; margin-bottom: 12px; }
+    .col-types   { grid-column: 2; grid-row: 3; }
+    .col-ext     { grid-column: 3; grid-row: 1 / 4; margin-left: 16px; }
+
+    .ext-service {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .ext-service:last-child { margin-bottom: 0; }
+    .ext-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ext-detail { font-size: 11px; color: var(--muted); }
+
+    .ext-github { background: #1f2937; border: 1px solid #374151; }
+    .ext-n8n    { background: #1a1040; border: 1px solid #4c1d95; }
+    .ext-ai     { background: #1a0b2e; border: 1px solid #6d28d9; }
+    .ext-drawio { background: #1a1000; border: 1px solid #92400e; }
+    .ext-deploy { background: #0c2340; border: 1px solid #1d4ed8; }
+
+    /* n8n internal flow */
+    .n8n-flow {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .n8n-step {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: #a78bfa;
+    }
+    .n8n-arrow { color: var(--muted); }
+
+    /* connector arrows (SVG overlay) */
+    .conn-label {
+      font-size: 10px;
+      color: var(--muted);
+      background: var(--surface);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    /* model entities */
+    .model-section { margin-top: 8px; }
+    .model-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .model-fields {
+      font-family: 'Consolas', monospace;
+      font-size: 11px;
+      color: var(--label);
+      line-height: 1.7;
+    }
+    .field-type { color: var(--cyan); }
+    .field-opt  { color: var(--muted); }
+
+    /* legend */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .legend-line {
+      width: 24px;
+      height: 2px;
+      border-radius: 1px;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+
+    .icon { font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>arch-tool — Architecture Diagrams</h1>
+  <p>Tech Stack · App/Component Architecture</p>
+</header>
+
+<!-- ══════════════════════════════════════
+     DIAGRAM 1 — TECH STACK
+══════════════════════════════════════ -->
+<div class="section-title">Diagram 1 — Tech Stack</div>
+<div class="diagram-wrap">
+  <div class="stack">
+
+    <!-- CLIENT -->
+    <div class="layer l-client">
+      <div class="layer-label">Client</div>
+      <div class="layer-content">
+        <span class="chip chip-gray"><span class="dot"></span>Browser</span>
+        <span class="chip chip-gray"><span class="dot"></span>React Server Components <span class="chip-note">RSC</span></span>
+        <span class="chip chip-gray"><span class="dot"></span>React Client Components <span class="chip-note">'use client'</span></span>
+      </div>
+    </div>
+
+    <div class="layer-arrow">↕</div>
+
+    <!-- FRONTEND -->
+    <div class="layer l-frontend">
+      <div class="layer-label">Frontend</div>
+      <div class="layer-content">
+        <span class="chip chip-blue"><span class="dot"></span>Next.js 14 <span class="chip-note">App Router</span></span>
+        <span class="chip chip-blue"><span class="dot"></span>TypeScript</span>
+        <span class="chip chip-cyan"><span class="dot"></span>Tailwind CSS</span>
+        <span class="chip chip-cyan"><span class="dot"></span>shadcn/ui <span class="chip-note">optional</span></span>
+        <span class="chip chip-blue"><span class="dot"></span>js-yaml</span>
+      </div>
+    </div>
+
+    <div class="layer-arrow">↕</div>
+
+    <!-- API -->
+    <div class="layer l-api">
+      <div class="layer-label">API</div>
+      <div class="layer-content">
+        <span class="chip chip-cyan"><span class="dot"></span>Next.js API Routes <span class="chip-note">Route Handlers</span></span>
+        <span class="chip chip-cyan"><span class="dot"></span>GET /api/components</span>
+        <span class="chip chip-cyan"><span class="dot"></span>POST /api/components</span>
+        <span class="chip chip-cyan"><span class="dot"></span>POST /api/generate</span>
+        <span class="chip chip-cyan"><span class="dot"></span>GET /api/export/drawio</span>
+      </div>
+    </div>
+
+    <div class="layer-arrow">↕</div>
+
+    <!-- DATA -->
+    <div class="layer l-data">
+      <div class="layer-label">Data</div>
+      <div class="layer-content">
+        <span class="chip chip-green"><span class="dot"></span>GitHub API <span class="chip-note">REST v3</span></span>
+        <span class="chip chip-green"><span class="dot"></span>arch-data repo <span class="chip-note">jazzwedz/arch-data</span></span>
+        <span class="chip chip-green"><span class="dot"></span>YAML per component <span class="chip-note">/components/{id}.yaml</span></span>
+        <span class="chip chip-gray"><span class="dot"></span>No DB — Git as storage</span>
+      </div>
+    </div>
+
+    <div class="layer-arrow">↕</div>
+
+    <!-- AI / AUTOMATION -->
+    <div class="layer l-ai">
+      <div class="layer-label">AI / Auto</div>
+      <div class="layer-content">
+        <span class="chip chip-purple"><span class="dot"></span>n8n <span class="chip-note">staging.railway.app</span></span>
+        <span class="chip chip-purple"><span class="dot"></span>Webhook <span class="chip-note">POST /arch-doc-gen</span></span>
+        <span class="chip chip-purple"><span class="dot"></span>Basic LLM Chain</span>
+        <span class="chip chip-pink"><span class="dot"></span>Anthropic Claude <span class="chip-note">claude-sonnet-4-5</span></span>
+        <span class="chip chip-gray"><span class="dot"></span>Header Auth <span class="chip-note">X-N8N-Webhook-Secret</span></span>
+      </div>
+    </div>
+
+    <div class="layer-arrow">↕</div>
+
+    <!-- INFRA -->
+    <div class="layer l-infra">
+      <div class="layer-label">Infra</div>
+      <div class="layer-content">
+        <span class="chip chip-orange"><span class="dot"></span>Railway <span class="chip-note">arch-tool-production</span></span>
+        <span class="chip chip-orange"><span class="dot"></span>GitHub <span class="chip-note">jazzwedz/arch-tool</span></span>
+        <span class="chip chip-yellow"><span class="dot"></span>Draw.io <span class="chip-note">mxlibrary export</span></span>
+        <span class="chip chip-gray"><span class="dot"></span>Env Vars <span class="chip-note">GITHUB_TOKEN · N8N_ARCH_WEBHOOK_URL</span></span>
+      </div>
+    </div>
+
+  </div><!-- .stack -->
+</div><!-- .diagram-wrap -->
+
+
+<!-- ══════════════════════════════════════
+     DIAGRAM 2 — APP / COMPONENT
+══════════════════════════════════════ -->
+<div class="section-title">Diagram 2 — App / Component Architecture</div>
+<div class="diagram-wrap">
+  <div class="app-diagram">
+
+    <!-- PAGES (left column) -->
+    <div class="box col-pages">
+      <div class="box-title">
+        <span class="icon">🖥</span> Pages / Routes
+        <span class="badge" style="background:#1e3a5f;color:#93c5fd">Next.js App Router</span>
+      </div>
+
+      <div class="route-item">
+        <span class="method GET">GET</span>
+        <div>
+          <div class="route-path">/</div>
+          <div class="route-desc">Dashboard — zoznam komponentov</div>
+        </div>
+      </div>
+      <div class="route-item">
+        <span class="method GET">GET</span>
+        <div>
+          <div class="route-path">/components/[id]</div>
+          <div class="route-desc">Detail komponentu, generovanie doc</div>
+        </div>
+      </div>
+
+      <div class="box-title" style="margin-top:18px">
+        <span class="icon">⚡</span> API Route Handlers
+      </div>
+
+      <div class="route-item">
+        <span class="method GET">GET</span>
+        <div>
+          <div class="route-path">/api/components</div>
+          <div class="route-desc">Načítaj všetky z GitHub</div>
+        </div>
+      </div>
+      <div class="route-item">
+        <span class="method POST">POST</span>
+        <div>
+          <div class="route-path">/api/components</div>
+          <div class="route-desc">Vytvor nový komponent</div>
+        </div>
+      </div>
+      <div class="route-item">
+        <span class="method GET">GET</span>
+        <div>
+          <div class="route-path">/api/components/[id]</div>
+          <div class="route-desc">Načítaj jeden komponent</div>
+        </div>
+      </div>
+      <div class="route-item">
+        <span class="method POST">POST</span>
+        <div>
+          <div class="route-path">/api/generate</div>
+          <div class="route-desc">Volá n8n webhook → AI doc</div>
+        </div>
+      </div>
+      <div class="route-item">
+        <span class="method GET">GET</span>
+        <div>
+          <div class="route-path">/api/export/drawio</div>
+          <div class="route-desc">Generuj .drawio mxlibrary XML</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API / LIB / TYPES (centre column) -->
+    <div class="box col-api">
+      <div class="box-title"><span class="icon">📦</span> Lib / Utilities</div>
+
+      <div class="lib-item">
+        <span class="lib-file">lib/github.ts</span>
+        <span class="lib-desc">GitHub API client — read/write YAML</span>
+      </div>
+      <div class="lib-item">
+        <span class="lib-file">lib/drawio.ts</span>
+        <span class="lib-desc">mxlibrary XML generator</span>
+      </div>
+      <div class="lib-item">
+        <span class="lib-file">lib/types.ts</span>
+        <span class="lib-desc">Shared TypeScript interfaces</span>
+      </div>
+      <div class="lib-item">
+        <span class="lib-file">lib/constants.ts</span>
+        <span class="lib-desc">Typy, farby, ikony komponentov</span>
+      </div>
+      <div class="lib-item">
+        <span class="lib-file">lib/utils.ts</span>
+        <span class="lib-desc">Helper funkcie</span>
+      </div>
+    </div>
+
+    <div class="box col-lib">
+      <div class="box-title"><span class="icon">🔷</span> Dátový model — Component</div>
+      <div class="model-fields">
+        <div><span style="color:var(--accent2)">id</span>: <span class="field-type">string</span></div>
+        <div><span style="color:var(--accent2)">name</span>: <span class="field-type">string</span></div>
+        <div><span style="color:var(--accent2)">type</span>: <span class="field-type">ComponentType</span> <span class="field-opt">// microservice | frontend | db | ...</span></div>
+        <div><span style="color:var(--accent2)">status</span>: <span class="field-type">ComponentStatus</span> <span class="field-opt">// draft | production | deprecated</span></div>
+        <div><span style="color:var(--accent2)">owner</span>: <span class="field-type">string</span></div>
+        <div><span style="color:var(--accent2)">description</span>: <span class="field-type">ComponentDescription</span> <span class="field-opt">// oneliner | technical | business</span></div>
+        <div><span style="color:var(--accent2)">interfaces</span>: <span class="field-type">ComponentInterface[]</span> <span class="field-opt">// provides/consumes, type, target</span></div>
+        <div><span style="color:var(--accent2)">dependencies</span>: <span class="field-type">ComponentDependency[]</span></div>
+        <div><span style="color:var(--accent2)">tags</span>: <span class="field-type">string[]</span></div>
+        <div><span style="color:var(--accent2)">risks</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>
+        <div><span style="color:var(--accent2)">diagram</span>: <span class="field-type">ComponentDiagram</span> <span class="field-opt">? // color, shape</span></div>
+      </div>
+    </div>
+
+    <div class="box col-types">
+      <div class="box-title"><span class="icon">💾</span> Storage — GitHub (arch-data)</div>
+      <div style="font-family:Consolas,monospace;font-size:11px;color:var(--label);line-height:1.8">
+        <div>📁 arch-data/</div>
+        <div style="padding-left:16px">📁 components/</div>
+        <div style="padding-left:32px">📄 <span style="color:var(--cyan)">{id}.yaml</span> <span style="color:var(--muted)">← jeden komponent</span></div>
+        <div style="padding-left:32px">📄 <span style="color:var(--cyan)">{id}.yaml</span></div>
+        <div style="padding-left:32px">📄 <span style="color:var(--muted)">...</span></div>
+      </div>
+    </div>
+
+    <!-- EXTERNAL (right column) -->
+    <div class="col-ext">
+      <div class="ext-service ext-github">
+        <div class="ext-title">
+          <span>🐙</span> GitHub API
+        </div>
+        <div class="ext-detail">
+          repo: jazzwedz/arch-data<br>
+          branch: main<br>
+          auth: GITHUB_TOKEN<br>
+          format: YAML per file
+        </div>
+      </div>
+
+      <div class="ext-service ext-n8n">
+        <div class="ext-title">
+          <span>⚙️</span> n8n Workflow
+        </div>
+        <div class="ext-detail">
+          n8n-staging-5eae.up.railway.app<br>
+          POST /webhook/arch-doc-gen<br>
+          auth: X-N8N-Webhook-Secret
+        </div>
+        <div class="n8n-flow">
+          <div class="n8n-step">🔗 Webhook trigger</div>
+          <div class="n8n-step"><span class="n8n-arrow">↓</span> Basic LLM Chain</div>
+          <div class="n8n-step"><span class="n8n-arrow">↓</span> Code (JSON parse)</div>
+          <div class="n8n-step"><span class="n8n-arrow">↓</span> Respond to Webhook</div>
+        </div>
+      </div>
+
+      <div class="ext-service ext-ai">
+        <div class="ext-title">
+          <span>🤖</span> Anthropic Claude
+        </div>
+        <div class="ext-detail">
+          model: claude-sonnet-4-5<br>
+          creds v n8n: Anthropic account<br>
+          prompt: per audience<br>
+          output: JSON doc
+        </div>
+      </div>
+
+      <div class="ext-service ext-drawio">
+        <div class="ext-title">
+          <span>📐</span> Draw.io Export
+        </div>
+        <div class="ext-detail">
+          format: mxlibrary XML<br>
+          HTML-encode: &lt; &gt; only<br>
+          download: .drawio file
+        </div>
+      </div>
+
+      <div class="ext-service ext-deploy">
+        <div class="ext-title">
+          <span>🚂</span> Railway
+        </div>
+        <div class="ext-detail">
+          project: modest-charisma<br>
+          repo: jazzwedz/arch-tool<br>
+          url: arch-tool-production<br>&nbsp;&nbsp;&nbsp;&nbsp;.up.railway.app
+        </div>
+      </div>
+    </div>
+
+  </div><!-- .app-diagram -->
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-line" style="background:#3b82f6"></div>
+      Next.js / frontend
+    </div>
+    <div class="legend-item">
+      <div class="legend-line" style="background:#06b6d4"></div>
+      API Routes
+    </div>
+    <div class="legend-item">
+      <div class="legend-line" style="background:#22c55e"></div>
+      GitHub / Data
+    </div>
+    <div class="legend-item">
+      <div class="legend-line" style="background:#8b5cf6"></div>
+      n8n / AI Automation
+    </div>
+    <div class="legend-item">
+      <div class="legend-line" style="background:#f97316"></div>
+      Infrastructure
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#86efac"></div>
+      GET request
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#93c5fd"></div>
+      POST request
+    </div>
+  </div>
+
+</div><!-- .diagram-wrap -->
+
+</body>
+</html>
