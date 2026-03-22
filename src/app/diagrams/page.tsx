@@ -104,15 +104,10 @@ export default function DiagramsPage() {
     if (previewDiagram) {
       setPreviewLoading(true)
       setPreviewImage(null)
-      fetch("https://convert.diagrams.net/node/export", {
+      fetch("/api/diagrams/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          xml: previewDiagram.content,
-          format: "png",
-          scale: 2,
-          border: 20,
-        }),
+        body: JSON.stringify({ xml: previewDiagram.content }),
       })
         .then((res) => {
           if (!res.ok) throw new Error("Export failed")
