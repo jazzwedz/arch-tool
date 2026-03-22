@@ -27,6 +27,8 @@ import {
   Copy,
   Check,
   X,
+  Upload,
+  Trash2,
 } from "lucide-react"
 import Link from "next/link"
 import type { Component, DiagramWithSha } from "@/lib/types"
@@ -98,6 +100,9 @@ export default function GeneratePage() {
   const [componentDiagrams, setComponentDiagrams] = useState<string[]>([])
   const [showDocModal, setShowDocModal] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [bizReqFile, setBizReqFile] = useState<{ name: string; content: string } | null>(null)
+  const [erdFile, setErdFile] = useState<{ name: string; content: string } | null>(null)
+  const [bpmnFile, setBpmnFile] = useState<{ name: string; content: string } | null>(null)
   const docContentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -177,6 +182,20 @@ export default function GeneratePage() {
     }
   }
 
+  const handleAttachment = async (
+    file: File,
+    allowedExt: string,
+    setter: (val: { name: string; content: string } | null) => void
+  ) => {
+    const ext = file.name.toLowerCase().split(".").pop()
+    if (ext !== allowedExt) {
+      alert(`Only .${allowedExt} files are accepted.`)
+      return
+    }
+    const content = await file.text()
+    setter({ name: file.name, content })
+  }
+
   const handleGenerate = async () => {
     if (selectionMode === "component" && !selectedComponent) return
     if (selectionMode === "diagram" && !selectedDiagramName) return
@@ -187,12 +206,18 @@ export default function GeneratePage() {
     try {
       let body: Record<string, unknown>
 
+      const attachments: Record<string, string> = {}
+      if (bizReqFile) attachments.businessRequirement = bizReqFile.content
+      if (erdFile) attachments.dataModel = erdFile.content
+      if (bpmnFile) attachments.processModel = bpmnFile.content
+
       if (selectionMode === "component" && selectedComponent) {
         const yamlContent = yaml.dump(selectedComponent)
         body = {
           componentId: selectedComponentId,
           audience,
           yamlContent,
+          attachments,
         }
       } else {
         body = {
@@ -202,6 +227,7 @@ export default function GeneratePage() {
             .filter((m) => m.component)
             .map((m) => yaml.dump(m.component!))
             .join("\n---\n"),
+          attachments,
         }
       }
 
@@ -384,6 +410,109 @@ export default function GeneratePage() {
                 <SelectItem value="Executive">Executive</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Optional attachments */}
+          <div className="space-y-3 pt-2 border-t">
+            <Label className="text-muted-foreground text-xs uppercase tracking-wide">
+              Optional context (not stored, used only for generation)
+            </Label>
+
+            {/* Business Requirement */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Business Requirement</p>
+                <p className="text-xs text-muted-foreground">Only .pdf files</p>
+              </div>
+              {bizReqFile ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono truncate max-w-[160px]">{bizReqFile.name}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setBizReqFile(null)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <label className="cursor-pointer">
+                  <Button variant="outline" size="sm" asChild>
+                    <span><Upload className="h-3.5 w-3.5 mr-1" />Attach</span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) handleAttachment(f, "pdf", setBizReqFile)
+                      e.target.value = ""
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Data Model (ERD) */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Data Model</p>
+                <p className="text-xs text-muted-foreground">Only .erd files (ERD format)</p>
+              </div>
+              {erdFile ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono truncate max-w-[160px]">{erdFile.name}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setErdFile(null)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <label className="cursor-pointer">
+                  <Button variant="outline" size="sm" asChild>
+                    <span><Upload className="h-3.5 w-3.5 mr-1" />Attach</span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".erd"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) handleAttachment(f, "erd", setErdFile)
+                      e.target.value = ""
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Process Model (BPMN) */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Process Model</p>
+                <p className="text-xs text-muted-foreground">Only .bpmn files (BPMN format)</p>
+              </div>
+              {bpmnFile ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono truncate max-w-[160px]">{bpmnFile.name}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setBpmnFile(null)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <label className="cursor-pointer">
+                  <Button variant="outline" size="sm" asChild>
+                    <span><Upload className="h-3.5 w-3.5 mr-1" />Attach</span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".bpmn"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) handleAttachment(f, "bpmn", setBpmnFile)
+                      e.target.value = ""
+                    }}
+                  />
+                </label>
+              )}
+            </div>
           </div>
 
           <Button

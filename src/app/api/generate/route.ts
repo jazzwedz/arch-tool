@@ -25,15 +25,19 @@ export async function POST(request: Request) {
       )
     }
 
+    const attachments = body.attachments || {}
+    const attachmentContext = buildAttachmentContext(attachments)
+
     let prompt: string
 
     if (body.componentId) {
-      prompt = buildComponentPrompt(sanitizeForPrompt(body.yamlContent), audience)
+      prompt = buildComponentPrompt(sanitizeForPrompt(body.yamlContent), audience, attachmentContext)
     } else if (body.diagramName) {
       prompt = buildDiagramPrompt(
         sanitizeForPrompt(body.diagramName),
         sanitizeForPrompt(body.componentsYaml),
-        audience
+        audience,
+        attachmentContext
       )
     } else {
       return NextResponse.json(
@@ -66,7 +70,7 @@ export async function POST(request: Request) {
   }
 }
 
-function buildComponentPrompt(yamlContent: string, audience: string): string {
+function buildComponentPrompt(yamlContent: string, audience: string, attachmentContext: string): string {
   return `You are a documentation writer producing clear, professional architecture documents. Your writing must sound human and natural — never like AI-generated content.
 
 ${writingStyleRules()}
@@ -78,6 +82,7 @@ Component definition (YAML):
 \`\`\`yaml
 ${yamlContent}
 \`\`\`
+${attachmentContext}
 
 Generate a well-structured document in Markdown format with these chapters in this exact order:
 
@@ -140,7 +145,8 @@ Focus on accurately describing what is defined in the data. Do not invent inform
 function buildDiagramPrompt(
   diagramName: string,
   componentsYaml: string,
-  audience: string
+  audience: string,
+  attachmentContext: string
 ): string {
   return `You are a documentation writer producing clear, professional architecture documents. Your writing must sound human and natural — never like AI-generated content.
 
@@ -155,6 +161,7 @@ The diagram contains the following components from the architecture catalog:
 \`\`\`yaml
 ${componentsYaml}
 \`\`\`
+${attachmentContext}
 
 Generate a well-structured document in Markdown format with these chapters in this exact order:
 
@@ -240,4 +247,37 @@ function audienceGuidance(audience: string): string {
     default:
       return ""
   }
+}
+
+function buildAttachmentContext(attachments: Record<string, string>): string {
+  const sections: string[] = []
+
+  if (attachments.businessRequirement) {
+    sections.push(`
+ADDITIONAL CONTEXT — Business Requirement Document (PDF text):
+The following is extracted text from a business requirement document. Use it to enrich the document with business context, requirements, and goals. Reference specific requirements where relevant.
+\`\`\`
+${sanitizeForPrompt(attachments.businessRequirement)}
+\`\`\``)
+  }
+
+  if (attachments.dataModel) {
+    sections.push(`
+ADDITIONAL CONTEXT — Data Model (ERD):
+The following is an ERD (Entity Relationship Diagram) definition. Use it to make the Data Perspective chapter more accurate. Base the mermaid erDiagram on this real data model instead of extrapolating.
+\`\`\`
+${sanitizeForPrompt(attachments.dataModel)}
+\`\`\``)
+  }
+
+  if (attachments.processModel) {
+    sections.push(`
+ADDITIONAL CONTEXT — Process Model (BPMN):
+The following is a BPMN (Business Process Model) definition. Use it to describe the business processes and workflows in the document. You may reference specific process steps, gateways, and flows.
+\`\`\`
+${sanitizeForPrompt(attachments.processModel)}
+\`\`\``)
+  }
+
+  return sections.join("\n")
 }
