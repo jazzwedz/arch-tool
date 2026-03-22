@@ -486,11 +486,18 @@ export default function GeneratePage() {
       {/* Generated documentation modal */}
       <Dialog open={showDocModal} onOpenChange={setShowDocModal}>
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 [&>button:last-child]:hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b shrink-0 bg-gray-50">
             <DialogHeader className="flex-1">
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-3">
                 <FileText className="h-5 w-5" />
-                Generated Documentation
+                <span>
+                  {selectionMode === "component" && selectedComponent
+                    ? selectedComponent.name
+                    : selectedDiagramName}
+                </span>
+                <span className="inline-flex items-center px-3 py-1 rounded text-xs font-semibold bg-gray-900 text-white uppercase tracking-wide">
+                  {audience}
+                </span>
               </DialogTitle>
             </DialogHeader>
             <div className="flex items-center gap-2">
