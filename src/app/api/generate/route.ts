@@ -110,10 +110,31 @@ graph LR
   B -->|returns result| C[Component C]
 \`\`\`
 
-## 6. Current State
+## 6. Data Perspective
+Based on the component's interfaces, dependencies, and descriptions, describe what data this component works with. What data comes in? What data goes out? What does it store or transform?
+
+Include a mermaid ER diagram showing the key data entities this component likely deals with. Extrapolate from the interface names, dependency names, and descriptions. Use a \`\`\`mermaid code block with erDiagram syntax. Keep it practical — show 3-8 entities with their relationships. Example format:
+\`\`\`mermaid
+erDiagram
+  ORDER ||--o{ ORDER_LINE : contains
+  ORDER {
+    string orderId
+    date createdAt
+    string status
+  }
+  CUSTOMER ||--o{ ORDER : places
+  CUSTOMER {
+    string customerId
+    string name
+  }
+\`\`\`
+
+Mark this section clearly as an **informed estimate** based on available data, not a verified data model.
+
+## 7. Current State
 Status, who is responsible, any known risks.
 
-Focus on accurately describing what is defined in the data. Do not invent information that is not present.`
+Focus on accurately describing what is defined in the data. Do not invent information that is not present. The Data Perspective chapter is the only exception — there you may reasonably extrapolate from interface names, types, and descriptions, but clearly label it as an estimate.`
 }
 
 function buildDiagramPrompt(
@@ -169,10 +190,31 @@ graph LR
   B -->|returns result| C[Component C]
 \`\`\`
 
-## 7. Current State
+## 7. Data Perspective
+Based on the components' interfaces, dependencies, and descriptions, describe what data flows through this system. What are the key data entities? What gets created, read, updated, or passed between components?
+
+Include a mermaid ER diagram showing the key data entities across the system. Extrapolate from interface names, dependency types, component descriptions, and connector labels. Use a \`\`\`mermaid code block with erDiagram syntax. Keep it practical — show 5-12 entities with their relationships. Example format:
+\`\`\`mermaid
+erDiagram
+  ORDER ||--o{ ORDER_LINE : contains
+  ORDER {
+    string orderId
+    date createdAt
+    string status
+  }
+  CUSTOMER ||--o{ ORDER : places
+  CUSTOMER {
+    string customerId
+    string name
+  }
+\`\`\`
+
+Mark this section clearly as an **informed estimate** based on available data, not a verified data model.
+
+## 8. Current State
 Overall maturity, ownership, any known risks or limitations.
 
-Focus on accurately describing what is defined in the data. Use the interfaces, dependencies, types, and descriptions to explain the system. Do not invent information that is not present.`
+Focus on accurately describing what is defined in the data. Use the interfaces, dependencies, types, and descriptions to explain the system. Do not invent information that is not present. The Data Perspective chapter is the only exception — there you may reasonably extrapolate from interface names, types, and descriptions, but clearly label it as an estimate.`
 }
 
 function writingStyleRules(): string {
