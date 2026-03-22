@@ -96,10 +96,47 @@ export default function DiagramsPage() {
     URL.revokeObjectURL(url)
   }
 
-  const buildViewerUrl = useCallback((xmlContent: string): string => {
-    const base64Xml = btoa(unescape(encodeURIComponent(xmlContent)))
-    return `https://viewer.diagrams.net/?highlight=0000ff&nav=1&title=diagram#R${base64Xml}`
-  }, [])
+  const [viewerBlobUrl, setViewerBlobUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (previewDiagram) {
+      const base64Xml = btoa(unescape(encodeURIComponent(previewDiagram.content)))
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: auto; }
+    .geDiagramContainer { max-width: 100% !important; }
+    .geDiagramContainer svg { max-width: 100% !important; height: auto !important; }
+  </style>
+</head>
+<body>
+  <div id="diagram"></div>
+  <script>
+    var xml = decodeURIComponent(escape(atob("${base64Xml}")));
+    var div = document.getElementById("diagram");
+    div.className = "mxgraph";
+    div.setAttribute("data-mxgraph", JSON.stringify({
+      highlight: "#0000ff",
+      nav: true,
+      resize: true,
+      toolbar: "zoom layers lightbox",
+      edit: "_blank",
+      xml: xml
+    }));
+  </script>
+  <script src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+</body>
+</html>`
+      const blob = new Blob([html], { type: "text/html" })
+      const url = URL.createObjectURL(blob)
+      setViewerBlobUrl(url)
+      return () => URL.revokeObjectURL(url)
+    }
+    setViewerBlobUrl(null)
+  }, [previewDiagram])
 
   return (
     <div className="space-y-6">
@@ -261,11 +298,11 @@ export default function DiagramsPage() {
             </div>
           </div>
           <div className="flex-1 overflow-hidden bg-gray-50">
-            {previewDiagram && (
+            {viewerBlobUrl && (
               <iframe
-                src={buildViewerUrl(previewDiagram.content)}
+                src={viewerBlobUrl}
                 className="w-full h-full border-0"
-                title={`Preview: ${previewDiagram.name}`}
+                title={`Preview: ${previewDiagram?.name}`}
               />
             )}
           </div>
