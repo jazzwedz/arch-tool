@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { listComponents, saveComponent } from "@/lib/github"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const components = await listComponents()

@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, FileText, Loader2, ExternalLink } from "lucide-react"
+import { ArrowLeft, FileText, Loader2, ExternalLink, Upload, X } from "lucide-react"
 import Link from "next/link"
 import type { Component } from "@/lib/types"
 import yaml from "js-yaml"
@@ -30,6 +30,7 @@ export default function GeneratePage() {
   const [audience, setAudience] = useState<string>("Technical")
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<GenerateResult | null>(null)
+  const [diagramFile, setDiagramFile] = useState<File | null>(null)
 
   useEffect(() => {
     fetch("/api/components")
@@ -120,6 +121,44 @@ export default function GeneratePage() {
                 <SelectItem value="Executive">Executive</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Draw.io Diagram (optional)</Label>
+            {diagramFile ? (
+              <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/50">
+                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm truncate flex-1">{diagramFile.name}</span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {(diagramFile.size / 1024).toFixed(1)} KB
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0"
+                  onClick={() => setDiagramFile(null)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border-2 border-dashed cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Click to select a .drawio file
+                </span>
+                <input
+                  type="file"
+                  accept=".drawio,.xml"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) setDiagramFile(file)
+                    e.target.value = ""
+                  }}
+                />
+              </label>
+            )}
           </div>
 
           <Button

@@ -10,34 +10,45 @@ const branch = process.env.GITHUB_BRANCH || "main"
 
 export async function listComponents(): Promise<Component[]> {
   try {
-    const { data } = await octokit.rest.repos.getContent({
+    // Use git trees API to get all files in one request, avoiding caching issues
+    const { data: refData } = await octokit.rest.git.getRef({
       owner,
       repo,
-      path: "components",
-      ref: branch,
+      ref: `heads/${branch}`,
     })
 
-    if (!Array.isArray(data)) return []
+    const { data: commitData } = await octokit.rest.git.getCommit({
+      owner,
+      repo,
+      commit_sha: refData.object.sha,
+    })
 
-    const yamlFiles = data.filter(
-      (f) => f.type === "file" && f.name.endsWith(".yaml")
+    const { data: treeData } = await octokit.rest.git.getTree({
+      owner,
+      repo,
+      tree_sha: commitData.tree.sha,
+      recursive: "true",
+    })
+
+    const yamlFiles = treeData.tree.filter(
+      (f) => f.path?.startsWith("components/") && f.path.endsWith(".yaml") && f.type === "blob"
     )
 
     const components = await Promise.all(
       yamlFiles.map(async (file) => {
-        const { data: fileData } = await octokit.rest.repos.getContent({
-          owner,
-          repo,
-          path: file.path,
-          ref: branch,
-        })
+        try {
+          const { data: blobData } = await octokit.rest.git.getBlob({
+            owner,
+            repo,
+            file_sha: file.sha!,
+          })
 
-        if (!("content" in fileData)) return null
-
-        const content = Buffer.from(fileData.content, "base64").toString(
-          "utf-8"
-        )
-        return yaml.load(content) as Component
+          const content = Buffer.from(blobData.content, "base64").toString("utf-8")
+          return yaml.load(content) as Component
+        } catch (err) {
+          console.error(`Failed to fetch component ${file.path}:`, err)
+          return null
+        }
       })
     )
 

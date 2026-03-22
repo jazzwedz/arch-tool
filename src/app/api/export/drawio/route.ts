@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { listComponents } from "@/lib/github"
 import { generateMxLibrary } from "@/lib/drawio"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const components = await listComponents()
