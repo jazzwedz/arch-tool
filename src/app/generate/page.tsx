@@ -32,7 +32,39 @@ import Link from "next/link"
 import type { Component, DiagramWithSha } from "@/lib/types"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import mermaid from "mermaid"
 import yaml from "js-yaml"
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: "default",
+  securityLevel: "strict",
+})
+
+function MermaidDiagram({ chart }: { chart: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [svg, setSvg] = useState<string>("")
+
+  useEffect(() => {
+    const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`
+    mermaid.render(id, chart).then(({ svg }) => {
+      setSvg(svg)
+    }).catch((err) => {
+      console.error("Mermaid render failed:", err)
+      setSvg("")
+    })
+  }, [chart])
+
+  if (!svg) return <pre className="bg-gray-100 p-4 rounded-md text-xs overflow-x-auto">{chart}</pre>
+
+  return (
+    <div
+      ref={containerRef}
+      className="my-4 flex justify-center bg-white rounded-md border p-4 overflow-x-auto"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
+}
 
 type GenerateResult = {
   generated?: string
@@ -547,7 +579,29 @@ export default function GeneratePage() {
                 [&_strong]:font-semibold [&_strong]:text-gray-900
                 [&_hr]:my-4 [&_hr]:border-gray-200"
             >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{result?.generated ?? ""}</ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({ className, children, ...props }) {
+                    const isMermaid = /language-mermaid/.test(className || "")
+                    if (isMermaid) {
+                      return <MermaidDiagram chart={String(children).trim()} />
+                    }
+                    const isInline = !className
+                    if (isInline) {
+                      return <code className={className} {...props}>{children}</code>
+                    }
+                    return (
+                      <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto my-3">
+                        <code className={className} {...props}>{children}</code>
+                      </pre>
+                    )
+                  },
+                  pre({ children }) {
+                    return <>{children}</>
+                  },
+                }}
+              >{result?.generated ?? ""}</ReactMarkdown>
             </div>
           </div>
         </DialogContent>

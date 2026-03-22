@@ -103,6 +103,13 @@ What can people do with it? What does it make possible?
 ## 5. How It Connects to Other Systems
 Describe the connections in plain language — what goes in, what comes out, who depends on it.
 
+Include a mermaid diagram showing the connections. Use a \`\`\`mermaid code block with a flowchart (graph LR or graph TD). Use short, readable node labels. Keep it simple — only show real connections from the data. Example format:
+\`\`\`mermaid
+graph LR
+  A[Component A] -->|sends data| B[Component B]
+  B -->|returns result| C[Component C]
+\`\`\`
+
 ## 6. Current State
 Status, who is responsible, any known risks.
 
@@ -154,6 +161,13 @@ Describe each component in the system — not technically, but by what role it p
 
 ## 6. How the Parts Connect
 Describe how data and requests flow between the building blocks. What talks to what, and why.
+
+Include a mermaid diagram showing the connections between components. Use a \`\`\`mermaid code block with a flowchart (graph LR or graph TD). Use short, readable node labels. Keep it simple — only show real connections from the data. Example format:
+\`\`\`mermaid
+graph LR
+  A[Component A] -->|sends data| B[Component B]
+  B -->|returns result| C[Component C]
+\`\`\`
 
 ## 7. Current State
 Overall maturity, ownership, any known risks or limitations.
