@@ -541,7 +541,7 @@ export default function GeneratePage() {
                 <div className="space-y-2">
                   {componentDiagrams.map((name) => {
                     const diagram = diagrams.find((d) => d.name === name)
-                    const chart = diagram ? drawioToMermaid(diagram.content) : null
+                    const chart = diagram ? drawioToMermaid(diagram.content, selectedComponentId) : null
                     const isExpanded = expandedDiagram === name
                     return (
                       <div key={name} className="rounded-md border overflow-hidden">

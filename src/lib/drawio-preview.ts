@@ -1,9 +1,10 @@
-export function drawioToMermaid(xml: string): string | null {
+export function drawioToMermaid(xml: string, highlightArchId?: string): string | null {
   try {
     const parser = new DOMParser()
     const doc = parser.parseFromString(xml, "text/xml")
 
     const nodes = new Map<string, string>()
+    const nodeArchIds = new Map<string, string>() // drawio id -> arch_id
     const edges: { source: string; target: string; label: string }[] = []
 
     const stripHtml = (s: string) =>
@@ -26,6 +27,8 @@ export function drawioToMermaid(xml: string): string | null {
 
       if (childCell.getAttribute("vertex") === "1" && label) {
         nodes.set(id, stripHtml(label))
+        const archId = obj.getAttribute("arch_id")
+        if (archId) nodeArchIds.set(id, archId)
       }
       if (childCell.getAttribute("edge") === "1") {
         const source = childCell.getAttribute("source")
@@ -94,6 +97,23 @@ export function drawioToMermaid(xml: string): string | null {
     })
 
     if (edges.length === 0 && nodes.size < 2) return null
+
+    // Highlight the selected component
+    if (highlightArchId) {
+      const highlightNodeIds: string[] = []
+      nodeArchIds.forEach((archId, nodeId) => {
+        if (archId === highlightArchId) highlightNodeIds.push(nodeId)
+      })
+      // Also check if any node label matches the arch_id directly (standalone mxCells)
+      nodes.forEach((label, nodeId) => {
+        if (label === highlightArchId && !highlightNodeIds.includes(nodeId)) {
+          highlightNodeIds.push(nodeId)
+        }
+      })
+      for (const nodeId of highlightNodeIds) {
+        lines.push(`  style ${nodeId} fill:#2563eb,stroke:#1d4ed8,color:#fff,stroke-width:2px`)
+      }
+    }
 
     return lines.join("\n")
   } catch {
