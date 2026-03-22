@@ -96,46 +96,44 @@ export default function DiagramsPage() {
     URL.revokeObjectURL(url)
   }
 
-  const [viewerBlobUrl, setViewerBlobUrl] = useState<string | null>(null)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
     if (previewDiagram) {
-      const base64Xml = btoa(unescape(encodeURIComponent(previewDiagram.content)))
-      const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: auto; }
-    .geDiagramContainer { max-width: 100% !important; }
-    .geDiagramContainer svg { max-width: 100% !important; height: auto !important; }
-  </style>
-</head>
-<body>
-  <div id="diagram"></div>
-  <script>
-    var xml = decodeURIComponent(escape(atob("${base64Xml}")));
-    var div = document.getElementById("diagram");
-    div.className = "mxgraph";
-    div.setAttribute("data-mxgraph", JSON.stringify({
-      highlight: "#0000ff",
-      nav: true,
-      resize: true,
-      toolbar: "zoom layers lightbox",
-      edit: "_blank",
-      xml: xml
-    }));
-  </script>
-  <script src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
-</body>
-</html>`
-      const blob = new Blob([html], { type: "text/html" })
-      const url = URL.createObjectURL(blob)
-      setViewerBlobUrl(url)
-      return () => URL.revokeObjectURL(url)
+      setPreviewLoading(true)
+      setPreviewImage(null)
+      fetch("https://convert.diagrams.net/node/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          xml: previewDiagram.content,
+          format: "png",
+          scale: 2,
+          border: 20,
+        }),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Export failed")
+          return res.blob()
+        })
+        .then((blob) => {
+          const url = URL.createObjectURL(blob)
+          setPreviewImage(url)
+        })
+        .catch((err) => {
+          console.error("Diagram export failed:", err)
+          // Fallback: show raw XML info
+          setPreviewImage(null)
+        })
+        .finally(() => setPreviewLoading(false))
+
+      return () => {
+        if (previewImage) URL.revokeObjectURL(previewImage)
+      }
     }
-    setViewerBlobUrl(null)
+    setPreviewImage(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewDiagram])
 
   return (
@@ -297,13 +295,22 @@ export default function DiagramsPage() {
               </Button>
             </div>
           </div>
-          <div className="flex-1 overflow-hidden bg-gray-50">
-            {viewerBlobUrl && (
-              <iframe
-                src={viewerBlobUrl}
-                className="w-full h-full border-0"
-                title={`Preview: ${previewDiagram?.name}`}
+          <div className="flex-1 overflow-auto bg-gray-50 flex items-center justify-center p-4">
+            {previewLoading && (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Rendering diagram...</p>
+              </div>
+            )}
+            {previewImage && (
+              <img
+                src={previewImage}
+                alt={`Diagram: ${previewDiagram?.name}`}
+                className="max-w-full max-h-full object-contain"
               />
+            )}
+            {!previewLoading && !previewImage && previewDiagram && (
+              <p className="text-sm text-muted-foreground">Failed to render diagram preview.</p>
             )}
           </div>
         </DialogContent>
