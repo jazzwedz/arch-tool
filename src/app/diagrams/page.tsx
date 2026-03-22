@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -18,6 +18,7 @@ import {
   Eye,
   X,
 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import type { DiagramWithSha } from "@/lib/types"
 
@@ -303,10 +304,13 @@ export default function DiagramsPage() {
               </div>
             )}
             {previewImage && (
-              <img
+              <Image
                 src={previewImage}
                 alt={`Diagram: ${previewDiagram?.name}`}
                 className="max-w-full max-h-full object-contain"
+                width={800}
+                height={600}
+                unoptimized
               />
             )}
             {!previewLoading && !previewImage && previewDiagram && (
