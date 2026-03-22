@@ -4,19 +4,12 @@ import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   Upload,
   Trash2,
   FileImage,
   Loader2,
   Download,
   ArrowLeft,
-  Eye,
-  X,
 } from "lucide-react"
 import Link from "next/link"
 import type { DiagramWithSha } from "@/lib/types"
@@ -26,9 +19,6 @@ export default function DiagramsPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [deletingName, setDeletingName] = useState<string | null>(null)
-  const [previewDiagram, setPreviewDiagram] = useState<DiagramWithSha | null>(
-    null
-  )
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchDiagrams = () => {
@@ -95,7 +85,6 @@ export default function DiagramsPage() {
     a.click()
     URL.revokeObjectURL(url)
   }
-
 
   return (
     <div className="space-y-6">
@@ -187,15 +176,6 @@ export default function DiagramsPage() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => setPreviewDiagram(d)}
-                    title="Preview"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
                     onClick={() => handleDownload(d)}
                     title="Download"
                   >
@@ -221,84 +201,6 @@ export default function DiagramsPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Diagram preview modal */}
-      <Dialog
-        open={!!previewDiagram}
-        onOpenChange={(open) => !open && setPreviewDiagram(null)}
-      >
-        <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-0 [&>button:last-child]:hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-            <div className="flex items-center gap-2">
-              <FileImage className="h-5 w-5" />
-              <DialogTitle className="text-lg font-semibold">
-                {previewDiagram?.name}.drawio
-              </DialogTitle>
-            </div>
-            <div className="flex items-center gap-2">
-              {previewDiagram && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDownload(previewDiagram)}
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Download
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPreviewDiagram(null)}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Close
-              </Button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-hidden bg-gray-50">
-            {previewDiagram && (
-              <iframe
-                srcDoc={(() => {
-                  const base64Xml = btoa(unescape(encodeURIComponent(previewDiagram.content)))
-                  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: auto; }
-    .geDiagramContainer { max-width: 100% !important; }
-    .geDiagramContainer svg { max-width: 100% !important; height: auto !important; }
-  </style>
-</head>
-<body>
-  <div id="diagram"></div>
-  <script>
-    var xml = atob("${base64Xml}");
-    var div = document.getElementById("diagram");
-    div.className = "mxgraph";
-    div.setAttribute("data-mxgraph", JSON.stringify({
-      highlight: "#0000ff",
-      nav: true,
-      resize: true,
-      toolbar: "zoom layers lightbox",
-      edit: "_blank",
-      xml: xml
-    }));
-  </script>
-  <script src="https://viewer.diagrams.net/js/viewer-static.min.js"><\/script>
-</body>
-</html>`
-                })()}
-                className="w-full h-full border-0"
-                title={`Preview: ${previewDiagram.name}`}
-                sandbox="allow-scripts"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
