@@ -50,3 +50,12 @@ export interface Component {
 export interface ComponentWithSha extends Component {
   sha: string
 }
+
+export interface Diagram {
+  name: string
+  content: string
+}
+
+export interface DiagramWithSha extends Diagram {
+  sha: string
+}

@@ -2,19 +2,27 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Download, FileBox } from "lucide-react"
+import { Download, FileBox, ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
 export default function ExportPage() {
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold">Export for Draw.io</h1>
-        <p className="text-muted-foreground mt-1">
-          Use your architecture components as a custom library in Draw.io
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold">Export for Draw.io</h1>
+          <p className="text-muted-foreground mt-1">
+            Use your architecture components as a custom library in Draw.io
+          </p>
+        </div>
       </div>
 
-      <Card>
+      <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileBox className="h-5 w-5" />

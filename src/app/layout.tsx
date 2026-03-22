@@ -3,7 +3,7 @@ import localFont from "next/font/local"
 import "./globals.css"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import { Layers, FileText, Download } from "lucide-react"
+import { Layers, FileText, Download, FileImage } from "lucide-react"
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -47,6 +47,13 @@ export default function RootLayout({
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Catalog
+              </Link>
+              <Link
+                href="/diagrams"
+                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <FileImage className="h-3.5 w-3.5" />
+                Diagrams
               </Link>
               <Link
                 href="/generate"

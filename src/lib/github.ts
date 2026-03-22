@@ -1,6 +1,6 @@
 import { Octokit } from "octokit"
 import yaml from "js-yaml"
-import type { Component, ComponentWithSha } from "./types"
+import type { Component, ComponentWithSha, DiagramWithSha } from "./types"
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN })
 
@@ -117,6 +117,114 @@ export async function deleteComponent(id: string, sha: string): Promise<void> {
     repo,
     path,
     message: `feat: remove component ${id}`,
+    sha,
+    branch,
+  })
+}
+
+// Diagrams
+
+export async function listDiagrams(): Promise<DiagramWithSha[]> {
+  try {
+    const { data: refData } = await octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+    })
+
+    const { data: commitData } = await octokit.rest.git.getCommit({
+      owner,
+      repo,
+      commit_sha: refData.object.sha,
+    })
+
+    const { data: treeData } = await octokit.rest.git.getTree({
+      owner,
+      repo,
+      tree_sha: commitData.tree.sha,
+      recursive: "true",
+    })
+
+    const drawioFiles = treeData.tree.filter(
+      (f) => f.path?.startsWith("diagrams/") && f.path.endsWith(".drawio") && f.type === "blob"
+    )
+
+    const diagrams = await Promise.all(
+      drawioFiles.map(async (file) => {
+        try {
+          const { data: blobData } = await octokit.rest.git.getBlob({
+            owner,
+            repo,
+            file_sha: file.sha!,
+          })
+
+          const content = Buffer.from(blobData.content, "base64").toString("utf-8")
+          const name = file.path!.replace("diagrams/", "").replace(".drawio", "")
+          return { name, content, sha: file.sha! } as DiagramWithSha
+        } catch (err) {
+          console.error(`Failed to fetch diagram ${file.path}:`, err)
+          return null
+        }
+      })
+    )
+
+    return diagrams.filter(Boolean) as DiagramWithSha[]
+  } catch (error: unknown) {
+    if (error instanceof Error && "status" in error && (error as { status: number }).status === 404) {
+      return []
+    }
+    throw error
+  }
+}
+
+export async function saveDiagram(
+  name: string,
+  content: string,
+  sha?: string
+): Promise<void> {
+  const path = `diagrams/${name}.drawio`
+
+  const message = sha
+    ? `feat: update diagram ${name}`
+    : `feat: add diagram ${name}`
+
+  await octokit.rest.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path,
+    message,
+    content: Buffer.from(content).toString("base64"),
+    branch,
+    ...(sha ? { sha } : {}),
+  })
+}
+
+export async function getDiagram(name: string): Promise<DiagramWithSha> {
+  const path = `diagrams/${name}.drawio`
+
+  const { data } = await octokit.rest.repos.getContent({
+    owner,
+    repo,
+    path,
+    ref: branch,
+  })
+
+  if (!("content" in data)) {
+    throw new Error(`Diagram ${name} not found`)
+  }
+
+  const content = Buffer.from(data.content, "base64").toString("utf-8")
+  return { name, content, sha: data.sha }
+}
+
+export async function deleteDiagram(name: string, sha: string): Promise<void> {
+  const path = `diagrams/${name}.drawio`
+
+  await octokit.rest.repos.deleteFile({
+    owner,
+    repo,
+    path,
+    message: `feat: remove diagram ${name}`,
     sha,
     branch,
   })

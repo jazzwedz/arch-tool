@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -10,13 +10,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, FileText, Loader2, ExternalLink, Upload, X } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import {
+  ArrowLeft,
+  FileText,
+  Loader2,
+  FileImage,
+  Download,
+  Copy,
+  Check,
+  X,
+} from "lucide-react"
 import Link from "next/link"
-import type { Component } from "@/lib/types"
+import type { Component, DiagramWithSha } from "@/lib/types"
+import ReactMarkdown from "react-markdown"
 import yaml from "js-yaml"
 
 type GenerateResult = {
+  generated?: string
   confluenceUrl?: string
   pdfUrl?: string
   message?: string
@@ -24,50 +42,209 @@ type GenerateResult = {
   error?: string
 }
 
+type MatchedComponent = {
+  archId: string
+  component: Component | null
+}
+
+type SelectionMode = "none" | "component" | "diagram"
+
 export default function GeneratePage() {
   const [components, setComponents] = useState<Component[]>([])
-  const [selectedId, setSelectedId] = useState<string>("")
+  const [diagrams, setDiagrams] = useState<DiagramWithSha[]>([])
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>("none")
+  const [selectedComponentId, setSelectedComponentId] = useState<string>("")
+  const [selectedDiagramName, setSelectedDiagramName] = useState<string>("")
   const [audience, setAudience] = useState<string>("Technical")
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<GenerateResult | null>(null)
-  const [diagramFile, setDiagramFile] = useState<File | null>(null)
+  const [matchedComponents, setMatchedComponents] = useState<
+    MatchedComponent[]
+  >([])
+  const [analyzing, setAnalyzing] = useState(false)
+  const [componentDiagrams, setComponentDiagrams] = useState<string[]>([])
+  const [showDocModal, setShowDocModal] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const docContentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch("/api/components")
       .then((r) => r.json())
       .then(setComponents)
       .catch(console.error)
+
+    fetch("/api/diagrams")
+      .then((r) => r.json())
+      .then(setDiagrams)
+      .catch(console.error)
   }, [])
 
-  const selectedComponent = components.find((c) => c.id === selectedId)
+  const selectedComponent = components.find(
+    (c) => c.id === selectedComponentId
+  )
+
+  const handleModeChange = (mode: string) => {
+    setSelectionMode(mode as SelectionMode)
+    setSelectedComponentId("")
+    setSelectedDiagramName("")
+    setMatchedComponents([])
+    setComponentDiagrams([])
+    setResult(null)
+  }
+
+  const handleComponentSelect = (id: string) => {
+    setSelectedComponentId(id)
+    setMatchedComponents([])
+    setResult(null)
+
+    // Search all diagrams for this component
+    if (id) {
+      const found = diagrams
+        .filter((d) => d.content.includes(`arch_id="${id}"`))
+        .map((d) => d.name)
+      setComponentDiagrams(found)
+    } else {
+      setComponentDiagrams([])
+    }
+  }
+
+  const handleDiagramSelect = async (name: string) => {
+    setSelectedDiagramName(name)
+    setMatchedComponents([])
+    setResult(null)
+
+    if (!name) return
+
+    setAnalyzing(true)
+    try {
+      const res = await fetch(`/api/diagrams/${encodeURIComponent(name)}`)
+      if (!res.ok) throw new Error("Failed to fetch diagram")
+      const diagram: DiagramWithSha = await res.json()
+
+      // Parse arch_id attributes from diagram XML
+      const archIdRegex = /arch_id="([^"]+)"/g
+      const foundIds = new Set<string>()
+      let match
+      while ((match = archIdRegex.exec(diagram.content)) !== null) {
+        foundIds.add(match[1])
+      }
+
+      const matched: MatchedComponent[] = Array.from(foundIds).map(
+        (archId) => ({
+          archId,
+          component: components.find((c) => c.id === archId) || null,
+        })
+      )
+
+      setMatchedComponents(matched)
+    } catch (err) {
+      console.error("Failed to analyze diagram:", err)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   const handleGenerate = async () => {
-    if (!selectedComponent) return
+    if (selectionMode === "component" && !selectedComponent) return
+    if (selectionMode === "diagram" && !selectedDiagramName) return
 
     setGenerating(true)
     setResult(null)
 
     try {
-      const yamlContent = yaml.dump(selectedComponent)
+      let body: Record<string, unknown>
+
+      if (selectionMode === "component" && selectedComponent) {
+        const yamlContent = yaml.dump(selectedComponent)
+        body = {
+          componentId: selectedComponentId,
+          audience,
+          yamlContent,
+        }
+      } else {
+        body = {
+          diagramName: selectedDiagramName,
+          audience,
+          componentsYaml: matchedComponents
+            .filter((m) => m.component)
+            .map((m) => yaml.dump(m.component!))
+            .join("\n---\n"),
+        }
+      }
 
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          componentId: selectedId,
-          audience,
-          yamlContent,
-        }),
+        body: JSON.stringify(body),
       })
 
       const data = await response.json()
       setResult(data)
+      if (data.generated) setShowDocModal(true)
     } catch {
       setResult({ error: "Failed to trigger generation. Check console." })
     } finally {
       setGenerating(false)
     }
   }
+
+  const handleSavePdf = useCallback(() => {
+    if (!docContentRef.current) return
+    const content = docContentRef.current.innerHTML
+    const title =
+      selectionMode === "component" && selectedComponent
+        ? selectedComponent.name
+        : selectedDiagramName
+
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) return
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${title} - Architecture Documentation</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.6; }
+    h1 { font-size: 24px; border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { font-size: 20px; margin-top: 24px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+    h3 { font-size: 16px; margin-top: 20px; }
+    p { margin: 8px 0; }
+    ul, ol { padding-left: 24px; }
+    li { margin: 4px 0; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f4f4f4; }
+    @media print { body { margin: 0; } }
+  </style>
+</head>
+<body>${content}</body>
+</html>`)
+    printWindow.document.close()
+    printWindow.onload = () => {
+      printWindow.print()
+    }
+  }, [selectionMode, selectedComponent, selectedDiagramName])
+
+  const handleCopyMarkdown = useCallback(() => {
+    if (!result?.generated) return
+    navigator.clipboard.writeText(result.generated).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [result])
+
+  const getDescription = (component: Component): string => {
+    if (audience === "Business") return component.description.business
+    if (audience === "Executive") return component.description.oneliner
+    return component.description.technical
+  }
+
+  const hasSelection =
+    (selectionMode === "component" && selectedComponentId) ||
+    (selectionMode === "diagram" && selectedDiagramName)
 
   return (
     <div className="space-y-6">
@@ -80,12 +257,12 @@ export default function GeneratePage() {
         <div>
           <h1 className="text-3xl font-bold">Generate Documentation</h1>
           <p className="text-muted-foreground mt-1">
-            Generate architecture documentation via AI
+            Instant, always up-to-date architecture insights — generated directly from your live catalog
           </p>
         </div>
       </div>
 
-      <Card className="max-w-xl">
+      <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -93,22 +270,74 @@ export default function GeneratePage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Source selection */}
           <div className="space-y-2">
-            <Label>Component</Label>
-            <Select value={selectedId} onValueChange={setSelectedId}>
+            <Label>Source</Label>
+            <Select
+              value={selectionMode === "none" ? "" : selectionMode}
+              onValueChange={handleModeChange}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select component..." />
+                <SelectValue placeholder="Select source type..." />
               </SelectTrigger>
               <SelectContent>
-                {components.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} ({c.id})
-                  </SelectItem>
-                ))}
+                <SelectItem value="component">Component</SelectItem>
+                <SelectItem value="diagram">Diagram</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {/* Component selector */}
+          {selectionMode === "component" && (
+            <div className="space-y-2">
+              <Label>Component</Label>
+              <Select
+                value={selectedComponentId}
+                onValueChange={handleComponentSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select component..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {components.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} ({c.id})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Diagram selector */}
+          {selectionMode === "diagram" && (
+            <div className="space-y-2">
+              <Label>Diagram</Label>
+              <Select
+                value={selectedDiagramName}
+                onValueChange={handleDiagramSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select diagram..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {diagrams.length === 0 ? (
+                    <SelectItem value="_none" disabled>
+                      No diagrams available
+                    </SelectItem>
+                  ) : (
+                    diagrams.map((d) => (
+                      <SelectItem key={d.name} value={d.name}>
+                        {d.name}.drawio
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Audience */}
           <div className="space-y-2">
             <Label>Audience</Label>
             <Select value={audience} onValueChange={setAudience}>
@@ -123,93 +352,197 @@ export default function GeneratePage() {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Draw.io Diagram (optional)</Label>
-            {diagramFile ? (
-              <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/50">
-                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm truncate flex-1">{diagramFile.name}</span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {(diagramFile.size / 1024).toFixed(1)} KB
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 shrink-0"
-                  onClick={() => setDiagramFile(null)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border-2 border-dashed cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors">
-                <Upload className="h-8 w-8 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Click to select a .drawio file
-                </span>
-                <input
-                  type="file"
-                  accept=".drawio,.xml"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) setDiagramFile(file)
-                    e.target.value = ""
-                  }}
-                />
-              </label>
-            )}
-          </div>
-
           <Button
             onClick={handleGenerate}
-            disabled={!selectedId || generating}
-            className="w-full"
+            disabled={!hasSelection || generating}
+            className={`w-full ${generating ? "bg-teal-500 hover:bg-teal-600 text-white" : ""}`}
           >
             {generating ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <FileText className="h-4 w-4 mr-2" />
             )}
-            Generate
+            {generating ? "Generating..." : "Generate"}
           </Button>
 
-          {result && (
+          {result?.error && (
             <div className="mt-4 p-4 rounded-md border bg-muted/50">
-              {result.error ? (
-                <p className="text-destructive text-sm">{result.error}</p>
-              ) : result.timeout ? (
-                <p className="text-yellow-700 text-sm">{result.message}</p>
-              ) : (
-                <div className="space-y-2">
-                  {result.confluenceUrl && (
-                    <a
-                      href={result.confluenceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Open in Confluence
-                    </a>
-                  )}
-                  {result.pdfUrl && (
-                    <a
-                      href={result.pdfUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Download PDF
-                    </a>
-                  )}
-                </div>
-              )}
+              <p className="text-destructive text-sm">{result.error}</p>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Component detail */}
+      {selectionMode === "component" && selectedComponent && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {selectedComponent.name}
+              <Badge variant="secondary" className="text-xs">
+                {selectedComponent.type}
+              </Badge>
+              <span className="text-xs text-muted-foreground font-mono font-normal">
+                {selectedComponent.id}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {getDescription(selectedComponent)}
+            </p>
+            <div>
+              <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                <FileImage className="h-4 w-4" />
+                Appears in diagrams
+              </p>
+              {componentDiagrams.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  This component does not appear in any diagram.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {componentDiagrams.map((name) => (
+                    <div
+                      key={name}
+                      className="flex items-center gap-2 p-2 rounded-md border text-sm hover:bg-muted/50 transition-colors"
+                    >
+                      <FileImage className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-mono">{name}.drawio</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Diagram analysis results */}
+      {selectionMode === "diagram" && selectedDiagramName && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileImage className="h-5 w-5" />
+              Diagram Analysis: {selectedDiagramName}.drawio
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {analyzing ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Analyzing diagram...
+              </div>
+            ) : matchedComponents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No catalog components found in this diagram.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground mb-3">
+                  This diagram contains{" "}
+                  <strong>{matchedComponents.length}</strong> component
+                  {matchedComponents.length !== 1 ? "s" : ""} from the catalog:
+                </p>
+                <div className="space-y-3">
+                  {matchedComponents.map((m) => (
+                    <div
+                      key={m.archId}
+                      className="p-3 rounded-md border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm">
+                          {m.component ? m.component.name : m.archId}
+                        </span>
+                        {m.component ? (
+                          <Badge variant="secondary" className="text-xs">
+                            {m.component.type}
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs">
+                            not in catalog
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {m.archId}
+                        </span>
+                      </div>
+                      {m.component && (
+                        <p className="text-sm text-muted-foreground">
+                          {getDescription(m.component)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Generated documentation modal */}
+      <Dialog open={showDocModal} onOpenChange={setShowDocModal}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 [&>button:last-child]:hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+            <DialogHeader className="flex-1">
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Generated Documentation
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyMarkdown}
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 mr-1" />
+                ) : (
+                  <Copy className="h-4 w-4 mr-1" />
+                )}
+                {copied ? "Copied" : "Copy Markdown"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSavePdf}>
+                <Download className="h-4 w-4 mr-1" />
+                Save as PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDocModal(false)}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Close
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-8 py-6 bg-white">
+            <div
+              ref={docContentRef}
+              className="max-w-none
+                [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:border-b-2 [&_h1]:border-gray-800 [&_h1]:pb-2 [&_h1]:mb-4 [&_h1]:text-gray-900
+                [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3 [&_h2]:border-b [&_h2]:border-gray-300 [&_h2]:pb-1 [&_h2]:text-gray-800
+                [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:text-gray-700
+                [&_p]:text-sm [&_p]:leading-relaxed [&_p]:my-2 [&_p]:text-gray-700
+                [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:pl-6 [&_ol]:my-2
+                [&_li]:text-sm [&_li]:my-1 [&_li]:text-gray-700
+                [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-gray-800
+                [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_pre]:my-3
+                [&_pre_code]:bg-transparent [&_pre_code]:p-0
+                [&_table]:w-full [&_table]:border-collapse [&_table]:my-3
+                [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-100 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold
+                [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2 [&_td]:text-sm
+                [&_strong]:font-semibold [&_strong]:text-gray-900
+                [&_hr]:my-4 [&_hr]:border-gray-200"
+            >
+              <ReactMarkdown>{result?.generated ?? ""}</ReactMarkdown>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

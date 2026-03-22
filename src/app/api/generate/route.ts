@@ -1,52 +1,111 @@
 import { NextResponse } from "next/server"
+import Anthropic from "@anthropic-ai/sdk"
+
+const anthropic = new Anthropic()
 
 export async function POST(request: Request) {
   try {
-    const { componentId, audience, yamlContent } = await request.json()
+    const body = await request.json()
+    const { audience } = body
 
-    const webhookUrl = process.env.N8N_ARCH_WEBHOOK_URL
-    if (!webhookUrl) {
+    let prompt: string
+
+    if (body.componentId) {
+      prompt = buildComponentPrompt(body.yamlContent, audience)
+    } else if (body.diagramName) {
+      prompt = buildDiagramPrompt(
+        body.diagramName,
+        body.componentsYaml,
+        audience
+      )
+    } else {
       return NextResponse.json(
-        { error: "N8N webhook URL not configured" },
-        { status: 500 }
+        { error: "No component or diagram selected" },
+        { status: 400 }
       )
     }
 
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 45000)
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    })
 
-    try {
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ componentId, audience, yaml: yamlContent }),
-        signal: controller.signal,
-      })
+    const textBlock = message.content.find((block) => block.type === "text")
+    const generatedText = textBlock ? textBlock.text : ""
 
-      clearTimeout(timeout)
-
-      if (!response.ok) {
-        throw new Error(`n8n responded with ${response.status}`)
-      }
-
-      const result = await response.json()
-      return NextResponse.json(result)
-    } catch (error) {
-      clearTimeout(timeout)
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return NextResponse.json({
-          message:
-            "Spracováva sa, skontroluj Confluence. Generovanie trvá dlhšie ako obvykle.",
-          timeout: true,
-        })
-      }
-      throw error
-    }
+    return NextResponse.json({ generated: generatedText })
   } catch (error) {
     console.error("Failed to generate doc:", error)
     return NextResponse.json(
-      { error: "Failed to trigger generation" },
+      { error: "Failed to generate documentation" },
       { status: 500 }
     )
+  }
+}
+
+function buildComponentPrompt(yamlContent: string, audience: string): string {
+  return `You are an enterprise architecture documentation expert. Generate a detailed, accurate architecture description for the following IT component based on all the data provided.
+
+Audience: ${audience}
+${audienceGuidance(audience)}
+
+Component definition (YAML):
+\`\`\`yaml
+${yamlContent}
+\`\`\`
+
+Generate a well-structured document in Markdown format. Include:
+1. Component Overview — what it is and what it does
+2. Purpose and Responsibilities
+3. Technical Details — interfaces it provides/consumes, dependencies, protocols
+4. Integration Points — how it connects to other systems
+5. Current Status and Ownership
+
+Focus on accurately describing what is defined in the data. Do not invent information that is not present. Adapt the language and depth to the specified audience.`
+}
+
+function buildDiagramPrompt(
+  diagramName: string,
+  componentsYaml: string,
+  audience: string
+): string {
+  return `You are an enterprise architecture documentation expert. Generate a detailed, accurate architecture description for a system represented by the following diagram.
+
+Diagram: ${diagramName}
+Audience: ${audience}
+${audienceGuidance(audience)}
+
+The diagram contains the following components from the architecture catalog. Here is the full definition of each component:
+
+\`\`\`yaml
+${componentsYaml}
+\`\`\`
+
+Generate a well-structured document in Markdown format. Include:
+1. System Overview — what this diagram represents as a whole, based on the components present
+2. Component Descriptions — the role and responsibility of each component in the system
+3. Integration and Data Flow — how the components connect and communicate, based on their interfaces and dependencies
+4. Architecture Patterns — patterns observed (e.g., event-driven, microservices, gateway pattern)
+5. System Status — overall maturity based on component statuses
+
+Focus on accurately describing what is defined in the data. Use the interfaces, dependencies, types, and descriptions to explain the architecture. Do not invent information that is not present. Adapt the language and depth to the specified audience.`
+}
+
+function audienceGuidance(audience: string): string {
+  switch (audience) {
+    case "Technical":
+      return "Write for software engineers and architects. Use technical terminology, mention protocols, patterns, and implementation details."
+    case "Business":
+      return "Write for business stakeholders and product managers. Focus on business value, capabilities, and impact. Avoid deep technical jargon."
+    case "Executive":
+      return "Write for C-level executives. Be concise and high-level. Focus on strategic value, risk, and ROI. Use simple language, no technical details."
+    default:
+      return ""
   }
 }
