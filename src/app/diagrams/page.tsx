@@ -259,7 +259,38 @@ export default function DiagramsPage() {
           <div className="flex-1 overflow-hidden bg-gray-50">
             {previewDiagram && (
               <iframe
-                src={`/api/diagrams/preview?name=${encodeURIComponent(previewDiagram.name)}`}
+                srcDoc={(() => {
+                  const base64Xml = btoa(unescape(encodeURIComponent(previewDiagram.content)))
+                  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: auto; }
+    .geDiagramContainer { max-width: 100% !important; }
+    .geDiagramContainer svg { max-width: 100% !important; height: auto !important; }
+  </style>
+</head>
+<body>
+  <div id="diagram"></div>
+  <script>
+    var xml = atob("${base64Xml}");
+    var div = document.getElementById("diagram");
+    div.className = "mxgraph";
+    div.setAttribute("data-mxgraph", JSON.stringify({
+      highlight: "#0000ff",
+      nav: true,
+      resize: true,
+      toolbar: "zoom layers lightbox",
+      edit: "_blank",
+      xml: xml
+    }));
+  </script>
+  <script src="https://viewer.diagrams.net/js/viewer-static.min.js"><\/script>
+</body>
+</html>`
+                })()}
                 className="w-full h-full border-0"
                 title={`Preview: ${previewDiagram.name}`}
                 sandbox="allow-scripts"
