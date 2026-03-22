@@ -31,6 +31,7 @@ import {
 import Link from "next/link"
 import type { Component, DiagramWithSha } from "@/lib/types"
 import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import yaml from "js-yaml"
 
 type GenerateResult = {
@@ -546,7 +547,7 @@ export default function GeneratePage() {
                 [&_strong]:font-semibold [&_strong]:text-gray-900
                 [&_hr]:my-4 [&_hr]:border-gray-200"
             >
-              <ReactMarkdown>{result?.generated ?? ""}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{result?.generated ?? ""}</ReactMarkdown>
             </div>
           </div>
         </DialogContent>
