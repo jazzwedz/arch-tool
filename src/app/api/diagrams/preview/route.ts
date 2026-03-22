@@ -1,43 +1,57 @@
 import { NextResponse } from "next/server"
+import { getDiagram } from "@/lib/github"
+import { isValidName } from "@/lib/validate"
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
-    const { xml } = await request.json()
+    const { searchParams } = new URL(request.url)
+    const name = searchParams.get("name")
 
-    if (!xml) {
-      return NextResponse.json({ error: "No XML provided" }, { status: 400 })
+    if (!name || !isValidName(name)) {
+      return new NextResponse("Invalid diagram name", { status: 400 })
     }
 
-    const res = await fetch("https://convert.diagrams.net/node/export", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        xml,
-        format: "png",
-        scale: 2,
-        border: 20,
-      }),
-    })
+    const diagram = await getDiagram(name)
+    const base64Xml = Buffer.from(diagram.content).toString("base64")
 
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: "Diagram export failed" },
-        { status: 502 }
-      )
-    }
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: auto; }
+    .geDiagramContainer { max-width: 100% !important; }
+    .geDiagramContainer svg { max-width: 100% !important; height: auto !important; }
+  </style>
+</head>
+<body>
+  <div id="diagram"></div>
+  <script>
+    var xml = atob("${base64Xml}");
+    var div = document.getElementById("diagram");
+    div.className = "mxgraph";
+    div.setAttribute("data-mxgraph", JSON.stringify({
+      highlight: "#0000ff",
+      nav: true,
+      resize: true,
+      toolbar: "zoom layers lightbox",
+      edit: "_blank",
+      xml: xml
+    }));
+  </script>
+  <script src="https://viewer.diagrams.net/js/viewer-static.min.js"></script>
+</body>
+</html>`
 
-    const buffer = await res.arrayBuffer()
-    return new NextResponse(buffer, {
+    return new NextResponse(html, {
       headers: {
-        "Content-Type": "image/png",
+        "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "private, max-age=300",
       },
     })
   } catch (error) {
     console.error("Diagram preview failed:", error instanceof Error ? error.message : "Unknown error")
-    return NextResponse.json(
-      { error: "Failed to generate preview" },
-      { status: 500 }
-    )
+    return new NextResponse("Failed to load diagram", { status: 500 })
   }
 }

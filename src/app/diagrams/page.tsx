@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -18,7 +18,6 @@ import {
   Eye,
   X,
 } from "lucide-react"
-import Image from "next/image"
 import Link from "next/link"
 import type { DiagramWithSha } from "@/lib/types"
 
@@ -97,40 +96,6 @@ export default function DiagramsPage() {
     URL.revokeObjectURL(url)
   }
 
-  const [previewImage, setPreviewImage] = useState<string | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
-
-  useEffect(() => {
-    if (previewDiagram) {
-      setPreviewLoading(true)
-      setPreviewImage(null)
-      fetch("/api/diagrams/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ xml: previewDiagram.content }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Export failed")
-          return res.blob()
-        })
-        .then((blob) => {
-          const url = URL.createObjectURL(blob)
-          setPreviewImage(url)
-        })
-        .catch((err) => {
-          console.error("Diagram export failed:", err)
-          // Fallback: show raw XML info
-          setPreviewImage(null)
-        })
-        .finally(() => setPreviewLoading(false))
-
-      return () => {
-        if (previewImage) URL.revokeObjectURL(previewImage)
-      }
-    }
-    setPreviewImage(null)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewDiagram])
 
   return (
     <div className="space-y-6">
@@ -291,25 +256,14 @@ export default function DiagramsPage() {
               </Button>
             </div>
           </div>
-          <div className="flex-1 overflow-auto bg-gray-50 flex items-center justify-center p-4">
-            {previewLoading && (
-              <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Rendering diagram...</p>
-              </div>
-            )}
-            {previewImage && (
-              <Image
-                src={previewImage}
-                alt={`Diagram: ${previewDiagram?.name}`}
-                className="max-w-full max-h-full object-contain"
-                width={800}
-                height={600}
-                unoptimized
+          <div className="flex-1 overflow-hidden bg-gray-50">
+            {previewDiagram && (
+              <iframe
+                src={`/api/diagrams/preview?name=${encodeURIComponent(previewDiagram.name)}`}
+                className="w-full h-full border-0"
+                title={`Preview: ${previewDiagram.name}`}
+                sandbox="allow-scripts"
               />
-            )}
-            {!previewLoading && !previewImage && previewDiagram && (
-              <p className="text-sm text-muted-foreground">Failed to render diagram preview.</p>
             )}
           </div>
         </DialogContent>
