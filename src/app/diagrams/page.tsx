@@ -44,10 +44,14 @@ export default function DiagramsPage() {
   }, [])
 
   const handleUpload = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".drawio")) {
+      alert("Only .drawio files are allowed.")
+      return
+    }
     setUploading(true)
     try {
       const content = await file.text()
-      const name = file.name.replace(/\.drawio$/i, "").replace(/\.xml$/i, "")
+      const name = file.name.replace(/\.drawio$/i, "")
 
       const res = await fetch("/api/diagrams", {
         method: "POST",
@@ -158,13 +162,13 @@ export default function DiagramsPage() {
                 {uploading ? "Uploading..." : "Click to upload a diagram"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Supports .drawio and .xml files
+                Only .drawio files are supported
               </p>
             </div>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".drawio,.xml"
+              accept=".drawio"
               className="hidden"
               disabled={uploading}
               onChange={(e) => {
@@ -292,7 +296,7 @@ export default function DiagramsPage() {
                 srcDoc={buildViewerHtml(previewDiagram.content)}
                 className="w-full h-full border-0"
                 title={`Preview: ${previewDiagram.name}`}
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts"
               />
             )}
           </div>

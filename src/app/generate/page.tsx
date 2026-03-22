@@ -191,10 +191,11 @@ export default function GeneratePage() {
   const handleSavePdf = useCallback(() => {
     if (!docContentRef.current) return
     const content = docContentRef.current.innerHTML
-    const title =
+    const rawTitle =
       selectionMode === "component" && selectedComponent
         ? selectedComponent.name
         : selectedDiagramName
+    const title = (rawTitle || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 
     const printWindow = window.open("", "_blank")
     if (!printWindow) return

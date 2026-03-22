@@ -44,7 +44,7 @@ export async function listComponents(): Promise<Component[]> {
           })
 
           const content = Buffer.from(blobData.content, "base64").toString("utf-8")
-          return yaml.load(content) as Component
+          return yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Component
         } catch (err) {
           console.error(`Failed to fetch component ${file.path}:`, err)
           return null
@@ -78,7 +78,7 @@ export async function getComponent(
   }
 
   const content = Buffer.from(data.content, "base64").toString("utf-8")
-  const component = yaml.load(content) as Component
+  const component = yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Component
 
   return { ...component, sha: data.sha }
 }

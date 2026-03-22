@@ -1,21 +1,38 @@
 import { NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
+import { checkRateLimit } from "@/lib/rate-limit"
+import { isValidAudience, sanitizeForPrompt } from "@/lib/validate"
 
 const anthropic = new Anthropic()
 
 export async function POST(request: Request) {
   try {
+    const clientIp = request.headers.get("x-forwarded-for") || "unknown"
+    if (!checkRateLimit(clientIp)) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a minute before trying again." },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { audience } = body
+
+    if (!isValidAudience(audience)) {
+      return NextResponse.json(
+        { error: "Invalid audience. Must be Technical, Business, or Executive." },
+        { status: 400 }
+      )
+    }
 
     let prompt: string
 
     if (body.componentId) {
-      prompt = buildComponentPrompt(body.yamlContent, audience)
+      prompt = buildComponentPrompt(sanitizeForPrompt(body.yamlContent), audience)
     } else if (body.diagramName) {
       prompt = buildDiagramPrompt(
-        body.diagramName,
-        body.componentsYaml,
+        sanitizeForPrompt(body.diagramName),
+        sanitizeForPrompt(body.componentsYaml),
         audience
       )
     } else {
@@ -41,7 +58,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ generated: generatedText })
   } catch (error) {
-    console.error("Failed to generate doc:", error)
+    console.error("Failed to generate doc:", error instanceof Error ? error.message : "Unknown error")
     return NextResponse.json(
       { error: "Failed to generate documentation" },
       { status: 500 }

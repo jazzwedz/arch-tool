@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getComponent, saveComponent, deleteComponent } from "@/lib/github"
+import { isValidName } from "@/lib/validate"
 
 export async function GET(
   _request: Request,
@@ -7,10 +8,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    if (!isValidName(id)) {
+      return NextResponse.json({ error: "Invalid component ID" }, { status: 400 })
+    }
     const component = await getComponent(id)
     return NextResponse.json(component)
   } catch (error) {
-    console.error("Failed to get component:", error)
+    console.error("Failed to get component:", error instanceof Error ? error.message : "Unknown error")
     return NextResponse.json(
       { error: "Component not found" },
       { status: 404 }
@@ -24,6 +28,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+    if (!isValidName(id)) {
+      return NextResponse.json({ error: "Invalid component ID" }, { status: 400 })
+    }
     const { sha, ...component } = await request.json()
     if (component.id !== id) {
       return NextResponse.json(
@@ -34,7 +41,7 @@ export async function PUT(
     await saveComponent(component, sha)
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Failed to update component:", error)
+    console.error("Failed to update component:", error instanceof Error ? error.message : "Unknown error")
     return NextResponse.json(
       { error: "Failed to update component" },
       { status: 500 }
@@ -48,11 +55,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    if (!isValidName(id)) {
+      return NextResponse.json({ error: "Invalid component ID" }, { status: 400 })
+    }
     const { sha } = await request.json()
     await deleteComponent(id, sha)
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Failed to delete component:", error)
+    console.error("Failed to delete component:", error instanceof Error ? error.message : "Unknown error")
     return NextResponse.json(
       { error: "Failed to delete component" },
       { status: 500 }
