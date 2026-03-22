@@ -29,44 +29,16 @@ import {
   X,
   Upload,
   Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import Link from "next/link"
 import type { Component, DiagramWithSha } from "@/lib/types"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import mermaid from "mermaid"
 import yaml from "js-yaml"
-
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "default",
-  securityLevel: "strict",
-})
-
-function MermaidDiagram({ chart }: { chart: string }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [svg, setSvg] = useState<string>("")
-
-  useEffect(() => {
-    const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`
-    mermaid.render(id, chart).then(({ svg }) => {
-      setSvg(svg)
-    }).catch((err) => {
-      console.error("Mermaid render failed:", err)
-      setSvg("")
-    })
-  }, [chart])
-
-  if (!svg) return <pre className="bg-gray-100 p-4 rounded-md text-xs overflow-x-auto">{chart}</pre>
-
-  return (
-    <div
-      ref={containerRef}
-      className="my-4 flex justify-center bg-white rounded-md border p-4 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  )
-}
+import { drawioToMermaid } from "@/lib/drawio-preview"
+import { MermaidPreview } from "@/components/mermaid-preview"
 
 type GenerateResult = {
   generated?: string
@@ -100,6 +72,7 @@ export default function GeneratePage() {
   const [componentDiagrams, setComponentDiagrams] = useState<string[]>([])
   const [showDocModal, setShowDocModal] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [expandedDiagram, setExpandedDiagram] = useState<string | null>(null)
   const [bizReqFile, setBizReqFile] = useState<{ name: string; content: string } | null>(null)
   const [erdFile, setErdFile] = useState<{ name: string; content: string } | null>(null)
   const [bpmnFile, setBpmnFile] = useState<{ name: string; content: string } | null>(null)
@@ -565,16 +538,40 @@ export default function GeneratePage() {
                   This component does not appear in any diagram.
                 </p>
               ) : (
-                <div className="space-y-1">
-                  {componentDiagrams.map((name) => (
-                    <div
-                      key={name}
-                      className="flex items-center gap-2 p-2 rounded-md border text-sm hover:bg-muted/50 transition-colors"
-                    >
-                      <FileImage className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="font-mono">{name}.drawio</span>
-                    </div>
-                  ))}
+                <div className="space-y-2">
+                  {componentDiagrams.map((name) => {
+                    const diagram = diagrams.find((d) => d.name === name)
+                    const chart = diagram ? drawioToMermaid(diagram.content) : null
+                    const isExpanded = expandedDiagram === name
+                    return (
+                      <div key={name} className="rounded-md border overflow-hidden">
+                        <div className="flex items-center gap-2 p-2 text-sm hover:bg-muted/50 transition-colors">
+                          <FileImage className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-mono flex-1">{name}.drawio</span>
+                          {chart && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setExpandedDiagram(isExpanded ? null : name)}
+                              title={isExpanded ? "Hide preview" : "Show preview"}
+                            >
+                              {isExpanded ? (
+                                <EyeOff className="h-3.5 w-3.5" />
+                              ) : (
+                                <Eye className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                        {isExpanded && chart && (
+                          <div className="border-t bg-white p-4">
+                            <MermaidPreview chart={chart} className="max-h-[400px]" />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -714,7 +711,7 @@ export default function GeneratePage() {
                   code({ className, children, ...props }) {
                     const isMermaid = /language-mermaid/.test(className || "")
                     if (isMermaid) {
-                      return <MermaidDiagram chart={String(children).trim()} />
+                      return <MermaidPreview chart={String(children).trim()} />
                     }
                     const isInline = !className
                     if (isInline) {
