@@ -17,6 +17,7 @@ import {
   Pencil,
   ArrowRight,
   Download,
+  Trash2,
 } from "lucide-react"
 
 export default function ComponentDetailPage() {
@@ -25,6 +26,8 @@ export default function ComponentDetailPage() {
   const [component, setComponent] = useState<ComponentWithSha | null>(null)
   const [loading, setLoading] = useState(true)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     fetch(`/api/components/${id}`)
@@ -41,6 +44,23 @@ export default function ComponentDetailPage() {
     navigator.clipboard.writeText(text)
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  const handleDelete = async () => {
+    if (!component) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/components/${component.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sha: component.sha }),
+      })
+      if (!res.ok) throw new Error("Failed to delete")
+      router.push("/")
+    } catch {
+      setDeleting(false)
+      setShowDeleteConfirm(false)
+    }
   }
 
   if (loading || !component) {
@@ -83,8 +103,43 @@ export default function ComponentDetailPage() {
               Edit
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      {showDeleteConfirm && (
+        <div className="rounded-lg border border-destructive bg-destructive/5 p-4">
+          <p className="text-sm font-medium mb-3">
+            Are you sure you want to delete <strong>{component.name}</strong>? This action cannot be undone.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Yes, delete"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Quick actions */}
       <div className="flex gap-2">

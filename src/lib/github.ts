@@ -97,3 +97,16 @@ export async function saveComponent(
     ...(sha ? { sha } : {}),
   })
 }
+
+export async function deleteComponent(id: string, sha: string): Promise<void> {
+  const path = `components/${id}.yaml`
+
+  await octokit.rest.repos.deleteFile({
+    owner,
+    repo,
+    path,
+    message: `feat: remove component ${id}`,
+    sha,
+    branch,
+  })
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getComponent, saveComponent } from "@/lib/github"
+import { getComponent, saveComponent, deleteComponent } from "@/lib/github"
 
 export async function GET(
   _request: Request,
@@ -37,6 +37,24 @@ export async function PUT(
     console.error("Failed to update component:", error)
     return NextResponse.json(
       { error: "Failed to update component" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const { sha } = await request.json()
+    await deleteComponent(id, sha)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Failed to delete component:", error)
+    return NextResponse.json(
+      { error: "Failed to delete component" },
       { status: 500 }
     )
   }
