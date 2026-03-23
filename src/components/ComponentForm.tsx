@@ -26,7 +26,12 @@ import type {
   ComponentInterface,
   ComponentDependency,
 } from "@/lib/types"
-import { Plus, Trash2, Save, Loader2 } from "lucide-react"
+import { Plus, Trash2, Save, Loader2, Info } from "lucide-react"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 
 interface ComponentFormProps {
   initialData?: Component & { sha?: string }
@@ -306,7 +311,17 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
       {/* Interfaces */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Interfaces</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Interfaces
+            <Tooltip>
+              <TooltipTrigger className="cursor-help">
+                <Info className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs">
+                What this component exposes to others (provides) and what it consumes from other components. Interfaces describe the API surface — the protocols, directions, and purposes of each connection point.
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
           <Button
             type="button"
             variant="outline"
@@ -412,7 +427,17 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
       {/* Dependencies */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Dependencies</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Dependencies
+            <Tooltip>
+              <TooltipTrigger className="cursor-help">
+                <Info className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs">
+                Other components this one depends on to function. If a dependency is unavailable, this component may be degraded or non-functional. Each dependency links to the target component and shows the connection type used.
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
           <Button
             type="button"
             variant="outline"

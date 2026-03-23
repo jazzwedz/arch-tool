@@ -18,7 +18,13 @@ import {
   ArrowRight,
   Download,
   Trash2,
+  Info,
 } from "lucide-react"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -249,7 +255,17 @@ export default function ComponentDetailPage() {
         {/* Interfaces */}
         <Card>
           <CardHeader>
-            <CardTitle>Interfaces</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Interfaces
+              <Tooltip>
+                <TooltipTrigger className="cursor-help">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  What this component exposes to others (provides) and what it consumes from other components. Interfaces describe the API surface — the protocols, directions, and purposes of each connection point.
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {component.interfaces.length === 0 ? (
@@ -290,7 +306,17 @@ export default function ComponentDetailPage() {
         {/* Dependencies */}
         <Card>
           <CardHeader>
-            <CardTitle>Dependencies</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Dependencies
+              <Tooltip>
+                <TooltipTrigger className="cursor-help">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  Other components this one depends on to function. If a dependency is unavailable, this component may be degraded or non-functional. Each dependency links to the target component and shows the connection type used.
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {component.dependencies.length === 0 ? (

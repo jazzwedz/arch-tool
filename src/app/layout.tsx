@@ -4,6 +4,7 @@ import "./globals.css"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { Layers, FileText, Download, FileImage } from "lucide-react"
+import { Providers } from "@/components/Providers"
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -72,7 +73,9 @@ export default function RootLayout({
             </nav>
           </div>
         </header>
-        <main className="container mx-auto px-4 py-8">{children}</main>
+        <Providers>
+          <main className="container mx-auto px-4 py-8">{children}</main>
+        </Providers>
       </body>
     </html>
   )
