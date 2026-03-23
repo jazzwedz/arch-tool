@@ -55,14 +55,15 @@ const connectorEntries = [
   },
 ]
 
-// Encode only < and > — Draw.io decodes these after XML parsing.
-// Double-quoted attribute values are left as-is; JSON.stringify escapes them to \".
+// Encode < and > for embedding in XML. Do NOT encode quotes — the xml values
+// go inside JSON strings where JSON.stringify handles quote escaping with \".
+// Encoding quotes as &quot; causes double-escaping when Draw.io parses the
+// outer XML first (converting &quot; back to ") which then breaks the JSON.
 function encodeXml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
 }
 
 function buildComponentXml(component: Component): string {
