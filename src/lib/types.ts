@@ -1,6 +1,6 @@
 export interface ComponentInterface {
   direction: "provides" | "consumes"
-  type: "rest" | "grpc" | "async" | "db" | "file" | "human"
+  type: "rest" | "grpc" | "async" | "db" | "file" | "human" | "info" | "link"
   target?: string
   description: string
 }
@@ -17,7 +17,7 @@ export type RelationshipType =
 export interface ComponentRelationship {
   target: string
   type: RelationshipType
-  connector?: "rest" | "grpc" | "async" | "db" | "file" | "human"
+  connector?: "rest" | "grpc" | "async" | "db" | "file" | "human" | "info" | "link"
   description?: string
 }
 

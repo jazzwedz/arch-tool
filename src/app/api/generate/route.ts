@@ -16,11 +16,19 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { audience } = body
+    const { audience, documentType, documentTypeLabel } = body
 
-    if (!isValidAudience(audience)) {
+    if (!documentType && !isValidAudience(audience)) {
       return NextResponse.json(
         { error: "Invalid audience. Must be Technical, Business, or Executive." },
+        { status: 400 }
+      )
+    }
+
+    const validDocTypes = ["detailed-solution", "audit-report", "security-report"]
+    if (documentType && !validDocTypes.includes(documentType)) {
+      return NextResponse.json(
+        { error: "Invalid document type." },
         { status: 400 }
       )
     }
@@ -30,7 +38,43 @@ export async function POST(request: Request) {
 
     let prompt: string
 
-    if (body.componentId) {
+    if (documentType === "detailed-solution") {
+      // Detailed Solution Description — same as audience-based Technical but with custom title
+      if (body.componentId) {
+        prompt = buildComponentPrompt(sanitizeForPrompt(body.yamlContent), "Technical", attachmentContext, "Detailed Solution Description")
+      } else if (body.diagramName) {
+        prompt = buildDiagramPrompt(
+          sanitizeForPrompt(body.diagramName),
+          sanitizeForPrompt(body.componentsYaml),
+          "Technical",
+          attachmentContext,
+          "Detailed Solution Description"
+        )
+      } else {
+        return NextResponse.json(
+          { error: "No component or diagram selected" },
+          { status: 400 }
+        )
+      }
+    } else if (documentType) {
+      // Audit Report or Security Report
+      if (body.componentId) {
+        prompt = buildDocTypeComponentPrompt(sanitizeForPrompt(body.yamlContent), documentType, documentTypeLabel || documentType, attachmentContext)
+      } else if (body.diagramName) {
+        prompt = buildDocTypeDiagramPrompt(
+          sanitizeForPrompt(body.diagramName),
+          sanitizeForPrompt(body.componentsYaml),
+          documentType,
+          documentTypeLabel || documentType,
+          attachmentContext
+        )
+      } else {
+        return NextResponse.json(
+          { error: "No component or diagram selected" },
+          { status: 400 }
+        )
+      }
+    } else if (body.componentId) {
       prompt = buildComponentPrompt(sanitizeForPrompt(body.yamlContent), audience, attachmentContext)
     } else if (body.diagramName) {
       prompt = buildDiagramPrompt(
@@ -70,7 +114,11 @@ export async function POST(request: Request) {
   }
 }
 
-function buildComponentPrompt(yamlContent: string, audience: string, attachmentContext: string): string {
+function buildComponentPrompt(yamlContent: string, audience: string, attachmentContext: string, docTitle?: string): string {
+  const titleInstruction = docTitle
+    ? `# [Component Name] — ${docTitle}`
+    : `# [Component Name]`
+
   return `You are a documentation writer producing clear, professional architecture documents. Your writing must sound human and natural — never like AI-generated content.
 
 ${writingStyleRules()}
@@ -86,7 +134,7 @@ ${attachmentContext}
 
 Generate a well-structured document in Markdown format with these chapters in this exact order:
 
-# [Component Name]
+${titleInstruction}
 
 ## Table of Contents
 (list all chapters below as a numbered list)
@@ -146,8 +194,13 @@ function buildDiagramPrompt(
   diagramName: string,
   componentsYaml: string,
   audience: string,
-  attachmentContext: string
+  attachmentContext: string,
+  docTitle?: string
 ): string {
+  const titleText = docTitle
+    ? `# ${diagramName} — ${docTitle}`
+    : `# ${diagramName} — System Overview`
+
   return `You are a documentation writer producing clear, professional architecture documents. Your writing must sound human and natural — never like AI-generated content.
 
 ${writingStyleRules()}
@@ -165,7 +218,7 @@ ${attachmentContext}
 
 Generate a well-structured document in Markdown format with these chapters in this exact order:
 
-# ${diagramName} — System Overview
+${titleText}
 
 ## Table of Contents
 (list all chapters below as a numbered list)
@@ -247,6 +300,161 @@ function audienceGuidance(audience: string): string {
     default:
       return ""
   }
+}
+
+function docTypeGuidance(docType: string): string {
+  switch (docType) {
+    case "audit-report":
+      return `You are writing an Audit Report — a structured assessment document that evaluates the component/system against best practices. Focus on: compliance with standards, identified gaps, risk areas, recommendations for improvement, and overall maturity assessment. Write in a formal, objective tone suitable for auditors and compliance officers.`
+    case "security-report":
+      return `You are writing a Security Report — a focused security assessment document. Analyze: attack surface, authentication/authorization mechanisms, data protection, known vulnerabilities or risks, security controls in place, and recommendations. Write for security engineers and CISOs. Be specific about threats and mitigations.`
+    default:
+      return ""
+  }
+}
+
+function docTypeChapters(docType: string, name: string, isComponent: boolean): string {
+  const entityWord = isComponent ? "Component" : "System"
+
+  switch (docType) {
+    case "audit-report":
+      return `# ${name} — Audit Report
+
+## Table of Contents
+(list all chapters below as a numbered list)
+
+## 1. Audit Metadata
+| Field | Value |
+|-------|-------|
+| Audit Date | [today's date] |
+| Scope | ${name} |
+| Generated By | Auto-generated |
+
+## 2. Executive Summary
+Brief overview of findings — what's good, what needs attention, overall risk level.
+
+## 3. ${entityWord} Overview
+Factual summary of what this ${entityWord.toLowerCase()} does and its role in the architecture.
+
+## 4. Architecture Assessment
+Evaluate the architecture against best practices. Are patterns appropriate? Is the design maintainable? Are there single points of failure?
+
+## 5. Interface & Integration Review
+Assess all external connections. Are protocols appropriate? Is error handling in place? Are there undocumented dependencies?
+
+## 6. Data Governance
+How is data handled? Is there proper classification? Are there data quality concerns? Privacy implications?
+
+## 7. Operational Readiness
+Is monitoring in place? Are there runbooks? Disaster recovery? SLAs defined?
+
+## 8. Risk Register
+| Risk | Severity | Likelihood | Impact | Recommendation |
+|------|----------|-----------|--------|----------------|
+(list identified risks as table rows)
+
+## 9. Findings & Recommendations
+Numbered list of specific findings with priority (Critical / High / Medium / Low) and concrete recommendations.
+
+## 10. Overall Assessment
+Summary maturity rating and key next steps.`
+
+    case "security-report":
+      return `# ${name} — Security Assessment Report
+
+## Table of Contents
+(list all chapters below as a numbered list)
+
+## 1. Assessment Metadata
+| Field | Value |
+|-------|-------|
+| Assessment Date | [today's date] |
+| Scope | ${name} |
+| Generated By | Auto-generated |
+
+## 2. Executive Summary
+Brief security posture overview — key risks, overall threat level, most urgent recommendations.
+
+## 3. ${entityWord} Overview
+Factual summary focused on security-relevant aspects — what it does, what data it handles, who accesses it.
+
+## 4. Attack Surface Analysis
+What is exposed? External APIs, user interfaces, admin interfaces, message queues, file endpoints. For each: what could an attacker target?
+
+## 5. Authentication & Authorization
+How are users and systems authenticated? What authorization model is used? Are there privilege escalation risks?
+
+## 6. Data Protection
+What sensitive data is handled? Is it encrypted at rest and in transit? Are there data leakage risks? PII/GDPR considerations?
+
+## 7. Integration Security
+Are external connections secured? TLS everywhere? API key management? Input validation on external data?
+
+## 8. Vulnerability Assessment
+Based on the architecture and interfaces, what are the likely vulnerability categories? (e.g., injection, broken access control, SSRF, etc.)
+
+## 9. Threat Matrix
+| Threat | Category | Severity | Current Mitigation | Gap |
+|--------|----------|----------|-------------------|-----|
+(list identified threats as table rows)
+
+## 10. Recommendations
+Prioritized list of security improvements. For each: what to do, why it matters, effort estimate (Low/Medium/High).
+
+## 11. Overall Security Posture
+Summary rating and key next steps.`
+
+    default:
+      return ""
+  }
+}
+
+function buildDocTypeComponentPrompt(yamlContent: string, docType: string, docTypeLabel: string, attachmentContext: string): string {
+  const name = yamlContent.match(/^id:\s*(.+)$/m)?.[1]?.trim() || "Component"
+  return `You are a documentation writer producing clear, professional architecture documents. Your writing must sound human and natural — never like AI-generated content.
+
+${writingStyleRules()}
+
+${docTypeGuidance(docType)}
+
+Component definition (YAML):
+\`\`\`yaml
+${yamlContent}
+\`\`\`
+${attachmentContext}
+
+Generate a well-structured document in Markdown format with these chapters in this exact order:
+
+${docTypeChapters(docType, name, true)}
+
+For mermaid diagrams: use \`\`\`mermaid code blocks. Use short, readable labels. Only show real connections from the data.
+
+Focus on accurately describing what is defined in the data. Do not invent information that is not present. Where you extrapolate (especially data models), clearly label it as an estimate.`
+}
+
+function buildDocTypeDiagramPrompt(diagramName: string, componentsYaml: string, docType: string, docTypeLabel: string, attachmentContext: string): string {
+  return `You are a documentation writer producing clear, professional architecture documents. Your writing must sound human and natural — never like AI-generated content.
+
+${writingStyleRules()}
+
+${docTypeGuidance(docType)}
+
+Diagram: ${diagramName}
+
+The diagram contains the following components from the architecture catalog:
+
+\`\`\`yaml
+${componentsYaml}
+\`\`\`
+${attachmentContext}
+
+Generate a well-structured document in Markdown format with these chapters in this exact order:
+
+${docTypeChapters(docType, diagramName, false)}
+
+For mermaid diagrams: use \`\`\`mermaid code blocks. Use short, readable labels. Only show real connections from the data.
+
+Focus on accurately describing what is defined in the data. Do not invent information that is not present. Where you extrapolate (especially data models), clearly label it as an estimate.`
 }
 
 function buildAttachmentContext(attachments: Record<string, string>): string {

@@ -55,6 +55,14 @@ type MatchedComponent = {
 }
 
 type SelectionMode = "none" | "component" | "diagram"
+type OutputMode = "audience" | "doctype"
+type DocumentType = "detailed-solution" | "audit-report" | "security-report"
+
+const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
+  "detailed-solution": "Detailed Solution Description",
+  "audit-report": "Audit Report",
+  "security-report": "Security Report",
+}
 
 export default function GeneratePage() {
   const [components, setComponents] = useState<Component[]>([])
@@ -62,7 +70,9 @@ export default function GeneratePage() {
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("none")
   const [selectedComponentId, setSelectedComponentId] = useState<string>("")
   const [selectedDiagramName, setSelectedDiagramName] = useState<string>("")
+  const [outputMode, setOutputMode] = useState<OutputMode>("audience")
   const [audience, setAudience] = useState<string>("Technical")
+  const [documentType, setDocumentType] = useState<DocumentType>("detailed-solution")
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState<GenerateResult | null>(null)
   const [matchedComponents, setMatchedComponents] = useState<
@@ -184,18 +194,22 @@ export default function GeneratePage() {
       if (erdFile) attachments.dataModel = erdFile.content
       if (bpmnFile) attachments.processModel = bpmnFile.content
 
+      const outputSpec = outputMode === "audience"
+        ? { audience }
+        : { audience: "Technical", documentType: documentType, documentTypeLabel: DOCUMENT_TYPE_LABELS[documentType] }
+
       if (selectionMode === "component" && selectedComponent) {
         const yamlContent = yaml.dump(selectedComponent)
         body = {
           componentId: selectedComponentId,
-          audience,
+          ...outputSpec,
           yamlContent,
           attachments,
         }
       } else {
         body = {
           diagramName: selectedDiagramName,
-          audience,
+          ...outputSpec,
           componentsYaml: matchedComponents
             .filter((m) => m.component)
             .map((m) => yaml.dump(m.component!))
@@ -370,20 +384,53 @@ export default function GeneratePage() {
             </div>
           )}
 
-          {/* Audience */}
+          {/* Output mode */}
           <div className="space-y-2">
-            <Label>Audience</Label>
-            <Select value={audience} onValueChange={setAudience}>
+            <Label>Output</Label>
+            <Select value={outputMode} onValueChange={(v) => setOutputMode(v as OutputMode)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Technical">Technical</SelectItem>
-                <SelectItem value="Business">Business</SelectItem>
-                <SelectItem value="Executive">Executive</SelectItem>
+                <SelectItem value="audience">By Audience</SelectItem>
+                <SelectItem value="doctype">Document Type</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {/* Audience selector */}
+          {outputMode === "audience" && (
+            <div className="space-y-2">
+              <Label>Audience</Label>
+              <Select value={audience} onValueChange={setAudience}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Technical">Technical</SelectItem>
+                  <SelectItem value="Business">Business</SelectItem>
+                  <SelectItem value="Executive">Executive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Document type selector */}
+          {outputMode === "doctype" && (
+            <div className="space-y-2">
+              <Label>Document Type</Label>
+              <Select value={documentType} onValueChange={(v) => setDocumentType(v as DocumentType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="detailed-solution">Detailed Solution Description</SelectItem>
+                  <SelectItem value="audit-report">Audit Report</SelectItem>
+                  <SelectItem value="security-report">Security Report</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Optional attachments */}
           <div className="space-y-3 pt-2 border-t">
@@ -655,7 +702,7 @@ export default function GeneratePage() {
                     : selectedDiagramName}
                 </span>
                 <span className="inline-flex items-center px-3 py-1 rounded text-xs font-semibold bg-gray-900 text-white uppercase tracking-wide">
-                  {audience}
+                  {outputMode === "audience" ? audience : DOCUMENT_TYPE_LABELS[documentType]}
                 </span>
               </DialogTitle>
             </DialogHeader>

@@ -94,6 +94,8 @@ export const CONNECTOR_TYPES = [
   "db",
   "file",
   "human",
+  "info",
+  "link",
 ] as const
 
 export const INTERFACE_DIRECTIONS = ["provides", "consumes"] as const

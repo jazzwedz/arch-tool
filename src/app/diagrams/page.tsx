@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   Eye,
   X,
+  Pencil,
 } from "lucide-react"
 import Link from "next/link"
 import type { DiagramWithSha } from "@/lib/types"
@@ -108,13 +109,19 @@ export default function DiagramsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold">Architecture Diagrams</h1>
           <p className="text-muted-foreground mt-1">
             Upload and manage Draw.io architecture diagrams stored in the
             repository
           </p>
         </div>
+        <Link href="/diagrams/builder">
+          <Button>
+            <Pencil className="h-4 w-4 mr-2" />
+            Diagram Builder
+          </Button>
+        </Link>
       </div>
 
       {/* Upload area */}
@@ -186,6 +193,16 @@ export default function DiagramsPage() {
                   <span className="text-xs text-muted-foreground">
                     {(d.content.length / 1024).toFixed(1)} KB
                   </span>
+                  <Link href={`/diagrams/builder?load=${encodeURIComponent(d.name)}`}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Edit in Builder"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="icon"

@@ -69,6 +69,16 @@ const connectorEntries = [
     xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=open;endFill=0;dashed=1;strokeColor=#d79b00;fontSize=10;" value="Human" connector_type="human" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
   },
+  {
+    title: "Info",
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=block;endFill=1;strokeColor=#2196f3;strokeWidth=2;fontSize=10;" value="Info" connector_type="info" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
+    w: 120, h: 20,
+  },
+  {
+    title: "Link",
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=none;strokeColor=#607d8b;fontSize=10;" value="Link" connector_type="link" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
+    w: 120, h: 20,
+  },
 ]
 
 // Encode < and > for embedding in XML. Do NOT encode quotes — the xml values
