@@ -41,6 +41,10 @@ export type ComponentType =
   | "external"
   | "platform"
   | "library"
+  | "data-pipeline"
+  | "storage"
+  | "batch-job"
+  | "cache"
 
 export type ComponentStatus = "draft" | "production" | "deprecated"
 

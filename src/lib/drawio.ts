@@ -1,25 +1,33 @@
 import type { Component, ComponentType } from "./types"
 
 const typeStyles: Record<ComponentType, string> = {
-  microservice: "rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;",
-  frontend:     "rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;",
-  database:     "shape=cylinder3;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;",
-  queue:        "rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;",
-  gateway:      "rhombus;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;",
-  external:     "rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;dashed=1;",
-  platform:     "rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=11;",
-  library:      "rounded=1;fillColor=#f0f0f0;strokeColor=#999999;fontStyle=1;fontSize=11;",
+  microservice:    "rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;",
+  frontend:        "rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;",
+  database:        "shape=cylinder3;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;",
+  queue:           "rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;",
+  gateway:         "rhombus;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;",
+  external:        "rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;dashed=1;",
+  platform:        "rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=11;",
+  library:         "rounded=1;fillColor=#f0f0f0;strokeColor=#999999;fontStyle=1;fontSize=11;",
+  "data-pipeline": "rounded=1;fillColor=#d4e8f7;strokeColor=#3a7ca5;fontStyle=1;fontSize=11;",
+  storage:         "shape=cylinder3;fillColor=#e8dff0;strokeColor=#7b5ea7;fontStyle=1;fontSize=11;",
+  "batch-job":     "rounded=1;fillColor=#fce4d6;strokeColor=#c55a11;fontStyle=1;fontSize=11;dashed=1;",
+  cache:           "rounded=1;fillColor=#d6f5d6;strokeColor=#48a848;fontStyle=1;fontSize=11;",
 }
 
 const typeSizes: Record<ComponentType, { w: number; h: number }> = {
-  microservice: { w: 120, h: 60 },
-  frontend:     { w: 120, h: 60 },
-  gateway:      { w: 120, h: 60 },
-  database:     { w: 60,  h: 70 },
-  queue:        { w: 60,  h: 60 },
-  external:     { w: 120, h: 60 },
-  platform:     { w: 120, h: 60 },
-  library:      { w: 120, h: 60 },
+  microservice:    { w: 120, h: 60 },
+  frontend:        { w: 120, h: 60 },
+  gateway:         { w: 120, h: 60 },
+  database:        { w: 60,  h: 70 },
+  queue:           { w: 60,  h: 60 },
+  external:        { w: 120, h: 60 },
+  platform:        { w: 120, h: 60 },
+  library:         { w: 120, h: 60 },
+  "data-pipeline": { w: 140, h: 60 },
+  storage:         { w: 60,  h: 70 },
+  "batch-job":     { w: 120, h: 60 },
+  cache:           { w: 60,  h: 60 },
 }
 
 const connectorEntries = [
