@@ -122,6 +122,34 @@ export async function deleteComponent(id: string, sha: string): Promise<void> {
   })
 }
 
+// Component history
+
+export interface ComponentCommit {
+  sha: string
+  message: string
+  author: string
+  date: string
+}
+
+export async function getComponentHistory(id: string): Promise<ComponentCommit[]> {
+  const path = `components/${id}.yaml`
+
+  const { data } = await octokit.rest.repos.listCommits({
+    owner,
+    repo,
+    path,
+    sha: branch,
+    per_page: 50,
+  })
+
+  return data.map((commit) => ({
+    sha: commit.sha.slice(0, 7),
+    message: commit.commit.message,
+    author: commit.commit.author?.name || "unknown",
+    date: commit.commit.author?.date || "",
+  }))
+}
+
 // Diagrams
 
 export async function listDiagrams(): Promise<DiagramWithSha[]> {

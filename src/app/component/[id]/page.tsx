@@ -19,6 +19,7 @@ import {
   Download,
   Trash2,
   Info,
+  History,
 } from "lucide-react"
 import {
   Tooltip,
@@ -34,6 +35,8 @@ export default function ComponentDetailPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [history, setHistory] = useState<{ sha: string; message: string; author: string; date: string }[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
 
   useEffect(() => {
     fetch(`/api/components/${id}`)
@@ -44,6 +47,12 @@ export default function ComponentDetailPage() {
       .then(setComponent)
       .catch(() => router.push("/"))
       .finally(() => setLoading(false))
+
+    fetch(`/api/components/${id}/history`)
+      .then((r) => r.json())
+      .then(setHistory)
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false))
   }, [id, router])
 
   const copyToClipboard = (text: string, field: string) => {
@@ -359,6 +368,47 @@ export default function ComponentDetailPage() {
           </Card>
         )}
       </div>
+
+      {/* Change History */}
+      <Card className="mt-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Change History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {historyLoading ? (
+            <p className="text-xs text-muted-foreground">Loading history...</p>
+          ) : history.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No history available.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {history.map((commit) => (
+                <div
+                  key={commit.sha}
+                  className="flex items-baseline gap-3 text-xs text-muted-foreground"
+                >
+                  <span className="font-mono shrink-0">{commit.sha}</span>
+                  <span className="shrink-0">
+                    {commit.date
+                      ? new Date(commit.date).toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : ""}
+                  </span>
+                  <span className="truncate text-foreground/70">
+                    {commit.message.split("\n")[0]}
+                  </span>
+                  <span className="shrink-0 ml-auto">{commit.author}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
