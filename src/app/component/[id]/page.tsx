@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TypeIcon } from "@/components/TypeIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { TYPE_LABELS, RELATIONSHIP_LABELS } from "@/lib/constants"
+import { TYPE_LABELS, RELATIONSHIP_LABELS, DATA_CLASSIFICATION_LABELS } from "@/lib/constants"
 import type { ComponentWithSha } from "@/lib/types"
 import {
   ArrowLeft,
@@ -369,6 +369,79 @@ export default function ComponentDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Business Capabilities */}
+        {component.business_capabilities && component.business_capabilities.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Business Capabilities</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-1.5">
+                {component.business_capabilities.map((cap) => (
+                  <Badge key={cap} variant="secondary">
+                    {cap}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Non-Functional Requirements */}
+        {component.nfr && Object.values(component.nfr).some(Boolean) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Non-Functional Requirements</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                {component.nfr.availability && (
+                  <div>
+                    <span className="text-muted-foreground">Availability</span>
+                    <p className="font-medium">{component.nfr.availability}</p>
+                  </div>
+                )}
+                {component.nfr.rto && (
+                  <div>
+                    <span className="text-muted-foreground">RTO</span>
+                    <p className="font-medium">{component.nfr.rto}</p>
+                  </div>
+                )}
+                {component.nfr.rpo && (
+                  <div>
+                    <span className="text-muted-foreground">RPO</span>
+                    <p className="font-medium">{component.nfr.rpo}</p>
+                  </div>
+                )}
+                {component.nfr.max_latency && (
+                  <div>
+                    <span className="text-muted-foreground">Max Latency</span>
+                    <p className="font-medium">{component.nfr.max_latency}</p>
+                  </div>
+                )}
+                {component.nfr.throughput && (
+                  <div>
+                    <span className="text-muted-foreground">Throughput</span>
+                    <p className="font-medium">{component.nfr.throughput}</p>
+                  </div>
+                )}
+                {component.nfr.data_classification && (
+                  <div>
+                    <span className="text-muted-foreground">Data Classification</span>
+                    <p className="font-medium">{DATA_CLASSIFICATION_LABELS[component.nfr.data_classification]}</p>
+                  </div>
+                )}
+                {component.nfr.scaling && (
+                  <div>
+                    <span className="text-muted-foreground">Scaling</span>
+                    <p className="font-medium capitalize">{component.nfr.scaling}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Risks */}
         {component.risks && component.risks.length > 0 && (

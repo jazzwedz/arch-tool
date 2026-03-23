@@ -52,6 +52,19 @@ export type ComponentType =
 
 export type ComponentStatus = "draft" | "production" | "deprecated"
 
+export type DataClassification = "public" | "internal" | "confidential" | "restricted"
+export type ScalingModel = "horizontal" | "vertical" | "none"
+
+export interface ComponentNFR {
+  availability?: string
+  rto?: string
+  rpo?: string
+  max_latency?: string
+  throughput?: string
+  data_classification?: DataClassification
+  scaling?: ScalingModel
+}
+
 export interface Component {
   id: string
   name: string
@@ -63,6 +76,8 @@ export interface Component {
   interfaces: ComponentInterface[]
   relationships: ComponentRelationship[]
   risks?: string[]
+  business_capabilities?: string[]
+  nfr?: ComponentNFR
   diagram?: ComponentDiagram
 }
 

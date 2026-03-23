@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import {
   COMPONENT_TYPES,
   COMPONENT_STATUSES,
@@ -22,13 +23,18 @@ import {
   INTERFACE_DIRECTIONS,
   RELATIONSHIP_TYPES,
   RELATIONSHIP_LABELS,
+  BUSINESS_CAPABILITIES,
+  DATA_CLASSIFICATIONS,
+  DATA_CLASSIFICATION_LABELS,
+  SCALING_MODELS,
 } from "@/lib/constants"
 import type {
   Component,
   ComponentInterface,
   ComponentRelationship,
+  ComponentNFR,
 } from "@/lib/types"
-import { Plus, Trash2, Save, Loader2, Info } from "lucide-react"
+import { Plus, Trash2, Save, Loader2, Info, X } from "lucide-react"
 import {
   Tooltip,
   TooltipTrigger,
@@ -71,6 +77,8 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     interfaces: [],
     relationships: [],
     risks: [],
+    business_capabilities: [],
+    nfr: {},
     ...(initialData || {}),
   })
 
@@ -80,6 +88,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
   const [risksInput, setRisksInput] = useState(
     initialData?.risks?.join("\n") || ""
   )
+  const [capabilitySearch, setCapabilitySearch] = useState("")
 
   useEffect(() => {
     fetch("/api/components")
@@ -110,6 +119,13 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     }))
   }
 
+  const updateNFR = (field: keyof ComponentNFR, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      nfr: { ...prev.nfr, [field]: value || undefined },
+    }))
+  }
+
   const updateRelationship = (
     index: number,
     field: keyof ComponentRelationship,
@@ -127,6 +143,12 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     e.preventDefault()
     setSaving(true)
 
+    // Clean NFR: remove empty values
+    const cleanNfr = form.nfr
+      ? Object.fromEntries(Object.entries(form.nfr).filter(([, v]) => v))
+      : undefined
+    const hasNfr = cleanNfr && Object.keys(cleanNfr).length > 0
+
     const component: Component = {
       ...form,
       tags: tagsInput
@@ -137,6 +159,10 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
         .split("\n")
         .map((r) => r.trim())
         .filter(Boolean),
+      business_capabilities: (form.business_capabilities || []).length > 0
+        ? form.business_capabilities
+        : undefined,
+      nfr: hasNfr ? (cleanNfr as ComponentNFR) : undefined,
     }
 
     try {
@@ -575,6 +601,197 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
             </div>
             )
           })}
+        </CardContent>
+      </Card>
+
+      {/* Business Capabilities */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Business Capabilities
+            <Tooltip>
+              <TooltipTrigger className="cursor-help">
+                <Info className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs">
+                Which business capabilities does this component support? Select from the predefined list or type to filter.
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Selected capabilities */}
+          {(form.business_capabilities?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {form.business_capabilities!.map((cap) => (
+                <Badge key={cap} variant="secondary" className="flex items-center gap-1 pr-1">
+                  {cap}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateField(
+                        "business_capabilities",
+                        form.business_capabilities!.filter((c) => c !== cap)
+                      )
+                    }
+                    className="ml-0.5 hover:bg-muted rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          {/* Search + add */}
+          <div className="space-y-1">
+            <Input
+              placeholder="Search capabilities..."
+              value={capabilitySearch}
+              onChange={(e) => setCapabilitySearch(e.target.value)}
+              className="h-9"
+            />
+            {capabilitySearch && (
+              <div className="border rounded-md max-h-40 overflow-y-auto">
+                {BUSINESS_CAPABILITIES
+                  .filter(
+                    (cap) =>
+                      cap.toLowerCase().includes(capabilitySearch.toLowerCase()) &&
+                      !(form.business_capabilities || []).includes(cap)
+                  )
+                  .map((cap) => (
+                    <button
+                      key={cap}
+                      type="button"
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                      onClick={() => {
+                        updateField("business_capabilities", [
+                          ...(form.business_capabilities || []),
+                          cap,
+                        ])
+                        setCapabilitySearch("")
+                      }}
+                    >
+                      {cap}
+                    </button>
+                  ))}
+                {BUSINESS_CAPABILITIES.filter(
+                  (cap) =>
+                    cap.toLowerCase().includes(capabilitySearch.toLowerCase()) &&
+                    !(form.business_capabilities || []).includes(cap)
+                ).length === 0 && (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">No matching capabilities</p>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Non-Functional Requirements */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Non-Functional Requirements
+            <Tooltip>
+              <TooltipTrigger className="cursor-help">
+                <Info className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs">
+                Define availability, performance, and data requirements. All fields are optional — fill in what you know.
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="nfr-availability">Availability Target</Label>
+              <Input
+                id="nfr-availability"
+                placeholder="e.g. 99.9%"
+                value={form.nfr?.availability || ""}
+                onChange={(e) => updateNFR("availability", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nfr-rto">RTO (Recovery Time)</Label>
+              <Input
+                id="nfr-rto"
+                placeholder="e.g. 4h"
+                value={form.nfr?.rto || ""}
+                onChange={(e) => updateNFR("rto", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nfr-rpo">RPO (Recovery Point)</Label>
+              <Input
+                id="nfr-rpo"
+                placeholder="e.g. 1h"
+                value={form.nfr?.rpo || ""}
+                onChange={(e) => updateNFR("rpo", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nfr-latency">Max Latency</Label>
+              <Input
+                id="nfr-latency"
+                placeholder="e.g. 200ms"
+                value={form.nfr?.max_latency || ""}
+                onChange={(e) => updateNFR("max_latency", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nfr-throughput">Throughput</Label>
+              <Input
+                id="nfr-throughput"
+                placeholder="e.g. 1000 req/s"
+                value={form.nfr?.throughput || ""}
+                onChange={(e) => updateNFR("throughput", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Data Classification</Label>
+              <Select
+                value={form.nfr?.data_classification || "none"}
+                onValueChange={(v) => updateNFR("data_classification", v === "none" ? "" : v)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">Not set</span>
+                  </SelectItem>
+                  {DATA_CLASSIFICATIONS.map((dc) => (
+                    <SelectItem key={dc} value={dc}>
+                      {DATA_CLASSIFICATION_LABELS[dc]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Scaling Model</Label>
+              <Select
+                value={form.nfr?.scaling || "_notset"}
+                onValueChange={(v) => updateNFR("scaling", v === "_notset" ? "" : v)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_notset">
+                    <span className="text-muted-foreground">Not set</span>
+                  </SelectItem>
+                  {SCALING_MODELS.map((sm) => (
+                    <SelectItem key={sm} value={sm}>
+                      {sm.charAt(0).toUpperCase() + sm.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

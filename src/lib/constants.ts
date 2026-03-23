@@ -100,6 +100,45 @@ export const CONNECTOR_TYPES = [
 
 export const INTERFACE_DIRECTIONS = ["provides", "consumes"] as const
 
+export const BUSINESS_CAPABILITIES = [
+  "Customer Management",
+  "Order Management",
+  "Product Management",
+  "Billing & Invoicing",
+  "Payment Processing",
+  "Identity & Access Management",
+  "User Onboarding",
+  "Notification & Messaging",
+  "Reporting & Analytics",
+  "Data Integration",
+  "Document Management",
+  "Workflow & Approval",
+  "Inventory Management",
+  "Shipping & Logistics",
+  "Customer Support",
+  "Marketing & Campaigns",
+  "Compliance & Audit",
+  "Risk Management",
+  "Financial Accounting",
+  "Human Resources",
+  "Partner Management",
+  "Content Management",
+  "Search & Discovery",
+  "Pricing & Discounts",
+  "Subscription Management",
+] as const
+
+export const DATA_CLASSIFICATIONS = ["public", "internal", "confidential", "restricted"] as const
+
+export const DATA_CLASSIFICATION_LABELS: Record<string, string> = {
+  public: "Public",
+  internal: "Internal",
+  confidential: "Confidential",
+  restricted: "Restricted",
+}
+
+export const SCALING_MODELS = ["horizontal", "vertical", "none"] as const
+
 export const RELATIONSHIP_TYPES = [
   "parent-of",
   "child-of",
