@@ -45,6 +45,8 @@ export type ComponentType =
   | "storage"
   | "batch-job"
   | "cache"
+  | "context"
+  | "boundary"
 
 export type ComponentStatus = "draft" | "production" | "deprecated"
 

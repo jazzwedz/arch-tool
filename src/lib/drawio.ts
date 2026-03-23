@@ -13,6 +13,8 @@ const typeStyles: Record<ComponentType, string> = {
   storage:         "shape=cylinder3;fillColor=#e8dff0;strokeColor=#7b5ea7;fontStyle=1;fontSize=11;",
   "batch-job":     "rounded=1;fillColor=#fce4d6;strokeColor=#c55a11;fontStyle=1;fontSize=11;dashed=1;",
   cache:           "rounded=1;fillColor=#d6f5d6;strokeColor=#48a848;fontStyle=1;fontSize=11;",
+  context:         "rounded=1;fillColor=#e8f4e8;strokeColor=#2e7d32;fontStyle=1;fontSize=11;dashed=1;strokeWidth=2;",
+  boundary:        "rounded=1;fillColor=#fde8e8;strokeColor=#c62828;fontStyle=1;fontSize=11;strokeWidth=2;",
 }
 
 const typeSizes: Record<ComponentType, { w: number; h: number }> = {
@@ -28,6 +30,8 @@ const typeSizes: Record<ComponentType, { w: number; h: number }> = {
   storage:         { w: 60,  h: 70 },
   "batch-job":     { w: 120, h: 60 },
   cache:           { w: 60,  h: 60 },
+  context:         { w: 160, h: 80 },
+  boundary:        { w: 160, h: 80 },
 }
 
 const connectorEntries = [

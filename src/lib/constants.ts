@@ -11,6 +11,8 @@ import {
   HardDrive,
   Clock,
   Zap,
+  Box,
+  Shield,
 } from "lucide-react"
 import type { ComponentType, ComponentStatus } from "./types"
 
@@ -27,6 +29,8 @@ export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
   storage: HardDrive,
   "batch-job": Clock,
   cache: Zap,
+  context: Box,
+  boundary: Shield,
 }
 
 export const TYPE_LABELS: Record<ComponentType, string> = {
@@ -42,6 +46,8 @@ export const TYPE_LABELS: Record<ComponentType, string> = {
   storage: "Storage",
   "batch-job": "Batch Job",
   cache: "Cache",
+  context: "Context",
+  boundary: "Boundary",
 }
 
 export const STATUS_COLORS: Record<ComponentStatus, string> = {
@@ -63,6 +69,8 @@ export const COMPONENT_TYPES: ComponentType[] = [
   "external",
   "platform",
   "library",
+  "context",
+  "boundary",
 ]
 
 export const COMPONENT_STATUSES: ComponentStatus[] = [
@@ -117,4 +125,6 @@ export const TYPE_COLORS: Record<ComponentType, { fill: string; border: string; 
   storage:         { fill: "#e8dff0", border: "#7b5ea7", text: "#654b8a" },
   "batch-job":     { fill: "#fce4d6", border: "#c55a11", text: "#a84b0f" },
   cache:           { fill: "#d6f5d6", border: "#48a848", text: "#357a35" },
+  context:         { fill: "#e8f4e8", border: "#2e7d32", text: "#1b5e20" },
+  boundary:        { fill: "#fde8e8", border: "#c62828", text: "#b71c1c" },
 }
