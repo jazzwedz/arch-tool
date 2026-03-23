@@ -20,11 +20,13 @@ import {
   TYPE_LABELS,
   CONNECTOR_TYPES,
   INTERFACE_DIRECTIONS,
+  RELATIONSHIP_TYPES,
+  RELATIONSHIP_LABELS,
 } from "@/lib/constants"
 import type {
   Component,
   ComponentInterface,
-  ComponentDependency,
+  ComponentRelationship,
 } from "@/lib/types"
 import { Plus, Trash2, Save, Loader2, Info } from "lucide-react"
 import {
@@ -45,9 +47,11 @@ const emptyInterface: ComponentInterface = {
   description: "",
 }
 
-const emptyDependency: ComponentDependency = {
-  id: "",
+const emptyRelationship: ComponentRelationship = {
+  target: "",
+  type: "depends-on",
   connector: "rest",
+  description: "",
 }
 
 export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
@@ -66,7 +70,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     tags: [],
     description: { oneliner: "", technical: "", business: "" },
     interfaces: [],
-    dependencies: [],
+    relationships: [],
     risks: [],
     ...(initialData || {}),
   })
@@ -107,15 +111,15 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     }))
   }
 
-  const updateDependency = (
+  const updateRelationship = (
     index: number,
-    field: keyof ComponentDependency,
+    field: keyof ComponentRelationship,
     value: string
   ) => {
     setForm((prev) => ({
       ...prev,
-      dependencies: prev.dependencies.map((dep, i) =>
-        i === index ? { ...dep, [field]: value } : dep
+      relationships: prev.relationships.map((rel, i) =>
+        i === index ? { ...rel, [field]: value } : rel
       ),
     }))
   }
@@ -424,17 +428,25 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
         </CardContent>
       </Card>
 
-      {/* Dependencies */}
+      {/* Relationships */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            Dependencies
+            Relationships
             <Tooltip>
               <TooltipTrigger className="cursor-help">
                 <Info className="h-4 w-4 text-muted-foreground" />
               </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs">
-                Other components this one depends on to function. If a dependency is unavailable, this component may be degraded or non-functional. Each dependency links to the target component and shows the connection type used.
+              <TooltipContent side="right" className="max-w-xs text-left">
+                <p className="font-semibold mb-1">How this component relates to others:</p>
+                <ul className="text-xs space-y-0.5">
+                  <li><strong>Part of</strong> — this component belongs to a parent (e.g. module in a platform)</li>
+                  <li><strong>Depends on</strong> — requires another component to function</li>
+                  <li><strong>Communicates with</strong> — exchanges data with a peer</li>
+                  <li><strong>Reads from</strong> — consumes data from another component</li>
+                  <li><strong>Writes to</strong> — sends data to another component</li>
+                  <li><strong>Fallback for</strong> — acts as backup when another component is unavailable</li>
+                </ul>
               </TooltipContent>
             </Tooltip>
           </CardTitle>
@@ -443,9 +455,9 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
             variant="outline"
             size="sm"
             onClick={() =>
-              updateField("dependencies", [
-                ...form.dependencies,
-                { ...emptyDependency },
+              updateField("relationships", [
+                ...form.relationships,
+                { ...emptyRelationship },
               ])
             }
           >
@@ -454,21 +466,39 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          {form.dependencies.length === 0 && (
+          {form.relationships.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              No dependencies defined yet.
+              No relationships defined yet.
             </p>
           )}
-          {form.dependencies.map((dep, i) => (
+          {form.relationships.map((rel, i) => (
             <div
               key={i}
-              className="grid grid-cols-[1fr_120px_40px] gap-2 items-end"
+              className="grid grid-cols-[160px_1fr_120px_1fr_40px] gap-2 items-end"
             >
               <div>
-                <Label className="text-xs">Component</Label>
+                <Label className="text-xs">Relationship</Label>
                 <Select
-                  value={dep.id}
-                  onValueChange={(v) => updateDependency(i, "id", v)}
+                  value={rel.type}
+                  onValueChange={(v) => updateRelationship(i, "type", v)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RELATIONSHIP_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {RELATIONSHIP_LABELS[t]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Target Component</Label>
+                <Select
+                  value={rel.target}
+                  onValueChange={(v) => updateRelationship(i, "target", v)}
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Select component..." />
@@ -487,11 +517,11 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
               <div>
                 <Label className="text-xs">Connector</Label>
                 <Select
-                  value={dep.connector}
-                  onValueChange={(v) => updateDependency(i, "connector", v)}
+                  value={rel.connector || ""}
+                  onValueChange={(v) => updateRelationship(i, "connector", v)}
                 >
                   <SelectTrigger className="h-9">
-                    <SelectValue />
+                    <SelectValue placeholder="Optional" />
                   </SelectTrigger>
                   <SelectContent>
                     {CONNECTOR_TYPES.map((c) => (
@@ -502,6 +532,17 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label className="text-xs">Description</Label>
+                <Input
+                  className="h-9"
+                  placeholder="Optional note"
+                  value={rel.description || ""}
+                  onChange={(e) =>
+                    updateRelationship(i, "description", e.target.value)
+                  }
+                />
+              </div>
               <Button
                 type="button"
                 variant="ghost"
@@ -509,8 +550,8 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                 className="h-9 w-9"
                 onClick={() =>
                   updateField(
-                    "dependencies",
-                    form.dependencies.filter((_, idx) => idx !== i)
+                    "relationships",
+                    form.relationships.filter((_, idx) => idx !== i)
                   )
                 }
               >

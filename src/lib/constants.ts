@@ -66,6 +66,24 @@ export const CONNECTOR_TYPES = [
 
 export const INTERFACE_DIRECTIONS = ["provides", "consumes"] as const
 
+export const RELATIONSHIP_TYPES = [
+  "parent",
+  "depends-on",
+  "communicates-with",
+  "reads-from",
+  "writes-to",
+  "fallback",
+] as const
+
+export const RELATIONSHIP_LABELS: Record<string, string> = {
+  "parent": "Part of",
+  "depends-on": "Depends on",
+  "communicates-with": "Communicates with",
+  "reads-from": "Reads from",
+  "writes-to": "Writes to",
+  "fallback": "Fallback for",
+}
+
 // Colors matching Draw.io library export (drawio.ts typeStyles)
 // Each type has: fill (very subtle bg), border (left accent), text (icon/label tint)
 export const TYPE_COLORS: Record<ComponentType, { fill: string; border: string; text: string }> = {

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TypeIcon } from "@/components/TypeIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { TYPE_LABELS } from "@/lib/constants"
+import { TYPE_LABELS, RELATIONSHIP_LABELS } from "@/lib/constants"
 import type { ComponentWithSha } from "@/lib/types"
 import {
   ArrowLeft,
@@ -312,39 +312,56 @@ export default function ComponentDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Dependencies */}
+        {/* Relationships */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              Dependencies
+              Relationships
               <Tooltip>
                 <TooltipTrigger className="cursor-help">
                   <Info className="h-4 w-4 text-muted-foreground" />
                 </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-xs">
-                  Other components this one depends on to function. If a dependency is unavailable, this component may be degraded or non-functional. Each dependency links to the target component and shows the connection type used.
+                <TooltipContent side="right" className="max-w-xs text-left">
+                  <p className="font-semibold mb-1">How this component relates to others:</p>
+                  <ul className="text-xs space-y-0.5">
+                    <li><strong>Part of</strong> — belongs to a parent component</li>
+                    <li><strong>Depends on</strong> — requires another to function</li>
+                    <li><strong>Communicates with</strong> — exchanges data with a peer</li>
+                    <li><strong>Reads / Writes</strong> — directional data flow</li>
+                    <li><strong>Fallback for</strong> — backup when another is unavailable</li>
+                  </ul>
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {component.dependencies.length === 0 ? (
+            {(!component.relationships || component.relationships.length === 0) ? (
               <p className="text-sm text-muted-foreground">
-                No dependencies defined.
+                No relationships defined.
               </p>
             ) : (
               <div className="space-y-2">
-                {component.dependencies.map((dep) => (
+                {component.relationships.map((rel, i) => (
                   <Link
-                    key={dep.id}
-                    href={`/component/${dep.id}`}
+                    key={`${rel.target}-${i}`}
+                    href={`/component/${rel.target}`}
                     className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
                   >
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-mono">{dep.id}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {dep.connector}
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {RELATIONSHIP_LABELS[rel.type] || rel.type}
                     </Badge>
+                    <span className="font-mono">{rel.target}</span>
+                    {rel.connector && (
+                      <Badge variant="secondary" className="text-xs">
+                        {rel.connector}
+                      </Badge>
+                    )}
+                    {rel.description && (
+                      <span className="text-muted-foreground text-xs truncate">
+                        {rel.description}
+                      </span>
+                    )}
                   </Link>
                 ))}
               </div>

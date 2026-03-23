@@ -8,6 +8,23 @@ const owner = process.env.GITHUB_OWNER!
 const repo = process.env.GITHUB_REPO || "arch-data"
 const branch = process.env.GITHUB_BRANCH || "main"
 
+// Backward compatibility: convert old `dependencies` array to new `relationships` format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateComponent(raw: Record<string, any>): Component {
+  if (raw.dependencies && Array.isArray(raw.dependencies) && !raw.relationships) {
+    raw.relationships = raw.dependencies.map((dep: { id: string; connector?: string }) => ({
+      target: dep.id,
+      type: "depends-on" as const,
+      connector: dep.connector,
+    }))
+    delete raw.dependencies
+  }
+  if (!raw.relationships) {
+    raw.relationships = []
+  }
+  return raw as Component
+}
+
 export async function listComponents(): Promise<Component[]> {
   try {
     // Use git trees API to get all files in one request, avoiding caching issues
@@ -44,7 +61,7 @@ export async function listComponents(): Promise<Component[]> {
           })
 
           const content = Buffer.from(blobData.content, "base64").toString("utf-8")
-          return yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Component
+          return migrateComponent(yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>)
         } catch (err) {
           console.error(`Failed to fetch component ${file.path}:`, err)
           return null
@@ -78,7 +95,7 @@ export async function getComponent(
   }
 
   const content = Buffer.from(data.content, "base64").toString("utf-8")
-  const component = yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Component
+  const component = migrateComponent(yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>)
 
   return { ...component, sha: data.sha }
 }

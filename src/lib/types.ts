@@ -5,9 +5,19 @@ export interface ComponentInterface {
   description: string
 }
 
-export interface ComponentDependency {
-  id: string
-  connector: "rest" | "grpc" | "async" | "db" | "file" | "human"
+export type RelationshipType =
+  | "parent"
+  | "depends-on"
+  | "communicates-with"
+  | "reads-from"
+  | "writes-to"
+  | "fallback"
+
+export interface ComponentRelationship {
+  target: string
+  type: RelationshipType
+  connector?: "rest" | "grpc" | "async" | "db" | "file" | "human"
+  description?: string
 }
 
 export interface ComponentDiagram {
@@ -42,7 +52,7 @@ export interface Component {
   tags: string[]
   description: ComponentDescription
   interfaces: ComponentInterface[]
-  dependencies: ComponentDependency[]
+  relationships: ComponentRelationship[]
   risks?: string[]
   diagram?: ComponentDiagram
 }
