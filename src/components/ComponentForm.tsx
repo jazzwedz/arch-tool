@@ -166,11 +166,21 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     }
 
     try {
-      if (isEdit && initialData?.sha) {
+      if (isEdit) {
+        // Always fetch latest sha before saving to avoid stale sha conflicts
+        let latestSha = initialData?.sha
+        try {
+          const freshRes = await fetch(`/api/components/${component.id}`)
+          if (freshRes.ok) {
+            const freshData = await freshRes.json()
+            latestSha = freshData.sha
+          }
+        } catch { /* use initialData sha as fallback */ }
+
         await fetch(`/api/components/${component.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...component, sha: initialData.sha }),
+          body: JSON.stringify({ ...component, sha: latestSha }),
         })
       } else {
         await fetch("/api/components", {
