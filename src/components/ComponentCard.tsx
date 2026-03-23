@@ -8,8 +8,39 @@ import { StatusBadge } from "./StatusBadge"
 import type { Component } from "@/lib/types"
 import { TYPE_LABELS, TYPE_COLORS } from "@/lib/constants"
 
-export function ComponentCard({ component }: { component: Component }) {
+interface ComponentCardProps {
+  component: Component
+  compact?: boolean
+}
+
+export function ComponentCard({ component, compact }: ComponentCardProps) {
   const colors = TYPE_COLORS[component.type]
+
+  if (compact) {
+    return (
+      <Link href={`/component/${component.id}`}>
+        <Card
+          className="hover:shadow-md transition-shadow cursor-pointer border-l-[3px] py-0"
+          style={{
+            borderLeftColor: colors.border,
+            backgroundColor: `${colors.fill}18`,
+          }}
+        >
+          <div className="flex items-center gap-3 px-3 py-2">
+            <TypeIcon type={component.type} style={{ color: colors.text }} className="h-4 w-4 shrink-0" />
+            <span className="font-medium text-sm truncate min-w-0">{component.name}</span>
+            <span className="text-xs text-muted-foreground truncate min-w-0 hidden sm:inline">
+              {component.description.oneliner}
+            </span>
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              <span className="text-xs text-muted-foreground hidden md:inline">{component.owner}</span>
+              <StatusBadge status={component.status} />
+            </div>
+          </div>
+        </Card>
+      </Link>
+    )
+  }
 
   return (
     <Link href={`/component/${component.id}`}>

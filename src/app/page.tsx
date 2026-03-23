@@ -10,11 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ComponentCard } from "@/components/ComponentCard"
-import { COMPONENT_TYPES, COMPONENT_STATUSES, TYPE_LABELS } from "@/lib/constants"
-import type { Component } from "@/lib/types"
-import { Search, LayoutGrid, List, Plus, Download } from "lucide-react"
+import { COMPONENT_TYPES, COMPONENT_STATUSES, TYPE_LABELS, TYPE_COLORS } from "@/lib/constants"
+import type { Component, ComponentType } from "@/lib/types"
+import { Search, LayoutGrid, List, Plus, Download, Rows3, Group } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { TypeIcon } from "@/components/TypeIcon"
 import Link from "next/link"
+
+type ViewMode = "grid" | "list" | "compact" | "grouped"
 
 export default function CatalogPage() {
   const [components, setComponents] = useState<Component[]>([])
@@ -24,7 +27,7 @@ export default function CatalogPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [ownerFilter, setOwnerFilter] = useState<string>("all")
   const [tagFilter, setTagFilter] = useState<string>("all")
-  const [view, setView] = useState<"grid" | "list">("grid")
+  const [view, setView] = useState<ViewMode>("grid")
 
   useEffect(() => {
     fetch("/api/components")
@@ -60,6 +63,25 @@ export default function CatalogPage() {
       return matchesSearch && matchesType && matchesStatus && matchesOwner && matchesTag
     })
   }, [components, search, typeFilter, statusFilter, ownerFilter, tagFilter])
+
+  const grouped = useMemo(() => {
+    const groups: Partial<Record<ComponentType, Component[]>> = {}
+    for (const c of filtered) {
+      if (!groups[c.type]) groups[c.type] = []
+      groups[c.type]!.push(c)
+    }
+    // Return in the canonical COMPONENT_TYPES order
+    return COMPONENT_TYPES
+      .filter((t) => groups[t] && groups[t]!.length > 0)
+      .map((t) => ({ type: t, components: groups[t]! }))
+  }, [filtered])
+
+  const viewButtons: { mode: ViewMode; icon: typeof LayoutGrid; title: string }[] = [
+    { mode: "grid", icon: LayoutGrid, title: "Cards" },
+    { mode: "compact", icon: Rows3, title: "Compact" },
+    { mode: "list", icon: List, title: "List" },
+    { mode: "grouped", icon: Group, title: "Grouped by type" },
+  ]
 
   return (
     <div className="space-y-6">
@@ -153,20 +175,17 @@ export default function CatalogPage() {
           </Select>
         )}
         <div className="flex gap-1 border rounded-md p-1">
-          <Button
-            variant={view === "grid" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setView("grid")}
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={view === "list" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setView("list")}
-          >
-            <List className="h-4 w-4" />
-          </Button>
+          {viewButtons.map(({ mode, icon: Icon, title }) => (
+            <Button
+              key={mode}
+              variant={view === mode ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setView(mode)}
+              title={title}
+            >
+              <Icon className="h-4 w-4" />
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -186,11 +205,45 @@ export default function CatalogPage() {
             <ComponentCard key={c.id} component={c} />
           ))}
         </div>
-      ) : (
+      ) : view === "compact" ? (
+        <div className="space-y-1">
+          {filtered.map((c) => (
+            <ComponentCard key={c.id} component={c} compact />
+          ))}
+        </div>
+      ) : view === "list" ? (
         <div className="space-y-2">
           {filtered.map((c) => (
             <ComponentCard key={c.id} component={c} />
           ))}
+        </div>
+      ) : (
+        /* grouped view */
+        <div className="space-y-8">
+          {grouped.map(({ type, components: groupComponents }) => {
+            const colors = TYPE_COLORS[type]
+            return (
+              <div key={type}>
+                <div
+                  className="flex items-center gap-2 mb-3 pb-2 border-b-2"
+                  style={{ borderBottomColor: colors.border }}
+                >
+                  <TypeIcon type={type} style={{ color: colors.text }} />
+                  <h2 className="text-lg font-semibold" style={{ color: colors.text }}>
+                    {TYPE_LABELS[type]}
+                  </h2>
+                  <span className="text-sm text-muted-foreground ml-1">
+                    ({groupComponents.length})
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {groupComponents.map((c) => (
+                    <ComponentCard key={c.id} component={c} />
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
