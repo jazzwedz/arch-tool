@@ -6,17 +6,25 @@ import { Badge } from "@/components/ui/badge"
 import { TypeIcon } from "./TypeIcon"
 import { StatusBadge } from "./StatusBadge"
 import type { Component } from "@/lib/types"
-import { TYPE_LABELS } from "@/lib/constants"
+import { TYPE_LABELS, TYPE_COLORS } from "@/lib/constants"
 
 export function ComponentCard({ component }: { component: Component }) {
+  const colors = TYPE_COLORS[component.type]
+
   return (
     <Link href={`/component/${component.id}`}>
-      <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+      <Card
+        className="h-full hover:shadow-md transition-shadow cursor-pointer border-l-[3px]"
+        style={{
+          borderLeftColor: colors.border,
+          backgroundColor: `${colors.fill}18`,
+        }}
+      >
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <TypeIcon type={component.type} className="text-muted-foreground" />
-              <span className="text-xs text-muted-foreground uppercase tracking-wide">
+              <TypeIcon type={component.type} style={{ color: colors.text }} />
+              <span className="text-xs uppercase tracking-wide font-medium" style={{ color: colors.text }}>
                 {TYPE_LABELS[component.type]}
               </span>
             </div>

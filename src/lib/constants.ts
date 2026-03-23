@@ -65,3 +65,16 @@ export const CONNECTOR_TYPES = [
 ] as const
 
 export const INTERFACE_DIRECTIONS = ["provides", "consumes"] as const
+
+// Colors matching Draw.io library export (drawio.ts typeStyles)
+// Each type has: fill (very subtle bg), border (left accent), text (icon/label tint)
+export const TYPE_COLORS: Record<ComponentType, { fill: string; border: string; text: string }> = {
+  microservice: { fill: "#dae8fc", border: "#6c8ebf", text: "#4a6fa5" },
+  frontend:     { fill: "#d5e8d4", border: "#82b366", text: "#5a8a42" },
+  database:     { fill: "#fff2cc", border: "#d6b656", text: "#b8941e" },
+  queue:        { fill: "#f8cecc", border: "#b85450", text: "#a03e3a" },
+  gateway:      { fill: "#e1d5e7", border: "#9673a6", text: "#7a5a8a" },
+  external:     { fill: "#f5f5f5", border: "#666666", text: "#555555" },
+  platform:     { fill: "#ffe6cc", border: "#d79b00", text: "#b88400" },
+  library:      { fill: "#f0f0f0", border: "#999999", text: "#777777" },
+}
