@@ -13,6 +13,8 @@ import {
   Zap,
   Box,
   Shield,
+  AppWindow,
+  Puzzle,
 } from "lucide-react"
 import type { ComponentType, ComponentStatus } from "./types"
 
@@ -31,6 +33,8 @@ export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
   cache: Zap,
   context: Box,
   boundary: Shield,
+  application: AppWindow,
+  module: Puzzle,
 }
 
 export const TYPE_LABELS: Record<ComponentType, string> = {
@@ -48,6 +52,8 @@ export const TYPE_LABELS: Record<ComponentType, string> = {
   cache: "Cache",
   context: "Context",
   boundary: "Boundary",
+  application: "Application",
+  module: "Module",
 }
 
 export const STATUS_COLORS: Record<ComponentStatus, string> = {
@@ -71,6 +77,8 @@ export const COMPONENT_TYPES: ComponentType[] = [
   "library",
   "context",
   "boundary",
+  "application",
+  "module",
 ]
 
 export const COMPONENT_STATUSES: ComponentStatus[] = [
@@ -127,4 +135,6 @@ export const TYPE_COLORS: Record<ComponentType, { fill: string; border: string; 
   cache:           { fill: "#d6f5d6", border: "#48a848", text: "#357a35" },
   context:         { fill: "#e8f4e8", border: "#2e7d32", text: "#1b5e20" },
   boundary:        { fill: "#fde8e8", border: "#c62828", text: "#b71c1c" },
+  application:     { fill: "#e3f2fd", border: "#1565c0", text: "#0d47a1" },
+  module:          { fill: "#f3e5f5", border: "#8e24aa", text: "#6a1b9a" },
 }

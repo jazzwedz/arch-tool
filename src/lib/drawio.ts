@@ -15,6 +15,8 @@ const typeStyles: Record<ComponentType, string> = {
   cache:           "rounded=1;fillColor=#d6f5d6;strokeColor=#48a848;fontStyle=1;fontSize=11;",
   context:         "rounded=1;fillColor=#e8f4e8;strokeColor=#2e7d32;fontStyle=1;fontSize=11;dashed=1;strokeWidth=2;",
   boundary:        "rounded=1;fillColor=#fde8e8;strokeColor=#c62828;fontStyle=1;fontSize=11;strokeWidth=2;",
+  application:     "rounded=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontStyle=1;fontSize=11;strokeWidth=2;",
+  module:          "rounded=1;fillColor=#f3e5f5;strokeColor=#8e24aa;fontStyle=1;fontSize=11;",
 }
 
 const typeSizes: Record<ComponentType, { w: number; h: number }> = {
@@ -32,6 +34,8 @@ const typeSizes: Record<ComponentType, { w: number; h: number }> = {
   cache:           { w: 60,  h: 60 },
   context:         { w: 160, h: 80 },
   boundary:        { w: 160, h: 80 },
+  application:     { w: 140, h: 70 },
+  module:          { w: 100, h: 50 },
 }
 
 const connectorEntries = [
