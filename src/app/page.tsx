@@ -15,6 +15,7 @@ import type { Component, ComponentType } from "@/lib/types"
 import { Search, LayoutGrid, List, Plus, Download, Grid3X3, Group } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { TypeIcon } from "@/components/TypeIcon"
+import { TypeModelDialog } from "@/components/TypeModelDialog"
 import Link from "next/link"
 
 type ViewMode = "grid" | "list" | "compact"
@@ -224,6 +225,7 @@ export default function CatalogPage() {
             <Group className="h-4 w-4" />
           </Button>
         </div>
+        <TypeModelDialog />
       </div>
 
       {loading ? (
