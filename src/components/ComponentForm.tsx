@@ -50,7 +50,6 @@ const emptyInterface: ComponentInterface = {
 const emptyRelationship: ComponentRelationship = {
   target: "",
   type: "depends-on",
-  connector: "rest",
   description: "",
 }
 
@@ -472,7 +471,9 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
               No relationships defined yet.
             </p>
           )}
-          {form.relationships.map((rel, i) => (
+          {form.relationships.map((rel, i) => {
+            const hideConnector = rel.type === "parent-of" || rel.type === "child-of"
+            return (
             <div
               key={i}
               className="grid grid-cols-[160px_1fr_120px_1fr_40px] gap-2 items-end"
@@ -481,7 +482,13 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                 <Label className="text-xs">Relationship</Label>
                 <Select
                   value={rel.type}
-                  onValueChange={(v) => updateRelationship(i, "type", v)}
+                  onValueChange={(v) => {
+                    updateRelationship(i, "type", v)
+                    // Clear connector for non-technical relationships
+                    if (v === "parent-of" || v === "child-of") {
+                      updateRelationship(i, "connector", "")
+                    }
+                  }}
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue />
@@ -515,16 +522,22 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                   </SelectContent>
                 </Select>
               </div>
+              {hideConnector ? (
+                <div />
+              ) : (
               <div>
                 <Label className="text-xs">Connector</Label>
                 <Select
-                  value={rel.connector || ""}
-                  onValueChange={(v) => updateRelationship(i, "connector", v)}
+                  value={rel.connector || "none"}
+                  onValueChange={(v) => updateRelationship(i, "connector", v === "none" ? "" : v)}
                 >
                   <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Optional" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">none</span>
+                    </SelectItem>
                     {CONNECTOR_TYPES.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
@@ -533,6 +546,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                   </SelectContent>
                 </Select>
               </div>
+              )}
               <div>
                 <Label className="text-xs">Description</Label>
                 <Input
@@ -559,7 +573,8 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
             </div>
-          ))}
+            )
+          })}
         </CardContent>
       </Card>
 
