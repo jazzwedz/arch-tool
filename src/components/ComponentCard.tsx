@@ -20,22 +20,20 @@ export function ComponentCard({ component, compact }: ComponentCardProps) {
     return (
       <Link href={`/component/${component.id}`}>
         <Card
-          className="hover:shadow-md transition-shadow cursor-pointer border-l-[3px] py-0"
+          className="hover:shadow-md transition-shadow cursor-pointer border-l-[3px] py-0 w-[180px]"
           style={{
             borderLeftColor: colors.border,
             backgroundColor: `${colors.fill}18`,
           }}
         >
-          <div className="flex items-center gap-3 px-3 py-2">
-            <TypeIcon type={component.type} style={{ color: colors.text }} className="h-4 w-4 shrink-0" />
-            <span className="font-medium text-sm truncate min-w-0">{component.name}</span>
-            <span className="text-xs text-muted-foreground truncate min-w-0 hidden sm:inline">
-              {component.description.oneliner}
-            </span>
-            <div className="ml-auto flex items-center gap-2 shrink-0">
-              <span className="text-xs text-muted-foreground hidden md:inline">{component.owner}</span>
-              <StatusBadge status={component.status} />
+          <div className="flex flex-col gap-1 px-3 py-2.5">
+            <div className="flex items-center gap-1.5">
+              <TypeIcon type={component.type} style={{ color: colors.text }} className="h-3.5 w-3.5 shrink-0" />
+              <span className="text-[10px] uppercase tracking-wide font-medium" style={{ color: colors.text }}>
+                {TYPE_LABELS[component.type]}
+              </span>
             </div>
+            <span className="font-medium text-sm leading-tight truncate">{component.name}</span>
           </div>
         </Card>
       </Link>
