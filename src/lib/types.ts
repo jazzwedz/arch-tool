@@ -6,7 +6,8 @@ export interface ComponentInterface {
 }
 
 export type RelationshipType =
-  | "parent"
+  | "parent-of"
+  | "child-of"
   | "depends-on"
   | "communicates-with"
   | "reads-from"

@@ -440,7 +440,8 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
               <TooltipContent side="right" className="max-w-xs text-left">
                 <p className="font-semibold mb-1">How this component relates to others:</p>
                 <ul className="text-xs space-y-0.5">
-                  <li><strong>Part of</strong> — this component belongs to a parent (e.g. module in a platform)</li>
+                  <li><strong>Parent of</strong> — this component contains/owns another (e.g. platform owns a module)</li>
+                  <li><strong>Child of</strong> — this component belongs to a parent (e.g. module in a platform)</li>
                   <li><strong>Depends on</strong> — requires another component to function</li>
                   <li><strong>Communicates with</strong> — exchanges data with a peer</li>
                   <li><strong>Reads from</strong> — consumes data from another component</li>

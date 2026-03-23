@@ -67,7 +67,8 @@ export const CONNECTOR_TYPES = [
 export const INTERFACE_DIRECTIONS = ["provides", "consumes"] as const
 
 export const RELATIONSHIP_TYPES = [
-  "parent",
+  "parent-of",
+  "child-of",
   "depends-on",
   "communicates-with",
   "reads-from",
@@ -76,7 +77,8 @@ export const RELATIONSHIP_TYPES = [
 ] as const
 
 export const RELATIONSHIP_LABELS: Record<string, string> = {
-  "parent": "Part of",
+  "parent-of": "Parent of",
+  "child-of": "Child of",
   "depends-on": "Depends on",
   "communicates-with": "Communicates with",
   "reads-from": "Reads from",

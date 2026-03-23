@@ -324,7 +324,8 @@ export default function ComponentDetailPage() {
                 <TooltipContent side="right" className="max-w-xs text-left">
                   <p className="font-semibold mb-1">How this component relates to others:</p>
                   <ul className="text-xs space-y-0.5">
-                    <li><strong>Part of</strong> — belongs to a parent component</li>
+                    <li><strong>Parent of</strong> — contains/owns another component</li>
+                    <li><strong>Child of</strong> — belongs to a parent component</li>
                     <li><strong>Depends on</strong> — requires another to function</li>
                     <li><strong>Communicates with</strong> — exchanges data with a peer</li>
                     <li><strong>Reads / Writes</strong> — directional data flow</li>
