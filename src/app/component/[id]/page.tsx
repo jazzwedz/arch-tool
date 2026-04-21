@@ -49,8 +49,11 @@ export default function ComponentDetailPage() {
       .finally(() => setLoading(false))
 
     fetch(`/api/components/${id}/history`)
-      .then((r) => r.json())
-      .then(setHistory)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Request failed (${r.status})`)
+        return r.json()
+      })
+      .then((data) => setHistory(Array.isArray(data) ? data : []))
       .catch(() => setHistory([]))
       .finally(() => setHistoryLoading(false))
   }, [id, router])

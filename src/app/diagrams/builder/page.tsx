@@ -643,17 +643,23 @@ export default function DiagramBuilderPage() {
   // Load components
   useEffect(() => {
     fetch("/api/components")
-      .then((r) => r.json())
-      .then(setComponents)
-      .catch(console.error)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Request failed (${r.status})`)
+        return r.json()
+      })
+      .then((data) => setComponents(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Failed to load components:", err))
   }, [])
 
   // Load repo diagrams list (for the open dialog)
   useEffect(() => {
     fetch("/api/diagrams")
-      .then((r) => r.json())
-      .then(setRepoDiagrams)
-      .catch(console.error)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Request failed (${r.status})`)
+        return r.json()
+      })
+      .then((data) => setRepoDiagrams(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Failed to load diagrams:", err))
   }, [])
 
   // Load diagram from URL query param (?load=name)

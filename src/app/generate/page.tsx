@@ -90,14 +90,20 @@ export default function GeneratePage() {
 
   useEffect(() => {
     fetch("/api/components")
-      .then((r) => r.json())
-      .then(setComponents)
-      .catch(console.error)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Request failed (${r.status})`)
+        return r.json()
+      })
+      .then((data) => setComponents(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Failed to load components:", err))
 
     fetch("/api/diagrams")
-      .then((r) => r.json())
-      .then(setDiagrams)
-      .catch(console.error)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Request failed (${r.status})`)
+        return r.json()
+      })
+      .then((data) => setDiagrams(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Failed to load diagrams:", err))
   }, [])
 
   const selectedComponent = components.find(

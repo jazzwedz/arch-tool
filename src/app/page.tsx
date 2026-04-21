@@ -23,6 +23,7 @@ type ViewMode = "grid" | "list" | "compact"
 export default function CatalogPage() {
   const [components, setComponents] = useState<Component[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -33,9 +34,19 @@ export default function CatalogPage() {
 
   useEffect(() => {
     fetch("/api/components")
-      .then((r) => r.json())
-      .then(setComponents)
-      .catch(console.error)
+      .then(async (r) => {
+        const data = await r.json().catch(() => null)
+        if (!r.ok) {
+          const msg = data && typeof data === "object" && "error" in data ? String(data.error) : `Request failed (${r.status})`
+          throw new Error(msg)
+        }
+        return data
+      })
+      .then((data) => setComponents(Array.isArray(data) ? data : []))
+      .catch((err: Error) => {
+        console.error("Failed to load components:", err)
+        setLoadError(err.message || "Failed to load components")
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -231,6 +242,14 @@ export default function CatalogPage() {
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">
           Loading components...
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-12 space-y-2">
+          <p className="text-destructive font-medium">Failed to load components</p>
+          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <p className="text-xs text-muted-foreground">
+            Check that GITHUB_TOKEN, GITHUB_OWNER and GITHUB_REPO are configured correctly on the server.
+          </p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
