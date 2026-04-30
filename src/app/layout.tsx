@@ -18,7 +18,7 @@ const geistMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: "Architecture Repository",
+  title: "Retro Team Repository",
   description: "IT Component Catalog & Architecture Documentation",
 }
 
@@ -40,7 +40,7 @@ export default function RootLayout({
           <div className="container mx-auto px-4 h-14 flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 font-bold text-lg">
               <Layers className="h-5 w-5" />
-              Arch Repo
+              Retro Team Repository
             </Link>
             <nav className="flex items-center gap-4 text-sm">
               <Link

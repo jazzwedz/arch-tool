@@ -45,9 +45,9 @@ export default function LoginPage() {
           <div className="flex justify-center mb-2">
             <Layers className="h-8 w-8" />
           </div>
-          <CardTitle className="text-xl">Arch Repo</CardTitle>
+          <CardTitle className="text-xl">Retro Team Repository</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Enter password to access the architecture repository
+            Enter password to access the Retro Team Repository
           </p>
         </CardHeader>
         <CardContent>

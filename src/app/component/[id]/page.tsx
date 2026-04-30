@@ -20,12 +20,14 @@ import {
   Trash2,
   Info,
   History,
+  Radar,
 } from "lucide-react"
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip"
+import { BlastRadiusDialog } from "@/components/BlastRadiusDialog"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -37,6 +39,7 @@ export default function ComponentDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [history, setHistory] = useState<{ sha: string; message: string; author: string; date: string }[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [showBlastRadius, setShowBlastRadius] = useState(false)
 
   useEffect(() => {
     fetch(`/api/components/${id}`)
@@ -109,6 +112,13 @@ export default function ComponentDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            className="bg-orange-500 hover:bg-orange-600 text-white"
+            onClick={() => setShowBlastRadius(true)}
+          >
+            <Radar className="h-4 w-4 mr-2" />
+            Blast Radius
+          </Button>
           <a href="/api/export/drawio" download="arch-components.xml">
             <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
@@ -503,6 +513,12 @@ export default function ComponentDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <BlastRadiusDialog
+        open={showBlastRadius}
+        onOpenChange={setShowBlastRadius}
+        componentId={component.id}
+      />
     </div>
   )
 }
