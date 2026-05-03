@@ -6,7 +6,7 @@ import {
   saveConfluenceLink,
 } from "@/lib/github"
 import { isValidName } from "@/lib/validate"
-import { isConfluenceConfigured, getPage } from "@/lib/confluence"
+import { isConfluenceConfigured, getPage, findPageByComponentId } from "@/lib/confluence"
 import { parseMetaTable, diffPatch } from "@/lib/confluence-parse"
 import type { ComponentStatus } from "@/lib/types"
 import { COMPONENT_STATUSES } from "@/lib/constants"
@@ -40,15 +40,33 @@ export async function POST(request: Request) {
       )
     }
 
-    const link = await getConfluenceLink(componentId)
-    if (!link) {
+    // Resolve page id: side-file first, fall back to title-based lookup.
+    let pageId: string | undefined
+    let linkSha: string | undefined
+    try {
+      const link = await getConfluenceLink(componentId)
+      if (link) {
+        pageId = link.pageId
+        linkSha = link.sha
+      }
+    } catch (err) {
+      console.warn(
+        `getConfluenceLink failed for ${componentId}:`,
+        err instanceof Error ? err.message : err
+      )
+    }
+    if (!pageId) {
+      const found = await findPageByComponentId(componentId)
+      if (found) pageId = found.id
+    }
+    if (!pageId) {
       return NextResponse.json(
         { error: "Component has not been published to Confluence yet." },
         { status: 404 }
       )
     }
 
-    const page = await getPage(link.pageId)
+    const page = await getPage(pageId)
     const patch = parseMetaTable(page.body)
     const component = await getComponent(componentId)
 
@@ -103,14 +121,24 @@ export async function POST(request: Request) {
 
     await saveComponent(updated, componentSha)
 
-    await saveConfluenceLink(
-      {
-        ...link,
-        lastSyncedAt: new Date().toISOString(),
-        lastPublishedVersion: page.version.number,
-      },
-      link.sha
-    )
+    // Best-effort side-file update; non-fatal if GitHub PAT cannot write.
+    try {
+      await saveConfluenceLink(
+        {
+          componentId,
+          pageId,
+          spaceId: page.spaceId,
+          lastSyncedAt: new Date().toISOString(),
+          lastPublishedVersion: page.version.number,
+        },
+        linkSha
+      )
+    } catch (err) {
+      console.warn(
+        `saveConfluenceLink failed for ${componentId} (pull still applied):`,
+        err instanceof Error ? err.message : err
+      )
+    }
 
     return NextResponse.json({
       applied: true,

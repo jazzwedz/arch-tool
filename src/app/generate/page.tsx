@@ -91,7 +91,7 @@ export default function GeneratePage() {
   const docContentRef = useRef<HTMLDivElement>(null)
   const [publishing, setPublishing] = useState(false)
   const [publishResult, setPublishResult] = useState<
-    | { ok: true; pageUrl: string; action: string; capabilityParent: string }
+    | { ok: true; pageUrl: string; action: string; capabilityParent: string; warning?: string }
     | { ok: false; error: string }
     | null
   >(null)
@@ -322,6 +322,7 @@ export default function GeneratePage() {
           pageUrl: json.pageUrl,
           action: json.action,
           capabilityParent: json.capabilityParent,
+          warning: json.warning,
         })
       }
     } catch (e) {
@@ -817,20 +818,27 @@ export default function GeneratePage() {
               }`}
             >
               {publishResult.ok ? (
-                <div className="flex items-center justify-between gap-4">
-                  <span>
-                    Published to Confluence ({publishResult.action}) under
-                    capability <strong>{publishResult.capabilityParent}</strong>.
-                  </span>
-                  <a
-                    href={publishResult.pageUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 underline font-medium"
-                  >
-                    Open in Confluence
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <span>
+                      Published to Confluence ({publishResult.action}) under
+                      capability <strong>{publishResult.capabilityParent}</strong>.
+                    </span>
+                    <a
+                      href={publishResult.pageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 underline font-medium"
+                    >
+                      Open in Confluence
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                  {publishResult.warning && (
+                    <div className="text-xs text-amber-700">
+                      Note: {publishResult.warning}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <span>Publish failed: {publishResult.error}</span>

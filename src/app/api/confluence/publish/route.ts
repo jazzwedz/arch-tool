@@ -7,6 +7,7 @@ import {
   updatePage,
   getPage,
   findOrCreateCapabilityPage,
+  findPageByComponentId,
 } from "@/lib/confluence"
 import {
   buildPageBody,
@@ -63,16 +64,36 @@ export async function POST(request: Request) {
     })
     const title = pageTitleFor(component)
 
-    // Already linked? Fetch latest version, update.
-    const existing = await getConfluenceLink(componentId)
+    // Resolve the existing page via two strategies, in order:
+    //   1) side-file in arch-data repo (fast, survives renames)
+    //   2) title-based scan in Confluence space (works without repo access)
+    let existingPageId: string | undefined
+    let existingLinkSha: string | undefined
+    try {
+      const linked = await getConfluenceLink(componentId)
+      if (linked) {
+        existingPageId = linked.pageId
+        existingLinkSha = linked.sha
+      }
+    } catch (err) {
+      console.warn(
+        `getConfluenceLink failed for ${componentId} (continuing with title fallback):`,
+        err instanceof Error ? err.message : err
+      )
+    }
+    if (!existingPageId) {
+      const found = await findPageByComponentId(componentId)
+      if (found) existingPageId = found.id
+    }
+
     let pageRef
     let action: "created" | "updated"
 
-    if (existing) {
+    if (existingPageId) {
       try {
-        const current = await getPage(existing.pageId)
+        const current = await getPage(existingPageId)
         pageRef = await updatePage({
-          pageId: existing.pageId,
+          pageId: existingPageId,
           title,
           storageBody,
           currentVersion: current.version.number,
@@ -83,7 +104,7 @@ export async function POST(request: Request) {
       } catch (err) {
         // Page might have been deleted in Confluence; fall through to create.
         console.warn(
-          `Confluence page ${existing.pageId} no longer accessible, recreating:`,
+          `Confluence page ${existingPageId} no longer accessible, recreating:`,
           err instanceof Error ? err.message : err
         )
         pageRef = await createPage({
@@ -102,16 +123,31 @@ export async function POST(request: Request) {
       action = "created"
     }
 
-    await saveConfluenceLink(
-      {
-        componentId,
-        pageId: pageRef.id,
-        spaceId: pageRef.spaceId,
-        lastSyncedAt: new Date().toISOString(),
-        lastPublishedVersion: pageRef.version.number,
-      },
-      existing?.sha
-    )
+    // Side-file write is best-effort — if the GitHub PAT can't write
+    // (e.g., scoped permissions, branch protection), the publish still
+    // succeeds and pull falls back to title-based lookup.
+    let linkPersisted = true
+    let linkWarning: string | undefined
+    try {
+      await saveConfluenceLink(
+        {
+          componentId,
+          pageId: pageRef.id,
+          spaceId: pageRef.spaceId,
+          lastSyncedAt: new Date().toISOString(),
+          lastPublishedVersion: pageRef.version.number,
+        },
+        existingLinkSha
+      )
+    } catch (err) {
+      linkPersisted = false
+      linkWarning =
+        "Confluence page is live, but the link side-file in arch-data could not be written (GitHub PAT permission). Pull will use title-based lookup."
+      console.warn(
+        `saveConfluenceLink failed for ${componentId}:`,
+        err instanceof Error ? err.message : err
+      )
+    }
 
     return NextResponse.json({
       action,
@@ -119,6 +155,8 @@ export async function POST(request: Request) {
       pageUrl: pageRef.fullUrl,
       capabilityParent: parent.title,
       capabilityParentId: parent.id,
+      linkPersisted,
+      ...(linkWarning ? { warning: linkWarning } : {}),
     })
   } catch (error: unknown) {
     const status =

@@ -175,7 +175,7 @@ export async function deletePage(pageId: string): Promise<void> {
   await request<void>(`/wiki/api/v2/pages/${pageId}`, { method: "DELETE" })
 }
 
-// Search pages by title in our space.
+// Search pages by exact title in our space.
 // Returns the first match if any.
 export async function findPageByTitleInSpace(
   title: string
@@ -207,6 +207,51 @@ export async function findPageByTitleInSpace(
     webui: match._links.webui,
     fullUrl: buildFullUrl(match._links.webui),
   }
+}
+
+// Title-based fallback for finding a previously published component page.
+// We use the convention: title is `${componentName} (${componentId})`.
+// This finds any page in the space whose title ends with `(${componentId})`.
+export async function findPageByComponentId(
+  componentId: string
+): Promise<ConfluencePageRef | null> {
+  const suffix = `(${componentId})`
+  // Iterate space pages, paginate up to ~500 pages.
+  let cursor: string | undefined = undefined
+  for (let page = 0; page < 5; page++) {
+    const params = new URLSearchParams({ limit: "100" })
+    if (cursor) params.set("cursor", cursor)
+    const data = await request<{
+      results: Array<{
+        id: string
+        title: string
+        spaceId: string
+        parentId?: string
+        version: { number: number }
+        _links: { webui: string }
+      }>
+      _links?: { next?: string }
+    }>(`/wiki/api/v2/spaces/${SPACE_ID}/pages?${params.toString()}`)
+    const match = data.results.find((r) => r.title.endsWith(suffix))
+    if (match) {
+      return {
+        id: match.id,
+        title: match.title,
+        spaceId: match.spaceId,
+        parentId: match.parentId,
+        version: match.version,
+        webui: match._links.webui,
+        fullUrl: buildFullUrl(match._links.webui),
+      }
+    }
+    // Extract cursor from next link if present.
+    const next = data._links?.next
+    if (!next) break
+    const m = next.match(/[?&]cursor=([^&]+)/)
+    if (!m) break
+    cursor = decodeURIComponent(m[1])
+  }
+  return null
 }
 
 // Find a page by exact title under a known parent (used to find capability folders).

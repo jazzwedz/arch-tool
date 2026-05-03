@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
-import { isConfluenceConfigured } from "@/lib/confluence"
+import { isConfluenceConfigured, findPageByComponentId } from "@/lib/confluence"
 import { getConfluenceLink } from "@/lib/github"
 import { isValidName } from "@/lib/validate"
 
 export const dynamic = "force-dynamic"
 
 // GET /api/confluence/status?componentId=xxx
-// Reports whether Confluence is configured and whether this component already has a published page.
+// Reports whether Confluence is configured and whether this component
+// already has a published page (side-file first, title-based fallback).
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url)
@@ -18,15 +19,43 @@ export async function GET(request: Request) {
     if (!isValidName(componentId)) {
       return NextResponse.json({ error: "Invalid component ID" }, { status: 400 })
     }
-    const link = await getConfluenceLink(componentId)
+
+    let pageId: string | undefined
+    let lastSyncedAt: string | undefined
+    let pageUrl: string | undefined
+
+    try {
+      const link = await getConfluenceLink(componentId)
+      if (link) {
+        pageId = link.pageId
+        lastSyncedAt = link.lastSyncedAt
+      }
+    } catch {
+      // ignore — fall through to title lookup
+    }
+
+    if (!pageId && configured) {
+      try {
+        const found = await findPageByComponentId(componentId)
+        if (found) {
+          pageId = found.id
+          pageUrl = found.fullUrl
+        }
+      } catch {
+        // ignore — return unpublished
+      }
+    }
+
+    if (pageId && !pageUrl) {
+      pageUrl = `${process.env.CONFLUENCE_BASE_URL}/wiki/spaces/${process.env.CONFLUENCE_SPACE_KEY || "TR"}/pages/${pageId}`
+    }
+
     return NextResponse.json({
       configured,
-      published: !!link,
-      pageId: link?.pageId,
-      lastSyncedAt: link?.lastSyncedAt,
-      pageUrl: link?.pageId
-        ? `${process.env.CONFLUENCE_BASE_URL}/wiki/spaces/${process.env.CONFLUENCE_SPACE_KEY || "TR"}/pages/${link.pageId}`
-        : undefined,
+      published: !!pageId,
+      pageId,
+      lastSyncedAt,
+      pageUrl,
     })
   } catch (error) {
     console.error(
