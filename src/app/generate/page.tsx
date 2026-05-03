@@ -31,6 +31,8 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Send,
+  ExternalLink,
 } from "lucide-react"
 import Link from "next/link"
 import type { Component, DiagramWithSha } from "@/lib/types"
@@ -87,6 +89,12 @@ export default function GeneratePage() {
   const [erdFile, setErdFile] = useState<{ name: string; content: string } | null>(null)
   const [bpmnFile, setBpmnFile] = useState<{ name: string; content: string } | null>(null)
   const docContentRef = useRef<HTMLDivElement>(null)
+  const [publishing, setPublishing] = useState(false)
+  const [publishResult, setPublishResult] = useState<
+    | { ok: true; pageUrl: string; action: string; capabilityParent: string }
+    | { ok: false; error: string }
+    | null
+  >(null)
 
   useEffect(() => {
     fetch("/api/components")
@@ -288,6 +296,43 @@ export default function GeneratePage() {
       setTimeout(() => setCopied(false), 2000)
     })
   }, [result])
+
+  const handlePublishToConfluence = useCallback(async () => {
+    if (!result?.generated || !selectedComponentId) return
+    setPublishing(true)
+    setPublishResult(null)
+    try {
+      const audienceLabel =
+        outputMode === "audience" ? audience : DOCUMENT_TYPE_LABELS[documentType]
+      const res = await fetch("/api/confluence/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          componentId: selectedComponentId,
+          audienceLabel,
+          narrativeMarkdown: result.generated,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setPublishResult({ ok: false, error: json.error || `HTTP ${res.status}` })
+      } else {
+        setPublishResult({
+          ok: true,
+          pageUrl: json.pageUrl,
+          action: json.action,
+          capabilityParent: json.capabilityParent,
+        })
+      }
+    } catch (e) {
+      setPublishResult({
+        ok: false,
+        error: e instanceof Error ? e.message : "Unknown error",
+      })
+    } finally {
+      setPublishing(false)
+    }
+  }, [result, selectedComponentId, outputMode, audience, documentType])
 
   const getDescription = (component: Component): string => {
     if (audience === "Business") return component.description.business
@@ -729,16 +774,69 @@ export default function GeneratePage() {
                 <Download className="h-4 w-4 mr-1" />
                 Save as PDF
               </Button>
+              {selectionMode === "component" && selectedComponentId && (
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={handlePublishToConfluence}
+                  disabled={publishing}
+                  title="Publish to Confluence (Team Repository space)"
+                >
+                  {publishing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      Publishing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-1" />
+                      Publish to Confluence
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowDocModal(false)}
+                onClick={() => {
+                  setShowDocModal(false)
+                  setPublishResult(null)
+                }}
               >
                 <X className="h-4 w-4 mr-1" />
                 Close
               </Button>
             </div>
           </div>
+          {publishResult && (
+            <div
+              className={`px-6 py-3 border-b text-sm ${
+                publishResult.ok
+                  ? "bg-green-50 border-green-200 text-green-900"
+                  : "bg-red-50 border-red-200 text-red-900"
+              }`}
+            >
+              {publishResult.ok ? (
+                <div className="flex items-center justify-between gap-4">
+                  <span>
+                    Published to Confluence ({publishResult.action}) under
+                    capability <strong>{publishResult.capabilityParent}</strong>.
+                  </span>
+                  <a
+                    href={publishResult.pageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 underline font-medium"
+                  >
+                    Open in Confluence
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              ) : (
+                <span>Publish failed: {publishResult.error}</span>
+              )}
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto px-8 py-6 bg-white">
             <div
               ref={docContentRef}

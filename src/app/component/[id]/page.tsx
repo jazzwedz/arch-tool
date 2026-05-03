@@ -21,6 +21,9 @@ import {
   Info,
   History,
   Radar,
+  ExternalLink,
+  RefreshCw,
+  Loader2,
 } from "lucide-react"
 import {
   Tooltip,
@@ -28,6 +31,13 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip"
 import { BlastRadiusDialog } from "@/components/BlastRadiusDialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -40,6 +50,23 @@ export default function ComponentDetailPage() {
   const [history, setHistory] = useState<{ sha: string; message: string; author: string; date: string }[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [showBlastRadius, setShowBlastRadius] = useState(false)
+  const [confluence, setConfluence] = useState<{
+    configured: boolean
+    published: boolean
+    pageUrl?: string
+    pageId?: string
+    lastSyncedAt?: string
+  } | null>(null)
+  const [pullState, setPullState] = useState<{
+    loading: boolean
+    diff?: { field: string; oldValue: string; newValue: string }[]
+    confluenceVersion?: number
+    confluenceUrl?: string
+    error?: string
+    showDialog: boolean
+    applying: boolean
+    appliedAt?: string
+  }>({ loading: false, showDialog: false, applying: false })
 
   useEffect(() => {
     fetch(`/api/components/${id}`)
@@ -59,7 +86,84 @@ export default function ComponentDetailPage() {
       .then((data) => setHistory(Array.isArray(data) ? data : []))
       .catch(() => setHistory([]))
       .finally(() => setHistoryLoading(false))
+
+    fetch(`/api/confluence/status?componentId=${encodeURIComponent(id)}`)
+      .then(async (r) => (r.ok ? r.json() : null))
+      .then((data) => setConfluence(data))
+      .catch(() => setConfluence(null))
   }, [id, router])
+
+  const fetchPullDiff = async () => {
+    if (!component) return
+    setPullState((s) => ({ ...s, loading: true, error: undefined, showDialog: true }))
+    try {
+      const res = await fetch("/api/confluence/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ componentId: component.id, apply: false }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setPullState((s) => ({
+          ...s,
+          loading: false,
+          error: json.error || `HTTP ${res.status}`,
+        }))
+      } else {
+        setPullState((s) => ({
+          ...s,
+          loading: false,
+          diff: json.diff,
+          confluenceVersion: json.confluenceVersion,
+          confluenceUrl: json.confluenceUrl,
+          error: undefined,
+        }))
+      }
+    } catch (e) {
+      setPullState((s) => ({
+        ...s,
+        loading: false,
+        error: e instanceof Error ? e.message : "Unknown error",
+      }))
+    }
+  }
+
+  const applyPull = async () => {
+    if (!component) return
+    setPullState((s) => ({ ...s, applying: true, error: undefined }))
+    try {
+      const res = await fetch("/api/confluence/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ componentId: component.id, apply: true }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setPullState((s) => ({
+          ...s,
+          applying: false,
+          error: json.error || `HTTP ${res.status}`,
+        }))
+      } else {
+        setPullState((s) => ({
+          ...s,
+          applying: false,
+          appliedAt: new Date().toISOString(),
+        }))
+        // Refresh component data
+        const fresh = await fetch(`/api/components/${component.id}`).then((r) =>
+          r.json()
+        )
+        setComponent(fresh)
+      }
+    } catch (e) {
+      setPullState((s) => ({
+        ...s,
+        applying: false,
+        error: e instanceof Error ? e.message : "Unknown error",
+      }))
+    }
+  }
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text)
@@ -111,7 +215,7 @@ export default function ComponentDetailPage() {
             {component.description.oneliner}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             className="bg-orange-500 hover:bg-orange-600 text-white"
             onClick={() => setShowBlastRadius(true)}
@@ -119,6 +223,32 @@ export default function ComponentDetailPage() {
             <Radar className="h-4 w-4 mr-2" />
             Blast Radius
           </Button>
+          {confluence?.published && confluence.pageUrl && (
+            <a href={confluence.pageUrl} target="_blank" rel="noreferrer">
+              <Button
+                variant="outline"
+                className="border-blue-300 text-blue-700 hover:bg-blue-50"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open in Confluence
+              </Button>
+            </a>
+          )}
+          {confluence?.published && (
+            <Button
+              variant="outline"
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
+              onClick={fetchPullDiff}
+              disabled={pullState.loading}
+            >
+              {pullState.loading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Pull from Confluence
+            </Button>
+          )}
           <a href="/api/export/drawio" download="arch-components.xml">
             <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
@@ -519,6 +649,118 @@ export default function ComponentDetailPage() {
         onOpenChange={setShowBlastRadius}
         componentId={component.id}
       />
+
+      <Dialog
+        open={pullState.showDialog}
+        onOpenChange={(v) =>
+          setPullState((s) => ({
+            ...s,
+            showDialog: v,
+            ...(v ? {} : { diff: undefined, error: undefined, appliedAt: undefined }),
+          }))
+        }
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-blue-600" />
+              Pull from Confluence — {component.name}
+            </DialogTitle>
+            <DialogDescription>
+              Compare metadata edited in Confluence with the current catalog
+              entry. If you apply, the change is committed to the GitHub repo.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pullState.loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Reading Confluence page...
+            </div>
+          )}
+
+          {pullState.error && (
+            <div className="bg-destructive/10 text-destructive text-sm rounded-md p-3">
+              {pullState.error}
+            </div>
+          )}
+
+          {!pullState.loading && pullState.diff !== undefined && !pullState.error && (
+            <div className="space-y-4">
+              {pullState.appliedAt ? (
+                <div className="bg-green-50 border border-green-200 text-green-900 text-sm rounded-md p-3">
+                  Applied to repo. New commit pushed to GitHub.
+                </div>
+              ) : pullState.diff.length === 0 ? (
+                <div className="bg-muted/40 text-sm rounded-md p-4 text-center">
+                  No differences. Catalog and Confluence agree.
+                </div>
+              ) : (
+                <>
+                  <div className="text-sm">
+                    <strong>{pullState.diff.length}</strong> field
+                    {pullState.diff.length === 1 ? "" : "s"} would change:
+                  </div>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40">
+                        <tr>
+                          <th className="text-left p-2 font-medium">Field</th>
+                          <th className="text-left p-2 font-medium text-muted-foreground">
+                            Current
+                          </th>
+                          <th className="text-left p-2 font-medium text-blue-700">
+                            From Confluence
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pullState.diff.map((d) => (
+                          <tr key={d.field} className="border-t">
+                            <td className="p-2 font-mono text-xs">{d.field}</td>
+                            <td className="p-2 text-muted-foreground">
+                              <span className="line-through">{d.oldValue || "(empty)"}</span>
+                            </td>
+                            <td className="p-2 text-blue-900 font-medium">
+                              {d.newValue || "(empty)"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    {pullState.confluenceUrl && (
+                      <a
+                        href={pullState.confluenceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs underline text-blue-700"
+                      >
+                        Open Confluence page
+                      </a>
+                    )}
+                    <Button
+                      onClick={applyPull}
+                      disabled={pullState.applying}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {pullState.applying ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Applying...
+                        </>
+                      ) : (
+                        <>Apply &amp; commit</>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

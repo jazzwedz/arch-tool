@@ -274,3 +274,61 @@ export async function deleteDiagram(name: string, sha: string): Promise<void> {
     branch,
   })
 }
+
+// Confluence link side-file: maps a component to a Confluence page so that
+// publish/pull stays stable even if the component is renamed.
+
+export interface ConfluenceLink {
+  componentId: string
+  pageId: string
+  spaceId: string
+  lastSyncedAt: string
+  lastPublishedVersion?: number
+}
+
+interface ConfluenceLinkWithSha extends ConfluenceLink {
+  sha: string
+}
+
+export async function getConfluenceLink(
+  componentId: string
+): Promise<ConfluenceLinkWithSha | null> {
+  const path = `confluence-links/${componentId}.json`
+  try {
+    const { data } = await octokit.rest.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref: branch,
+    })
+    if (!("content" in data)) return null
+    const content = Buffer.from(data.content, "base64").toString("utf-8")
+    return { ...(JSON.parse(content) as ConfluenceLink), sha: data.sha }
+  } catch (error: unknown) {
+    if (
+      error instanceof Error &&
+      "status" in error &&
+      (error as { status: number }).status === 404
+    ) {
+      return null
+    }
+    throw error
+  }
+}
+
+export async function saveConfluenceLink(link: ConfluenceLink, sha?: string): Promise<void> {
+  const path = `confluence-links/${link.componentId}.json`
+  const content = JSON.stringify(link, null, 2) + "\n"
+  const message = sha
+    ? `chore: update confluence link for ${link.componentId}`
+    : `chore: add confluence link for ${link.componentId}`
+  await octokit.rest.repos.createOrUpdateFileContents({
+    owner,
+    repo,
+    path,
+    message,
+    content: Buffer.from(content).toString("base64"),
+    branch,
+    ...(sha ? { sha } : {}),
+  })
+}
