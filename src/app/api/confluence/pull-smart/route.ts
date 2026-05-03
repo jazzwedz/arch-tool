@@ -14,8 +14,6 @@ import {
   findPageByComponentId,
 } from "@/lib/confluence"
 import {
-  parseMetaTable,
-  diffPatch,
   resolveDataClassification,
   resolveScaling,
 } from "@/lib/confluence-parse"
@@ -25,7 +23,7 @@ import type {
   DataClassification,
   ScalingModel,
 } from "@/lib/types"
-import { COMPONENT_STATUSES, DATA_CLASSIFICATION_LABELS } from "@/lib/constants"
+import { COMPONENT_STATUSES } from "@/lib/constants"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 export const dynamic = "force-dynamic"
@@ -33,15 +31,13 @@ export const dynamic = "force-dynamic"
 const anthropic = new Anthropic()
 
 type Confidence = "high" | "medium" | "low"
-type PatchSource = "table" | "ai"
 
 export interface SmartPatch {
   field: string // e.g. "name", "owner", "tags", "description.oneliner", "nfr.availability"
   oldValue: string
   newValue: string
-  source: PatchSource
   confidence: Confidence
-  evidence?: string // for AI: a short quote from the page
+  evidence?: string // a short quote from the page that supports the change
 }
 
 interface PullSmartBody {
@@ -125,7 +121,8 @@ export async function POST(request: Request) {
       })
     }
 
-    // PROPOSE phase: gather deterministic table patches + AI narrative patches.
+    // PROPOSE phase: AI scans the whole page text against the catalog YAML
+    // and proposes precise field-level patches.
     const clientIp = request.headers.get("x-forwarded-for") || "unknown"
     if (!checkRateLimit(clientIp)) {
       return NextResponse.json(
@@ -134,16 +131,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const tablePatches = computeTablePatches(page.body, component)
     const aiPatches = await computeAiPatches(page.body, component)
 
-    // Merge: keep all, but if a field appears in BOTH with same newValue,
-    // collapse to the high-confidence (table) version. If newValues differ,
-    // keep both so the user can pick.
-    const merged = mergePatches(tablePatches, aiPatches)
-
     return NextResponse.json({
-      patches: merged,
+      patches: aiPatches,
       confluenceVersion: page.version.number,
       confluenceUrl: page.fullUrl,
     })
@@ -157,46 +148,6 @@ export async function POST(request: Request) {
     console.error("Failed pull-smart:", message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
-}
-
-function computeTablePatches(
-  storageBody: string,
-  component: { name: string; status: string; owner?: string; tags?: string[]; description?: { oneliner?: string }; nfr?: ComponentNFR }
-): SmartPatch[] {
-  const patch = parseMetaTable(storageBody)
-  const currentDataClass = component.nfr?.data_classification
-  const diff = diffPatch(
-    {
-      name: component.name,
-      status: component.status,
-      owner: component.owner || "",
-      tags: component.tags || [],
-      oneliner: component.description?.oneliner || "",
-      availability: component.nfr?.availability || "",
-      rto: component.nfr?.rto || "",
-      rpo: component.nfr?.rpo || "",
-      max_latency: component.nfr?.max_latency || "",
-      throughput: component.nfr?.throughput || "",
-      data_classification: currentDataClass
-        ? DATA_CLASSIFICATION_LABELS[currentDataClass] || currentDataClass
-        : "",
-      scaling: component.nfr?.scaling || "",
-    },
-    patch
-  )
-  return diff.map((d) => ({
-    field: tableFieldToPath(d.field),
-    oldValue: d.oldValue,
-    newValue: d.newValue,
-    source: "table" as const,
-    confidence: "high" as const,
-  }))
-}
-
-function tableFieldToPath(f: string): string {
-  // diffPatch already uses dot-notation for NFR (nfr.availability etc).
-  if (f === "oneliner") return "description.oneliner"
-  return f
 }
 
 async function computeAiPatches(
@@ -240,7 +191,6 @@ async function computeAiPatches(
             typeof p.oldValue === "string" ? p.oldValue : String(p.oldValue ?? ""),
           newValue:
             typeof p.newValue === "string" ? p.newValue : String(p.newValue ?? ""),
-          source: "ai",
           confidence,
           evidence:
             typeof p.evidence === "string" ? p.evidence.slice(0, 240) : undefined,
@@ -403,24 +353,6 @@ Output ONLY a single JSON object with this exact shape:
 
 If there are no changes, return {"patches": []}.
 Output JSON only, no surrounding prose, no markdown fences.`
-}
-
-function mergePatches(table: SmartPatch[], ai: SmartPatch[]): SmartPatch[] {
-  const out: SmartPatch[] = [...table]
-  const seen = new Map<string, SmartPatch>()
-  for (const p of out) seen.set(p.field, p)
-  for (const p of ai) {
-    const existing = seen.get(p.field)
-    if (!existing) {
-      out.push(p)
-      seen.set(p.field, p)
-    } else if (existing.newValue !== p.newValue) {
-      // Different value — keep both so user can pick.
-      out.push(p)
-    }
-    // If same value as table patch, drop the AI duplicate.
-  }
-  return out
 }
 
 interface ApplyArgs {

@@ -61,7 +61,6 @@ export default function ComponentDetailPage() {
     field: string
     oldValue: string
     newValue: string
-    source: "table" | "ai"
     confidence: "high" | "medium" | "low"
     evidence?: string
   }
@@ -128,10 +127,11 @@ export default function ComponentDetailPage() {
         }))
       } else {
         const patches: SmartPatch[] = json.patches || []
-        // Default-check: table source (always) + AI high/medium confidence.
+        // Default-check: high or medium confidence proposals; low-confidence
+        // proposals are surfaced but require explicit opt-in.
         const selected: Record<number, boolean> = {}
         patches.forEach((p, i) => {
-          selected[i] = p.source === "table" || p.confidence !== "low"
+          selected[i] = p.confidence !== "low"
         })
         setPullState((s) => ({
           ...s,
@@ -747,9 +747,8 @@ export default function ComponentDetailPage() {
                   <div className="text-sm flex items-center justify-between">
                     <span>
                       <strong>{pullState.patches.length}</strong> proposed
-                      change{pullState.patches.length === 1 ? "" : "s"}.
-                      Default selection: all from table + AI high/medium
-                      confidence.
+                      change{pullState.patches.length === 1 ? "" : "s"} from
+                      AI scan. Low-confidence proposals are unticked by default.
                     </span>
                     {pullState.confluenceUrl && (
                       <a
@@ -766,18 +765,12 @@ export default function ComponentDetailPage() {
                   <div className="space-y-2">
                     {pullState.patches.map((p, i) => {
                       const checked = !!pullState.selected[i]
-                      const sourceLabel =
-                        p.source === "table" ? "from table" : "from narrative"
                       const confColor =
                         p.confidence === "high"
                           ? "bg-green-100 text-green-800 border-green-300"
                           : p.confidence === "medium"
                           ? "bg-yellow-100 text-yellow-800 border-yellow-300"
                           : "bg-gray-100 text-gray-700 border-gray-300"
-                      const sourceColor =
-                        p.source === "table"
-                          ? "bg-blue-100 text-blue-800 border-blue-300"
-                          : "bg-purple-100 text-purple-800 border-purple-300"
                       return (
                         <label
                           key={i}
@@ -798,15 +791,9 @@ export default function ComponentDetailPage() {
                               </span>
                               <Badge
                                 variant="outline"
-                                className={`text-[10px] uppercase ${sourceColor}`}
-                              >
-                                {sourceLabel}
-                              </Badge>
-                              <Badge
-                                variant="outline"
                                 className={`text-[10px] uppercase ${confColor}`}
                               >
-                                {p.confidence}
+                                {p.confidence} confidence
                               </Badge>
                             </div>
                             <div className="text-xs space-y-0.5">
