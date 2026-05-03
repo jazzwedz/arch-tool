@@ -1,12 +1,23 @@
 // Parse a Confluence storage-format page body and extract the editable
 // metadata fields produced by buildPropertiesTable() in confluence-render.ts.
 
+import type { DataClassification, ScalingModel } from "./types"
+import { DATA_CLASSIFICATION_LABELS } from "./constants"
+
 export interface ParsedMetaPatch {
   name?: string
   status?: string
   owner?: string
   tags?: string[]
   oneliner?: string
+  // NFR
+  availability?: string
+  rto?: string
+  rpo?: string
+  max_latency?: string
+  throughput?: string
+  data_classification?: string // raw value from Confluence; validated downstream
+  scaling?: string // raw value
 }
 
 const FIELD_LABEL_TO_KEY: Record<string, keyof ParsedMetaPatch> = {
@@ -15,6 +26,13 @@ const FIELD_LABEL_TO_KEY: Record<string, keyof ParsedMetaPatch> = {
   Owner: "owner",
   Tags: "tags",
   Description: "oneliner",
+  "Availability Target": "availability",
+  RTO: "rto",
+  RPO: "rpo",
+  "Max Latency": "max_latency",
+  Throughput: "throughput",
+  "Data Classification": "data_classification",
+  "Scaling Model": "scaling",
 }
 
 // Strip Confluence/HTML tags and decode entities to a plain text value.
@@ -32,6 +50,9 @@ function stripTagsAndDecode(s: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
+    .replace(/&middot;/g, "·")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
   return out.trim()
 }
 
@@ -89,34 +110,85 @@ export function parseMetaTable(storageBody: string): ParsedMetaPatch {
 }
 
 // Compute a human-readable summary of which fields differ between the catalog
-// component and the parsed Confluence patch.
+// component and the parsed Confluence patch. Fields with empty values in the
+// patch are treated as "clear this value" (intentional empty).
 export interface FieldDiff {
   field: string
   oldValue: string
   newValue: string
 }
 
+export interface DiffInput {
+  name: string
+  status: string
+  owner: string
+  tags: string[]
+  oneliner: string
+  availability: string
+  rto: string
+  rpo: string
+  max_latency: string
+  throughput: string
+  data_classification: string // human label, or raw key
+  scaling: string
+}
+
+function trimEqual(a: string | undefined, b: string | undefined): boolean {
+  return (a || "").trim() === (b || "").trim()
+}
+
 export function diffPatch(
-  current: { name: string; status: string; owner: string; tags: string[]; oneliner: string },
+  current: DiffInput,
   patch: ParsedMetaPatch
 ): FieldDiff[] {
   const out: FieldDiff[] = []
-  if (patch.name !== undefined && patch.name !== current.name) {
-    out.push({ field: "name", oldValue: current.name, newValue: patch.name })
+  const push = (field: string, oldV: string, newV: string) => {
+    if (!trimEqual(oldV, newV)) {
+      out.push({ field, oldValue: oldV, newValue: newV })
+    }
   }
-  if (patch.status !== undefined && patch.status !== current.status) {
-    out.push({ field: "status", oldValue: current.status, newValue: patch.status })
-  }
-  if (patch.owner !== undefined && patch.owner !== current.owner) {
-    out.push({ field: "owner", oldValue: current.owner, newValue: patch.owner })
-  }
+  if (patch.name !== undefined) push("name", current.name, patch.name)
+  if (patch.status !== undefined) push("status", current.status, patch.status)
+  if (patch.owner !== undefined) push("owner", current.owner, patch.owner)
   if (patch.tags !== undefined) {
     const a = current.tags.join(", ")
     const b = patch.tags.join(", ")
     if (a !== b) out.push({ field: "tags", oldValue: a, newValue: b })
   }
-  if (patch.oneliner !== undefined && patch.oneliner !== current.oneliner) {
-    out.push({ field: "oneliner", oldValue: current.oneliner, newValue: patch.oneliner })
-  }
+  if (patch.oneliner !== undefined) push("oneliner", current.oneliner, patch.oneliner)
+  if (patch.availability !== undefined)
+    push("nfr.availability", current.availability, patch.availability)
+  if (patch.rto !== undefined) push("nfr.rto", current.rto, patch.rto)
+  if (patch.rpo !== undefined) push("nfr.rpo", current.rpo, patch.rpo)
+  if (patch.max_latency !== undefined)
+    push("nfr.max_latency", current.max_latency, patch.max_latency)
+  if (patch.throughput !== undefined)
+    push("nfr.throughput", current.throughput, patch.throughput)
+  if (patch.data_classification !== undefined)
+    push("nfr.data_classification", current.data_classification, patch.data_classification)
+  if (patch.scaling !== undefined) push("nfr.scaling", current.scaling, patch.scaling)
   return out
+}
+
+// Resolve a user-entered Data Classification value (may be label like "Confidential"
+// or raw key like "confidential") to a canonical DataClassification. Returns
+// undefined for empty input, null if value is invalid.
+export function resolveDataClassification(
+  raw: string
+): DataClassification | undefined | null {
+  const t = raw.trim()
+  if (!t) return undefined
+  const lower = t.toLowerCase()
+  const canon = (Object.keys(DATA_CLASSIFICATION_LABELS) as DataClassification[]).find(
+    (k) => k === lower || DATA_CLASSIFICATION_LABELS[k].toLowerCase() === lower
+  )
+  return canon ?? null
+}
+
+export function resolveScaling(raw: string): ScalingModel | undefined | null {
+  const t = raw.trim()
+  if (!t) return undefined
+  const lower = t.toLowerCase()
+  const valid: ScalingModel[] = ["horizontal", "vertical", "none"]
+  return valid.includes(lower as ScalingModel) ? (lower as ScalingModel) : null
 }

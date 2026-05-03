@@ -3,31 +3,49 @@
 
 import { marked } from "marked"
 import type { Component } from "./types"
-import { TYPE_LABELS } from "./constants"
+import { TYPE_LABELS, DATA_CLASSIFICATION_LABELS } from "./constants"
 import { escapeXml } from "./confluence"
 
 const ARCH_TOOL_PUBLIC_URL =
   process.env.ARCH_TOOL_PUBLIC_URL || "https://arch-tool-jaso.up.railway.app"
 
-const META_FIELDS = [
-  { key: "id", label: "Component ID", editable: false },
-  { key: "type", label: "Type", editable: false },
-  { key: "name", label: "Name", editable: true },
-  { key: "status", label: "Status", editable: true },
-  { key: "owner", label: "Owner", editable: true },
-  { key: "tags", label: "Tags", editable: true },
-  { key: "oneliner", label: "Description", editable: true },
-] as const
+interface MetaFieldDef {
+  key: string
+  label: string
+  editable: boolean
+  group: "core" | "nfr"
+}
 
-export type EditableMetaKey = "name" | "status" | "owner" | "tags" | "oneliner"
-
-export const EDITABLE_META_KEYS: EditableMetaKey[] = [
-  "name",
-  "status",
-  "owner",
-  "tags",
-  "oneliner",
+const META_FIELDS: MetaFieldDef[] = [
+  { key: "id", label: "Component ID", editable: false, group: "core" },
+  { key: "type", label: "Type", editable: false, group: "core" },
+  { key: "name", label: "Name", editable: true, group: "core" },
+  { key: "status", label: "Status", editable: true, group: "core" },
+  { key: "owner", label: "Owner", editable: true, group: "core" },
+  { key: "tags", label: "Tags", editable: true, group: "core" },
+  { key: "oneliner", label: "Description", editable: true, group: "core" },
+  { key: "availability", label: "Availability Target", editable: true, group: "nfr" },
+  { key: "rto", label: "RTO", editable: true, group: "nfr" },
+  { key: "rpo", label: "RPO", editable: true, group: "nfr" },
+  { key: "max_latency", label: "Max Latency", editable: true, group: "nfr" },
+  { key: "throughput", label: "Throughput", editable: true, group: "nfr" },
+  { key: "data_classification", label: "Data Classification", editable: true, group: "nfr" },
+  { key: "scaling", label: "Scaling Model", editable: true, group: "nfr" },
 ]
+
+export type EditableMetaKey =
+  | "name"
+  | "status"
+  | "owner"
+  | "tags"
+  | "oneliner"
+  | "availability"
+  | "rto"
+  | "rpo"
+  | "max_latency"
+  | "throughput"
+  | "data_classification"
+  | "scaling"
 
 // Convert markdown produced by /api/generate into Confluence storage XHTML.
 export async function markdownToStorage(markdown: string): Promise<string> {
@@ -73,6 +91,7 @@ function joinTags(tags?: string[]): string {
 
 // Build the editable properties table that goes at the top of the page.
 function buildPropertiesTable(component: Component): string {
+  const dataClass = component.nfr?.data_classification
   const values: Record<string, string> = {
     id: component.id,
     type: TYPE_LABELS[component.type] || component.type,
@@ -81,22 +100,34 @@ function buildPropertiesTable(component: Component): string {
     owner: component.owner || "",
     tags: joinTags(component.tags),
     oneliner: component.description?.oneliner || "",
+    availability: component.nfr?.availability || "",
+    rto: component.nfr?.rto || "",
+    rpo: component.nfr?.rpo || "",
+    max_latency: component.nfr?.max_latency || "",
+    throughput: component.nfr?.throughput || "",
+    data_classification: dataClass ? DATA_CLASSIFICATION_LABELS[dataClass] || dataClass : "",
+    scaling: component.nfr?.scaling || "",
   }
-  const rows = META_FIELDS.map((f) => {
-    const cellClass = f.editable ? "" : ' style="color:#6b7280;"'
-    const note = f.editable ? "" : " <em>(read-only)</em>"
-    return (
-      `<tr>` +
-      `<th${cellClass}>${escapeXml(f.label)}${note}</th>` +
-      `<td>${escapeXml(values[f.key] || "")}</td>` +
-      `</tr>`
-    )
-  }).join("")
+  const renderRows = (group: "core" | "nfr") =>
+    META_FIELDS.filter((f) => f.group === group)
+      .map((f) => {
+        const cellClass = f.editable ? "" : ' style="color:#6b7280;"'
+        const note = f.editable ? "" : " <em>(read-only)</em>"
+        return (
+          `<tr>` +
+          `<th${cellClass}>${escapeXml(f.label)}${note}</th>` +
+          `<td>${escapeXml(values[f.key] || "")}</td>` +
+          `</tr>`
+        )
+      })
+      .join("")
   return (
     `<h2>Component Properties</h2>` +
-    `<p><em>Edit values in the right column. Changes pulled back into the architecture catalog when "Pull from Confluence" is clicked in arch-tool.</em></p>` +
+    `<p><em>Edit values in the right column. Changes pulled back into the architecture catalog when "Pull from Confluence" is clicked in arch-tool. Leave a value empty to clear it. Read-only fields are managed in arch-tool.</em></p>` +
     `<table data-arch-tool="properties"><tbody>` +
-    rows +
+    renderRows("core") +
+    `<tr><th colspan="2" style="background:#f3f4f6;font-weight:600;">Non-Functional Requirements</th></tr>` +
+    renderRows("nfr") +
     `</tbody></table>`
   )
 }

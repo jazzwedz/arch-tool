@@ -7,9 +7,14 @@ import {
 } from "@/lib/github"
 import { isValidName } from "@/lib/validate"
 import { isConfluenceConfigured, getPage, findPageByComponentId } from "@/lib/confluence"
-import { parseMetaTable, diffPatch } from "@/lib/confluence-parse"
-import type { ComponentStatus } from "@/lib/types"
-import { COMPONENT_STATUSES } from "@/lib/constants"
+import {
+  parseMetaTable,
+  diffPatch,
+  resolveDataClassification,
+  resolveScaling,
+} from "@/lib/confluence-parse"
+import type { ComponentStatus, ComponentNFR } from "@/lib/types"
+import { COMPONENT_STATUSES, DATA_CLASSIFICATION_LABELS } from "@/lib/constants"
 
 export const dynamic = "force-dynamic"
 
@@ -70,6 +75,7 @@ export async function POST(request: Request) {
     const patch = parseMetaTable(page.body)
     const component = await getComponent(componentId)
 
+    const currentDataClass = component.nfr?.data_classification
     const diff = diffPatch(
       {
         name: component.name,
@@ -77,6 +83,15 @@ export async function POST(request: Request) {
         owner: component.owner || "",
         tags: component.tags || [],
         oneliner: component.description?.oneliner || "",
+        availability: component.nfr?.availability || "",
+        rto: component.nfr?.rto || "",
+        rpo: component.nfr?.rpo || "",
+        max_latency: component.nfr?.max_latency || "",
+        throughput: component.nfr?.throughput || "",
+        data_classification: currentDataClass
+          ? DATA_CLASSIFICATION_LABELS[currentDataClass] || currentDataClass
+          : "",
+        scaling: component.nfr?.scaling || "",
       },
       patch
     )
@@ -90,9 +105,10 @@ export async function POST(request: Request) {
       })
     }
 
-    // Validate status — only commit if it's a known value, otherwise skip that field.
+    // Validate status — only commit if it's a known value, otherwise reject.
     if (
       patch.status !== undefined &&
+      patch.status !== "" &&
       !COMPONENT_STATUSES.includes(patch.status as ComponentStatus)
     ) {
       return NextResponse.json(
@@ -104,19 +120,74 @@ export async function POST(request: Request) {
       )
     }
 
-    // Strip sha from the component before saving — saveComponent serializes
-    // the whole object to YAML and we don't want sha to leak into the file.
-    const { sha: componentSha, ...componentWithoutSha } = component
+    // Validate data_classification and scaling.
+    let dataClassResolved: ReturnType<typeof resolveDataClassification> = undefined
+    if (patch.data_classification !== undefined) {
+      dataClassResolved = resolveDataClassification(patch.data_classification)
+      if (dataClassResolved === null) {
+        return NextResponse.json(
+          {
+            error: `Invalid Data Classification "${patch.data_classification}" in Confluence. Must be one of: ${Object.values(DATA_CLASSIFICATION_LABELS).join(", ")}.`,
+            diff,
+          },
+          { status: 400 }
+        )
+      }
+    }
+    let scalingResolved: ReturnType<typeof resolveScaling> = undefined
+    if (patch.scaling !== undefined) {
+      scalingResolved = resolveScaling(patch.scaling)
+      if (scalingResolved === null) {
+        return NextResponse.json(
+          {
+            error: `Invalid Scaling Model "${patch.scaling}" in Confluence. Must be one of: horizontal, vertical, none.`,
+            diff,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Build merged NFR (preserve unchanged fields, apply patches).
+    const mergedNfr: ComponentNFR = { ...(component.nfr || {}) }
+    const applyNfrText = (key: keyof ComponentNFR, value: string | undefined) => {
+      if (value === undefined) return
+      if (value === "") delete mergedNfr[key]
+      else (mergedNfr as Record<string, unknown>)[key] = value
+    }
+    applyNfrText("availability", patch.availability)
+    applyNfrText("rto", patch.rto)
+    applyNfrText("rpo", patch.rpo)
+    applyNfrText("max_latency", patch.max_latency)
+    applyNfrText("throughput", patch.throughput)
+    if (patch.data_classification !== undefined) {
+      if (dataClassResolved) mergedNfr.data_classification = dataClassResolved
+      else delete mergedNfr.data_classification
+    }
+    if (patch.scaling !== undefined) {
+      if (scalingResolved) mergedNfr.scaling = scalingResolved
+      else delete mergedNfr.scaling
+    }
+
+    // Strip sha and nfr from the component before reassembling, so we control
+    // exactly which fields end up in the YAML.
+    const { sha: componentSha, nfr: _existingNfr, ...rest } = component
+    void _existingNfr
+    const hasNfr = Object.keys(mergedNfr).length > 0
     const updated = {
-      ...componentWithoutSha,
+      ...rest,
       name: patch.name ?? component.name,
-      status: (patch.status as ComponentStatus | undefined) ?? component.status,
+      status:
+        patch.status !== undefined && patch.status !== ""
+          ? (patch.status as ComponentStatus)
+          : component.status,
       owner: patch.owner ?? component.owner,
       tags: patch.tags ?? component.tags,
       description: {
         ...component.description,
         oneliner: patch.oneliner ?? component.description?.oneliner ?? "",
       },
+      ...(hasNfr ? { nfr: mergedNfr } : {}),
     }
 
     await saveComponent(updated, componentSha)
