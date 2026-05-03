@@ -57,16 +57,25 @@ export default function ComponentDetailPage() {
     pageId?: string
     lastSyncedAt?: string
   } | null>(null)
+  type SmartPatch = {
+    field: string
+    oldValue: string
+    newValue: string
+    source: "table" | "ai"
+    confidence: "high" | "medium" | "low"
+    evidence?: string
+  }
   const [pullState, setPullState] = useState<{
     loading: boolean
-    diff?: { field: string; oldValue: string; newValue: string }[]
+    patches?: SmartPatch[]
+    selected: Record<number, boolean> // index → selected
     confluenceVersion?: number
     confluenceUrl?: string
     error?: string
     showDialog: boolean
     applying: boolean
-    appliedAt?: string
-  }>({ loading: false, showDialog: false, applying: false })
+    appliedCount?: number
+  }>({ loading: false, showDialog: false, applying: false, selected: {} })
 
   useEffect(() => {
     fetch(`/api/components/${id}`)
@@ -95,9 +104,17 @@ export default function ComponentDetailPage() {
 
   const fetchPullDiff = async () => {
     if (!component) return
-    setPullState((s) => ({ ...s, loading: true, error: undefined, showDialog: true }))
+    setPullState((s) => ({
+      ...s,
+      loading: true,
+      error: undefined,
+      showDialog: true,
+      patches: undefined,
+      appliedCount: undefined,
+      selected: {},
+    }))
     try {
-      const res = await fetch("/api/confluence/pull", {
+      const res = await fetch("/api/confluence/pull-smart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ componentId: component.id, apply: false }),
@@ -110,13 +127,20 @@ export default function ComponentDetailPage() {
           error: json.error || `HTTP ${res.status}`,
         }))
       } else {
+        const patches: SmartPatch[] = json.patches || []
+        // Default-check: table source (always) + AI high/medium confidence.
+        const selected: Record<number, boolean> = {}
+        patches.forEach((p, i) => {
+          selected[i] = p.source === "table" || p.confidence !== "low"
+        })
         setPullState((s) => ({
           ...s,
           loading: false,
-          diff: json.diff,
+          patches,
           confluenceVersion: json.confluenceVersion,
           confluenceUrl: json.confluenceUrl,
           error: undefined,
+          selected,
         }))
       }
     } catch (e) {
@@ -129,13 +153,19 @@ export default function ComponentDetailPage() {
   }
 
   const applyPull = async () => {
-    if (!component) return
+    if (!component || !pullState.patches) return
+    const chosen = pullState.patches.filter((_, i) => pullState.selected[i])
+    if (chosen.length === 0) return
     setPullState((s) => ({ ...s, applying: true, error: undefined }))
     try {
-      const res = await fetch("/api/confluence/pull", {
+      const res = await fetch("/api/confluence/pull-smart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ componentId: component.id, apply: true }),
+        body: JSON.stringify({
+          componentId: component.id,
+          apply: true,
+          patches: chosen,
+        }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -148,7 +178,7 @@ export default function ComponentDetailPage() {
         setPullState((s) => ({
           ...s,
           applying: false,
-          appliedAt: new Date().toISOString(),
+          appliedCount: json.appliedCount ?? chosen.length,
         }))
         // Refresh component data
         const fresh = await fetch(`/api/components/${component.id}`).then((r) =>
@@ -163,6 +193,13 @@ export default function ComponentDetailPage() {
         error: e instanceof Error ? e.message : "Unknown error",
       }))
     }
+  }
+
+  const togglePatch = (index: number) => {
+    setPullState((s) => ({
+      ...s,
+      selected: { ...s.selected, [index]: !s.selected[index] },
+    }))
   }
 
   const copyToClipboard = (text: string, field: string) => {
@@ -656,26 +693,34 @@ export default function ComponentDetailPage() {
           setPullState((s) => ({
             ...s,
             showDialog: v,
-            ...(v ? {} : { diff: undefined, error: undefined, appliedAt: undefined }),
+            ...(v
+              ? {}
+              : {
+                  patches: undefined,
+                  error: undefined,
+                  appliedCount: undefined,
+                  selected: {},
+                }),
           }))
         }
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RefreshCw className="h-5 w-5 text-blue-600" />
               Pull from Confluence — {component.name}
             </DialogTitle>
             <DialogDescription>
-              Compare metadata edited in Confluence with the current catalog
-              entry. If you apply, the change is committed to the GitHub repo.
+              Smart scan combines the deterministic Properties table with an AI
+              read of the whole page. Tick the changes you want to apply — each
+              applied change is committed to the GitHub repo.
             </DialogDescription>
           </DialogHeader>
 
           {pullState.loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Reading Confluence page...
+              Reading Confluence page and running AI scan...
             </div>
           )}
 
@@ -685,64 +730,116 @@ export default function ComponentDetailPage() {
             </div>
           )}
 
-          {!pullState.loading && pullState.diff !== undefined && !pullState.error && (
+          {!pullState.loading && pullState.patches !== undefined && !pullState.error && (
             <div className="space-y-4">
-              {pullState.appliedAt ? (
+              {pullState.appliedCount !== undefined ? (
                 <div className="bg-green-50 border border-green-200 text-green-900 text-sm rounded-md p-3">
-                  Applied to repo. New commit pushed to GitHub.
+                  Applied {pullState.appliedCount} change
+                  {pullState.appliedCount === 1 ? "" : "s"} to the catalog.
+                  New commit pushed to GitHub.
                 </div>
-              ) : pullState.diff.length === 0 ? (
+              ) : pullState.patches.length === 0 ? (
                 <div className="bg-muted/40 text-sm rounded-md p-4 text-center">
-                  No differences. Catalog and Confluence agree.
+                  No differences detected. Catalog and Confluence agree.
                 </div>
               ) : (
                 <>
-                  <div className="text-sm">
-                    <strong>{pullState.diff.length}</strong> field
-                    {pullState.diff.length === 1 ? "" : "s"} would change:
-                  </div>
-                  <div className="border rounded-md overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/40">
-                        <tr>
-                          <th className="text-left p-2 font-medium">Field</th>
-                          <th className="text-left p-2 font-medium text-muted-foreground">
-                            Current
-                          </th>
-                          <th className="text-left p-2 font-medium text-blue-700">
-                            From Confluence
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pullState.diff.map((d) => (
-                          <tr key={d.field} className="border-t">
-                            <td className="p-2 font-mono text-xs">{d.field}</td>
-                            <td className="p-2 text-muted-foreground">
-                              <span className="line-through">{d.oldValue || "(empty)"}</span>
-                            </td>
-                            <td className="p-2 text-blue-900 font-medium">
-                              {d.newValue || "(empty)"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="text-sm flex items-center justify-between">
+                    <span>
+                      <strong>{pullState.patches.length}</strong> proposed
+                      change{pullState.patches.length === 1 ? "" : "s"}.
+                      Default selection: all from table + AI high/medium
+                      confidence.
+                    </span>
                     {pullState.confluenceUrl && (
                       <a
                         href={pullState.confluenceUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs underline text-blue-700"
+                        className="text-xs underline text-blue-700 inline-flex items-center gap-1"
                       >
-                        Open Confluence page
+                        Open page
+                        <ExternalLink className="h-3 w-3" />
                       </a>
                     )}
+                  </div>
+                  <div className="space-y-2">
+                    {pullState.patches.map((p, i) => {
+                      const checked = !!pullState.selected[i]
+                      const sourceLabel =
+                        p.source === "table" ? "from table" : "from narrative"
+                      const confColor =
+                        p.confidence === "high"
+                          ? "bg-green-100 text-green-800 border-green-300"
+                          : p.confidence === "medium"
+                          ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                          : "bg-gray-100 text-gray-700 border-gray-300"
+                      const sourceColor =
+                        p.source === "table"
+                          ? "bg-blue-100 text-blue-800 border-blue-300"
+                          : "bg-purple-100 text-purple-800 border-purple-300"
+                      return (
+                        <label
+                          key={i}
+                          className={`flex items-start gap-3 border rounded-md p-3 cursor-pointer transition-colors ${
+                            checked ? "bg-blue-50/50 border-blue-200" : "bg-white"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => togglePatch(i)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-mono text-xs font-semibold">
+                                {p.field}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] uppercase ${sourceColor}`}
+                              >
+                                {sourceLabel}
+                              </Badge>
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] uppercase ${confColor}`}
+                              >
+                                {p.confidence}
+                              </Badge>
+                            </div>
+                            <div className="text-xs space-y-0.5">
+                              <div className="text-muted-foreground">
+                                <span className="font-medium text-gray-500">Current:</span>{" "}
+                                <span className="line-through">
+                                  {p.oldValue || "(empty)"}
+                                </span>
+                              </div>
+                              <div className="text-blue-900">
+                                <span className="font-medium text-blue-700">New:</span>{" "}
+                                <span className="font-medium">
+                                  {p.newValue || "(empty)"}
+                                </span>
+                              </div>
+                              {p.evidence && (
+                                <div className="text-muted-foreground italic mt-1">
+                                  &ldquo;{p.evidence}&rdquo;
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center justify-end gap-2 border-t pt-3">
                     <Button
                       onClick={applyPull}
-                      disabled={pullState.applying}
+                      disabled={
+                        pullState.applying ||
+                        Object.values(pullState.selected).every((v) => !v)
+                      }
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       {pullState.applying ? (
@@ -751,7 +848,9 @@ export default function ComponentDetailPage() {
                           Applying...
                         </>
                       ) : (
-                        <>Apply &amp; commit</>
+                        <>
+                          Apply selected ({Object.values(pullState.selected).filter(Boolean).length}) &amp; commit
+                        </>
                       )}
                     </Button>
                   </div>
