@@ -51,7 +51,7 @@ function buildHeaderInfo(component: Component, audienceLabel: string): string {
   return (
     `<ac:structured-macro ac:name="info">` +
     `<ac:rich-text-body>` +
-    `<p><strong>Source of truth:</strong> <a href="${escapeXml(archToolUrl)}">${escapeXml(component.name)} in arch-tool</a> · ` +
+    `<p><strong>Repository information:</strong> <a href="${escapeXml(archToolUrl)}">${escapeXml(component.name)} in arch-tool</a> · ` +
     `<strong>Audience:</strong> ${escapeXml(audienceLabel)} · ` +
     `<strong>Last sync:</strong> ${escapeXml(new Date().toISOString().slice(0, 10))}</p>` +
     `<p><em>Edit anywhere on this page. When you click <strong>Pull from Confluence</strong> in arch-tool, an AI scan compares the page to the catalog and proposes precise field-level patches you can approve. The narrative is regenerated on each publish.</em></p>` +
