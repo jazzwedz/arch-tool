@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import {
   COMPONENT_TYPES,
   COMPONENT_STATUSES,
@@ -875,7 +874,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                 <p className="font-semibold mb-1">What data does this component own, consume, or produce?</p>
                 <ul className="text-xs space-y-0.5">
                   <li><strong>Owns</strong> — source-of-truth for this data</li>
-                  <li><strong>Consumes</strong> — reads/uses but doesn't own</li>
+                  <li><strong>Consumes</strong> — reads/uses but doesn&apos;t own</li>
                   <li><strong>Produces</strong> — generates (logs, metrics, derived data)</li>
                 </ul>
                 <p className="mt-2 text-xs">Kind: <em>business / reference / cache / config / transient / logs</em></p>

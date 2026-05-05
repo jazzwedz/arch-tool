@@ -887,7 +887,7 @@ export default function ComponentDetailPage() {
                     <p className="font-semibold mb-1">Data this component handles:</p>
                     <ul className="text-xs space-y-0.5">
                       <li><strong>Owns</strong> — source-of-truth</li>
-                      <li><strong>Consumes</strong> — reads/uses but doesn't own</li>
+                      <li><strong>Consumes</strong> — reads/uses but doesn&apos;t own</li>
                       <li><strong>Produces</strong> — generates (logs, metrics, derived)</li>
                     </ul>
                   </TooltipContent>
