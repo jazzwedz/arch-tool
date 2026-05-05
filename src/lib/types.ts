@@ -74,6 +74,18 @@ export interface ComponentCapability {
 }
 
 export type DataKind =
+  // Format kinds (the physical / structural shape of the artefact)
+  | "table"
+  | "file"
+  | "stream"
+  | "message"
+  | "form"
+  // Business kinds (semantic flow artefacts)
+  | "event"
+  | "command"
+  | "document"
+  | "decision"
+  | "signal"
   // Technical kinds (state / cached / streamed)
   | "business"
   | "reference"
@@ -81,12 +93,6 @@ export type DataKind =
   | "config"
   | "transient"
   | "logs"
-  // Business kinds (semantic flow artefacts)
-  | "event"
-  | "command"
-  | "document"
-  | "decision"
-  | "signal"
 
 export interface DataItem {
   name: string

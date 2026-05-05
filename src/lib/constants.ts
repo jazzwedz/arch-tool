@@ -186,13 +186,12 @@ export const CAPABILITY_ROLE_COLORS: Record<CapabilityRole, string> = {
   indirect: "bg-amber-100 text-amber-800 border-amber-300",
 }
 
-export const TECHNICAL_DATA_KINDS: DataKind[] = [
-  "business",
-  "reference",
-  "cache",
-  "config",
-  "transient",
-  "logs",
+export const FORMAT_DATA_KINDS: DataKind[] = [
+  "table",
+  "file",
+  "stream",
+  "message",
+  "form",
 ]
 
 export const BUSINESS_DATA_KINDS: DataKind[] = [
@@ -203,21 +202,37 @@ export const BUSINESS_DATA_KINDS: DataKind[] = [
   "signal",
 ]
 
-// All kinds, business first (BAs read top-down).
+export const TECHNICAL_DATA_KINDS: DataKind[] = [
+  "business",
+  "reference",
+  "cache",
+  "config",
+  "transient",
+  "logs",
+]
+
+// All kinds, in dropdown order (format → business → technical).
 export const DATA_KINDS: DataKind[] = [
+  ...FORMAT_DATA_KINDS,
   ...BUSINESS_DATA_KINDS,
   ...TECHNICAL_DATA_KINDS,
 ]
 
 export const DATA_KIND_LABELS: Record<DataKind, string> = {
-  // Business
+  // Format — the physical shape
+  table: "Table",
+  file: "File",
+  stream: "Stream",
+  message: "Message",
+  form: "Form",
+  // Business — the semantic meaning
   event: "Event",
   command: "Command",
   document: "Document",
   decision: "Decision",
   signal: "Signal",
-  // Technical
-  business: "Business",
+  // Technical — the role in the system
+  business: "Business state",
   reference: "Reference",
   cache: "Cache",
   config: "Config",
@@ -226,13 +241,19 @@ export const DATA_KIND_LABELS: Record<DataKind, string> = {
 }
 
 export const DATA_KIND_COLORS: Record<DataKind, string> = {
-  // Business — warmer palette (closer to "things you can talk about")
+  // Format — neutral / structural palette
+  table: "bg-slate-100 text-slate-800 border-slate-300",
+  file: "bg-zinc-100 text-zinc-800 border-zinc-300",
+  stream: "bg-teal-100 text-teal-800 border-teal-300",
+  message: "bg-cyan-100 text-cyan-800 border-cyan-300",
+  form: "bg-stone-100 text-stone-800 border-stone-300",
+  // Business — warmer palette (things you can talk about)
   event: "bg-emerald-100 text-emerald-800 border-emerald-300",
   command: "bg-rose-100 text-rose-800 border-rose-300",
   document: "bg-indigo-100 text-indigo-800 border-indigo-300",
   decision: "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300",
   signal: "bg-amber-100 text-amber-800 border-amber-300",
-  // Technical — cooler palette
+  // Technical — cooler palette (state and infra)
   business: "bg-blue-100 text-blue-800 border-blue-300",
   reference: "bg-purple-100 text-purple-800 border-purple-300",
   cache: "bg-green-100 text-green-800 border-green-300",

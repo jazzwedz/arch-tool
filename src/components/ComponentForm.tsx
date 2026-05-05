@@ -28,6 +28,7 @@ import {
   SCALING_MODELS,
   CAPABILITY_ROLES,
   CAPABILITY_ROLE_LABELS,
+  FORMAT_DATA_KINDS,
   BUSINESS_DATA_KINDS,
   TECHNICAL_DATA_KINDS,
   DATA_KIND_LABELS,
@@ -917,8 +918,9 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                   <li><strong>Owns</strong> — data the component is the source-of-truth for</li>
                 </ul>
                 <p className="mt-2 text-xs">
+                  <strong>Format kinds:</strong> table, file, stream, message, form.{" "}
                   <strong>Business kinds:</strong> event, command, document, decision, signal.{" "}
-                  <strong>Technical kinds:</strong> business, reference, cache, config, transient, logs.
+                  <strong>Technical kinds:</strong> business state, reference, cache, config, transient, logs.
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -989,6 +991,14 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                         </SelectTrigger>
                         <SelectContent>
                           <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            Format
+                          </div>
+                          {FORMAT_DATA_KINDS.map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {DATA_KIND_LABELS[k]}
+                            </SelectItem>
+                          ))}
+                          <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t">
                             Business
                           </div>
                           {BUSINESS_DATA_KINDS.map((k) => (

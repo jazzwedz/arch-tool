@@ -391,45 +391,6 @@ export default function ComponentDetailPage() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            className="bg-orange-500 hover:bg-orange-600 text-white"
-            onClick={() => setShowBlastRadius(true)}
-          >
-            <Radar className="h-4 w-4 mr-2" />
-            Blast Radius
-          </Button>
-          {confluence?.published && confluence.pageUrl && (
-            <a href={confluence.pageUrl} target="_blank" rel="noreferrer">
-              <Button
-                variant="outline"
-                className="border-blue-300 text-blue-700 hover:bg-blue-50"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open in Confluence
-              </Button>
-            </a>
-          )}
-          {confluence?.published && (
-            <Button
-              variant="outline"
-              className="border-blue-300 text-blue-700 hover:bg-blue-50"
-              onClick={fetchPullDiff}
-              disabled={pullState.loading}
-            >
-              {pullState.loading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Pull from Confluence
-            </Button>
-          )}
-          <a href="/api/export/drawio" download="arch-components.xml">
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Draw.io
-            </Button>
-          </a>
           <Link href={`/edit/${component.id}`}>
             <Button variant="outline">
               <Pencil className="h-4 w-4 mr-2" />
@@ -474,48 +435,122 @@ export default function ComponentDetailPage() {
         </div>
       )}
 
-      {/* Quick actions */}
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => copyToClipboard(component.id, "id")}
-        >
-          {copiedField === "id" ? (
-            <Check className="h-3 w-3 mr-1" />
-          ) : (
-            <Copy className="h-3 w-3 mr-1" />
-          )}
-          Copy ID
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            copyToClipboard(component.description.technical, "technical")
-          }
-        >
-          {copiedField === "technical" ? (
-            <Check className="h-3 w-3 mr-1" />
-          ) : (
-            <Copy className="h-3 w-3 mr-1" />
-          )}
-          Copy Technical Desc
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            copyToClipboard(component.description.business, "business")
-          }
-        >
-          {copiedField === "business" ? (
-            <Check className="h-3 w-3 mr-1" />
-          ) : (
-            <Copy className="h-3 w-3 mr-1" />
-          )}
-          Copy Business Desc
-        </Button>
+      {/* Action toolbar — grouped */}
+      <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+        {/* Analyse */}
+        <div className="flex items-start gap-3 flex-wrap">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-20 pt-2 shrink-0">
+            Analyse
+          </span>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+              onClick={() => setShowBlastRadius(true)}
+            >
+              <Radar className="h-4 w-4 mr-1.5" />
+              Blast Radius
+            </Button>
+          </div>
+        </div>
+
+        {/* Confluence — only when configured */}
+        {confluence?.configured && (
+          <div className="flex items-start gap-3 flex-wrap">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-20 pt-2 shrink-0">
+              Confluence
+            </span>
+            <div className="flex gap-2 flex-wrap">
+              {confluence.published && confluence.pageUrl ? (
+                <a href={confluence.pageUrl} target="_blank" rel="noreferrer">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1.5" />
+                    Open in Confluence
+                  </Button>
+                </a>
+              ) : (
+                <span className="text-xs text-muted-foreground py-2">
+                  Not yet published — use Generate Documentation below to publish.
+                </span>
+              )}
+              {confluence.published && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                  onClick={fetchPullDiff}
+                  disabled={pullState.loading}
+                >
+                  {pullState.loading ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-1.5" />
+                  )}
+                  Pull from Confluence
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Export & Copy */}
+        <div className="flex items-start gap-3 flex-wrap">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-20 pt-2 shrink-0">
+            Export
+          </span>
+          <div className="flex gap-2 flex-wrap">
+            <a href="/api/export/drawio" download="arch-components.xml">
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-1.5" />
+                Draw.io library
+              </Button>
+            </a>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => copyToClipboard(component.id, "id")}
+            >
+              {copiedField === "id" ? (
+                <Check className="h-3 w-3 mr-1.5" />
+              ) : (
+                <Copy className="h-3 w-3 mr-1.5" />
+              )}
+              Copy ID
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                copyToClipboard(component.description.technical, "technical")
+              }
+            >
+              {copiedField === "technical" ? (
+                <Check className="h-3 w-3 mr-1.5" />
+              ) : (
+                <Copy className="h-3 w-3 mr-1.5" />
+              )}
+              Copy Technical Desc
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                copyToClipboard(component.description.business, "business")
+              }
+            >
+              {copiedField === "business" ? (
+                <Check className="h-3 w-3 mr-1.5" />
+              ) : (
+                <Copy className="h-3 w-3 mr-1.5" />
+              )}
+              Copy Business Desc
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Generate documentation — in-page generator */}
