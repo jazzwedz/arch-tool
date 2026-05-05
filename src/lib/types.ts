@@ -74,26 +74,48 @@ export interface ComponentCapability {
 }
 
 export type DataKind =
+  // Technical kinds (state / cached / streamed)
   | "business"
   | "reference"
   | "cache"
   | "config"
   | "transient"
   | "logs"
+  // Business kinds (semantic flow artefacts)
+  | "event"
+  | "command"
+  | "document"
+  | "decision"
+  | "signal"
 
 export interface DataItem {
   name: string
   kind: DataKind
-  source?: string // component id (for items under `consumes`)
-  consumers?: string[] // component ids (for items under `produces`)
+  /** Component id where this item originates (for inputs). */
+  source?: string
+  /** Component ids that receive this item (for outputs). */
+  consumers?: string[]
   purpose?: string
   description?: string
 }
 
 export interface ComponentData {
+  /** Items the component is the source-of-truth for. */
   owns?: DataItem[]
-  consumes?: DataItem[]
-  produces?: DataItem[]
+  /** Items the component receives (formerly `consumes`). */
+  inputs?: DataItem[]
+  /** Items the component emits (formerly `produces`). */
+  outputs?: DataItem[]
+}
+
+export type ProcessRole = "owner" | "participant" | "listener" | "trigger"
+
+export interface ComponentProcess {
+  name: string
+  role: ProcessRole
+  /** Free-text label of what the component does in this process. */
+  activity?: string
+  description?: string
 }
 
 export interface Component {
@@ -111,6 +133,7 @@ export interface Component {
   business_capabilities?: string[]
   capabilities?: ComponentCapability[]
   data?: ComponentData
+  processes?: ComponentProcess[]
   nfr?: ComponentNFR
   diagram?: ComponentDiagram
 }

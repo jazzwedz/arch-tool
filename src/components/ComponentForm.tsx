@@ -28,8 +28,11 @@ import {
   SCALING_MODELS,
   CAPABILITY_ROLES,
   CAPABILITY_ROLE_LABELS,
-  DATA_KINDS,
+  BUSINESS_DATA_KINDS,
+  TECHNICAL_DATA_KINDS,
   DATA_KIND_LABELS,
+  PROCESS_ROLES,
+  PROCESS_ROLE_LABELS,
 } from "@/lib/constants"
 import type {
   Component,
@@ -41,6 +44,8 @@ import type {
   DataItem,
   DataKind,
   ComponentData,
+  ComponentProcess,
+  ProcessRole,
 } from "@/lib/types"
 import { Plus, Trash2, Save, Loader2, Info } from "lucide-react"
 import {
@@ -78,7 +83,14 @@ const emptyDataItem: DataItem = {
   kind: "business",
 }
 
-type DataBucket = "owns" | "consumes" | "produces"
+type DataBucket = "owns" | "inputs" | "outputs"
+
+const emptyProcess: ComponentProcess = {
+  name: "",
+  role: "participant",
+  activity: "",
+  description: "",
+}
 
 export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
   const router = useRouter()
@@ -100,6 +112,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     risks: [],
     capabilities: [],
     data: undefined,
+    processes: [],
     nfr: {},
     ...(initialData || {}),
   })
@@ -110,12 +123,12 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
   const [risksInput, setRisksInput] = useState(
     initialData?.risks?.join("\n") || ""
   )
-  // Per-data-row "consumers" string input (UI-only state, parsed to string[] on save).
-  const [producesConsumersInput, setProducesConsumersInput] = useState<
+  // Per-output-row "consumers" string input (UI-only state, parsed to string[] on save).
+  const [outputsConsumersInput, setOutputsConsumersInput] = useState<
     Record<number, string>
   >(() => {
     const initial: Record<number, string> = {}
-    initialData?.data?.produces?.forEach((item, i) => {
+    initialData?.data?.outputs?.forEach((item, i) => {
       if (item.consumers && item.consumers.length > 0) {
         initial[i] = item.consumers.join(", ")
       }
@@ -214,8 +227,8 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
       const list = (dataPrev[bucket] || []).filter((_, i) => i !== index)
       return { ...prev, data: { ...dataPrev, [bucket]: list } }
     })
-    if (bucket === "produces") {
-      setProducesConsumersInput((prev) => {
+    if (bucket === "outputs") {
+      setOutputsConsumersInput((prev) => {
         const next: Record<number, string> = {}
         Object.entries(prev).forEach(([k, v]) => {
           const i = Number(k)
@@ -225,6 +238,19 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
         return next
       })
     }
+  }
+
+  const updateProcess = (
+    index: number,
+    field: keyof ComponentProcess,
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      processes: (prev.processes || []).map((p, i) =>
+        i === index ? { ...p, [field]: value } : p
+      ),
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -248,7 +274,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
           : {}),
       }))
 
-    // Clean data: drop rows with empty name in each bucket; parse Produces.consumers
+    // Clean data: drop rows with empty name in each bucket; parse outputs.consumers
     // from the per-row textarea state; drop the whole `data` block if everything is empty.
     const cleanBucket = (
       bucket: DataBucket,
@@ -263,10 +289,10 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
             out.purpose = item.purpose.trim()
           if (item.description && item.description.trim())
             out.description = item.description.trim()
-          if (bucket === "consumes" && item.source && item.source.trim())
+          if (bucket === "inputs" && item.source && item.source.trim())
             out.source = item.source.trim()
-          if (bucket === "produces") {
-            const raw = producesConsumersInput[i]
+          if (bucket === "outputs") {
+            const raw = outputsConsumersInput[i]
             if (raw && raw.trim()) {
               const consumers = raw
                 .split(",")
@@ -283,14 +309,26 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
 
     const cleanData: ComponentData = {
       owns: cleanBucket("owns", form.data?.owns),
-      consumes: cleanBucket("consumes", form.data?.consumes),
-      produces: cleanBucket("produces", form.data?.produces),
+      inputs: cleanBucket("inputs", form.data?.inputs),
+      outputs: cleanBucket("outputs", form.data?.outputs),
     }
     const hasData = !!(
       cleanData.owns ||
-      cleanData.consumes ||
-      cleanData.produces
+      cleanData.inputs ||
+      cleanData.outputs
     )
+
+    // Clean processes: drop rows with empty name; trim activity/description.
+    const cleanProcesses: ComponentProcess[] = (form.processes || [])
+      .filter((p) => p.name && p.name.trim().length > 0)
+      .map((p) => ({
+        name: p.name.trim(),
+        role: p.role,
+        ...(p.activity && p.activity.trim() ? { activity: p.activity.trim() } : {}),
+        ...(p.description && p.description.trim()
+          ? { description: p.description.trim() }
+          : {}),
+      }))
 
     const component: Component = {
       ...form,
@@ -306,6 +344,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
       // Drop any legacy field on save so the YAML is upgraded.
       business_capabilities: undefined,
       data: hasData ? cleanData : undefined,
+      processes: cleanProcesses.length > 0 ? cleanProcesses : undefined,
       nfr: hasNfr ? (cleanNfr as ComponentNFR) : undefined,
     }
 
@@ -861,36 +900,52 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
         </CardContent>
       </Card>
 
-      {/* Data */}
+      {/* Inputs & Outputs (data) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Data
+            Inputs &amp; Outputs
             <Tooltip>
               <TooltipTrigger className="cursor-help">
                 <Info className="h-4 w-4 text-muted-foreground" />
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-xs text-left">
-                <p className="font-semibold mb-1">What data does this component own, consume, or produce?</p>
+                <p className="font-semibold mb-1">What this component receives and emits, and what it owns.</p>
                 <ul className="text-xs space-y-0.5">
-                  <li><strong>Owns</strong> — source-of-truth for this data</li>
-                  <li><strong>Consumes</strong> — reads/uses but doesn&apos;t own</li>
-                  <li><strong>Produces</strong> — generates (logs, metrics, derived data)</li>
+                  <li><strong>Inputs</strong> — events / commands / data the component receives</li>
+                  <li><strong>Outputs</strong> — events / decisions / documents the component emits</li>
+                  <li><strong>Owns</strong> — data the component is the source-of-truth for</li>
                 </ul>
-                <p className="mt-2 text-xs">Kind: <em>business / reference / cache / config / transient / logs</em></p>
+                <p className="mt-2 text-xs">
+                  <strong>Business kinds:</strong> event, command, document, decision, signal.{" "}
+                  <strong>Technical kinds:</strong> business, reference, cache, config, transient, logs.
+                </p>
               </TooltipContent>
             </Tooltip>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {(["owns", "consumes", "produces"] as DataBucket[]).map((bucket) => {
+          {(["inputs", "outputs", "owns"] as DataBucket[]).map((bucket) => {
             const items = form.data?.[bucket] || []
             const bucketLabel =
-              bucket === "owns" ? "Owns" : bucket === "consumes" ? "Consumes" : "Produces"
+              bucket === "inputs"
+                ? "Inputs"
+                : bucket === "outputs"
+                ? "Outputs"
+                : "Owned data"
+            const bucketHint =
+              bucket === "inputs"
+                ? "what comes in"
+                : bucket === "outputs"
+                ? "what goes out"
+                : "what this component is source-of-truth for"
             return (
               <div key={bucket} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold">{bucketLabel}</h4>
+                  <div>
+                    <h4 className="text-sm font-semibold">{bucketLabel}</h4>
+                    <p className="text-xs text-muted-foreground">{bucketHint}</p>
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
@@ -910,7 +965,13 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                       className="grid grid-cols-[1.2fr,auto,1.5fr,auto] gap-2 items-start"
                     >
                       <Input
-                        placeholder="Data item name (e.g. JWT Token)"
+                        placeholder={
+                          bucket === "inputs"
+                            ? "Input name (e.g. OrderRequest)"
+                            : bucket === "outputs"
+                            ? "Output name (e.g. OrderCreated)"
+                            : "Data name (e.g. Customer record)"
+                        }
                         value={item.name}
                         onChange={(e) =>
                           updateDataItem(bucket, i, "name", e.target.value)
@@ -923,11 +984,22 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                           updateDataItem(bucket, i, "kind", v as DataKind)
                         }
                       >
-                        <SelectTrigger className="h-9 w-[120px]">
+                        <SelectTrigger className="h-9 w-[140px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {DATA_KINDS.map((k) => (
+                          <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            Business
+                          </div>
+                          {BUSINESS_DATA_KINDS.map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {DATA_KIND_LABELS[k]}
+                            </SelectItem>
+                          ))}
+                          <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t">
+                            Technical
+                          </div>
+                          {TECHNICAL_DATA_KINDS.map((k) => (
                             <SelectItem key={k} value={k}>
                               {DATA_KIND_LABELS[k]}
                             </SelectItem>
@@ -943,7 +1015,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                           }
                           className="h-9"
                         />
-                        {bucket === "consumes" && (
+                        {bucket === "inputs" && (
                           <Input
                             placeholder="Source component id (optional)"
                             value={item.source || ""}
@@ -953,12 +1025,12 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                             className="h-9"
                           />
                         )}
-                        {bucket === "produces" && (
+                        {bucket === "outputs" && (
                           <Input
                             placeholder="Consumers, comma-separated (optional)"
-                            value={producesConsumersInput[i] || ""}
+                            value={outputsConsumersInput[i] || ""}
                             onChange={(e) =>
-                              setProducesConsumersInput((prev) => ({
+                              setOutputsConsumersInput((prev) => ({
                                 ...prev,
                                 [i]: e.target.value,
                               }))
@@ -982,6 +1054,109 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
               </div>
             )
           })}
+        </CardContent>
+      </Card>
+
+      {/* Processes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Processes
+            <Tooltip>
+              <TooltipTrigger className="cursor-help">
+                <Info className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs text-left">
+                <p className="font-semibold mb-1">Business processes this component participates in.</p>
+                <ul className="text-xs space-y-0.5">
+                  <li><strong>Owner</strong> — runs the whole process</li>
+                  <li><strong>Participant</strong> — performs one or more activities</li>
+                  <li><strong>Listener</strong> — observes events from the process</li>
+                  <li><strong>Trigger</strong> — initiates the process</li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(form.processes || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No processes defined.
+            </p>
+          ) : (
+            (form.processes || []).map((p, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[1fr,auto,1fr,1.2fr,auto] gap-2 items-start"
+              >
+                <Input
+                  placeholder="Process name (e.g. Customer Onboarding)"
+                  value={p.name}
+                  onChange={(e) => updateProcess(i, "name", e.target.value)}
+                  className="h-9"
+                />
+                <Select
+                  value={p.role}
+                  onValueChange={(v) =>
+                    updateProcess(i, "role", v as ProcessRole)
+                  }
+                >
+                  <SelectTrigger className="h-9 w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROCESS_ROLES.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {PROCESS_ROLE_LABELS[r]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Activity (what it does here)"
+                  value={p.activity || ""}
+                  onChange={(e) => updateProcess(i, "activity", e.target.value)}
+                  className="h-9"
+                />
+                <Input
+                  placeholder="Description (optional)"
+                  value={p.description || ""}
+                  onChange={(e) =>
+                    updateProcess(i, "description", e.target.value)
+                  }
+                  className="h-9"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() =>
+                    updateField(
+                      "processes",
+                      (form.processes || []).filter((_, idx) => idx !== i)
+                    )
+                  }
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              updateField("processes", [
+                ...(form.processes || []),
+                { ...emptyProcess },
+              ])
+            }
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add process
+          </Button>
         </CardContent>
       </Card>
 

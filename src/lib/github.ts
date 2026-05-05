@@ -37,6 +37,18 @@ function migrateComponent(raw: Record<string, any>): Component {
       }))
     delete raw.business_capabilities
   }
+  // Old `data.consumes` / `data.produces` → new `data.inputs` / `data.outputs`.
+  // Renamed to make the input/output dimension obvious to BAs and DEVs alike.
+  if (raw.data && typeof raw.data === "object") {
+    if (Array.isArray(raw.data.consumes) && !Array.isArray(raw.data.inputs)) {
+      raw.data.inputs = raw.data.consumes
+      delete raw.data.consumes
+    }
+    if (Array.isArray(raw.data.produces) && !Array.isArray(raw.data.outputs)) {
+      raw.data.outputs = raw.data.produces
+      delete raw.data.produces
+    }
+  }
   return raw as Component
 }
 

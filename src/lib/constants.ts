@@ -21,6 +21,7 @@ import type {
   ComponentStatus,
   CapabilityRole,
   DataKind,
+  ProcessRole,
 } from "./types"
 
 export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
@@ -185,7 +186,7 @@ export const CAPABILITY_ROLE_COLORS: Record<CapabilityRole, string> = {
   indirect: "bg-amber-100 text-amber-800 border-amber-300",
 }
 
-export const DATA_KINDS: DataKind[] = [
+export const TECHNICAL_DATA_KINDS: DataKind[] = [
   "business",
   "reference",
   "cache",
@@ -194,7 +195,28 @@ export const DATA_KINDS: DataKind[] = [
   "logs",
 ]
 
+export const BUSINESS_DATA_KINDS: DataKind[] = [
+  "event",
+  "command",
+  "document",
+  "decision",
+  "signal",
+]
+
+// All kinds, business first (BAs read top-down).
+export const DATA_KINDS: DataKind[] = [
+  ...BUSINESS_DATA_KINDS,
+  ...TECHNICAL_DATA_KINDS,
+]
+
 export const DATA_KIND_LABELS: Record<DataKind, string> = {
+  // Business
+  event: "Event",
+  command: "Command",
+  document: "Document",
+  decision: "Decision",
+  signal: "Signal",
+  // Technical
   business: "Business",
   reference: "Reference",
   cache: "Cache",
@@ -204,12 +226,40 @@ export const DATA_KIND_LABELS: Record<DataKind, string> = {
 }
 
 export const DATA_KIND_COLORS: Record<DataKind, string> = {
+  // Business — warmer palette (closer to "things you can talk about")
+  event: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  command: "bg-rose-100 text-rose-800 border-rose-300",
+  document: "bg-indigo-100 text-indigo-800 border-indigo-300",
+  decision: "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300",
+  signal: "bg-amber-100 text-amber-800 border-amber-300",
+  // Technical — cooler palette
   business: "bg-blue-100 text-blue-800 border-blue-300",
   reference: "bg-purple-100 text-purple-800 border-purple-300",
   cache: "bg-green-100 text-green-800 border-green-300",
   config: "bg-gray-100 text-gray-800 border-gray-300",
   transient: "bg-yellow-100 text-yellow-800 border-yellow-300",
   logs: "bg-orange-100 text-orange-800 border-orange-300",
+}
+
+export const PROCESS_ROLES: ProcessRole[] = [
+  "owner",
+  "participant",
+  "listener",
+  "trigger",
+]
+
+export const PROCESS_ROLE_LABELS: Record<ProcessRole, string> = {
+  owner: "Owner",
+  participant: "Participant",
+  listener: "Listener",
+  trigger: "Trigger",
+}
+
+export const PROCESS_ROLE_COLORS: Record<ProcessRole, string> = {
+  owner: "bg-blue-100 text-blue-800 border-blue-300",
+  participant: "bg-green-100 text-green-800 border-green-300",
+  listener: "bg-gray-100 text-gray-800 border-gray-300",
+  trigger: "bg-amber-100 text-amber-800 border-amber-300",
 }
 
 // Colors matching Draw.io library export (drawio.ts typeStyles)

@@ -16,6 +16,8 @@ import {
   CAPABILITY_ROLE_COLORS,
   DATA_KIND_LABELS,
   DATA_KIND_COLORS,
+  PROCESS_ROLE_LABELS,
+  PROCESS_ROLE_COLORS,
 } from "@/lib/constants"
 import type { ComponentWithSha } from "@/lib/types"
 import {
@@ -870,40 +872,40 @@ export default function ComponentDetailPage() {
           </Card>
         )}
 
-        {/* Data */}
+        {/* Inputs & Outputs */}
         {component.data &&
           (component.data.owns?.length ||
-            component.data.consumes?.length ||
-            component.data.produces?.length) ? (
+            component.data.inputs?.length ||
+            component.data.outputs?.length) ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                Data
+                Inputs &amp; Outputs
                 <Tooltip>
                   <TooltipTrigger className="cursor-help">
                     <Info className="h-4 w-4 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent side="right" className="max-w-xs text-left">
-                    <p className="font-semibold mb-1">Data this component handles:</p>
+                    <p className="font-semibold mb-1">What this component receives, emits, and owns.</p>
                     <ul className="text-xs space-y-0.5">
-                      <li><strong>Owns</strong> — source-of-truth</li>
-                      <li><strong>Consumes</strong> — reads/uses but doesn&apos;t own</li>
-                      <li><strong>Produces</strong> — generates (logs, metrics, derived)</li>
+                      <li><strong>Inputs</strong> — events / commands / data received</li>
+                      <li><strong>Outputs</strong> — events / decisions / documents emitted</li>
+                      <li><strong>Owns</strong> — source-of-truth for this data</li>
                     </ul>
                   </TooltipContent>
                 </Tooltip>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(["owns", "consumes", "produces"] as const).map((bucket) => {
+              {(["inputs", "outputs", "owns"] as const).map((bucket) => {
                 const items = component.data?.[bucket] || []
                 if (items.length === 0) return null
                 const label =
-                  bucket === "owns"
-                    ? "Owns"
-                    : bucket === "consumes"
-                    ? "Consumes"
-                    : "Produces"
+                  bucket === "inputs"
+                    ? "Inputs"
+                    : bucket === "outputs"
+                    ? "Outputs"
+                    : "Owned data"
                 return (
                   <div key={bucket}>
                     <h4 className="text-sm font-semibold mb-2">{label}</h4>
@@ -927,7 +929,7 @@ export default function ComponentDetailPage() {
                               {item.purpose}
                             </span>
                           )}
-                          {bucket === "consumes" && item.source && (
+                          {bucket === "inputs" && item.source && (
                             <Link
                               href={`/component/${item.source}`}
                               className="text-xs text-blue-700 hover:underline ml-auto"
@@ -935,7 +937,7 @@ export default function ComponentDetailPage() {
                               source: {item.source}
                             </Link>
                           )}
-                          {bucket === "produces" && item.consumers && item.consumers.length > 0 && (
+                          {bucket === "outputs" && item.consumers && item.consumers.length > 0 && (
                             <span className="text-xs text-muted-foreground ml-auto">
                               consumers: {item.consumers.join(", ")}
                             </span>
@@ -949,6 +951,64 @@ export default function ComponentDetailPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* Processes */}
+        {component.processes && component.processes.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Processes
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs text-left">
+                    <p className="font-semibold mb-1">Business processes this component participates in.</p>
+                    <ul className="text-xs space-y-0.5">
+                      <li><strong>Owner</strong> — runs the whole process</li>
+                      <li><strong>Participant</strong> — performs activities</li>
+                      <li><strong>Listener</strong> — observes events</li>
+                      <li><strong>Trigger</strong> — initiates the process</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    <th className="text-left font-medium pb-2">Process</th>
+                    <th className="text-left font-medium pb-2 w-32">Role</th>
+                    <th className="text-left font-medium pb-2">Activity</th>
+                    <th className="text-left font-medium pb-2">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {component.processes.map((p, i) => (
+                    <tr key={i} className="border-t">
+                      <td className="py-2 font-medium">{p.name}</td>
+                      <td className="py-2">
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${PROCESS_ROLE_COLORS[p.role] || ""}`}
+                        >
+                          {PROCESS_ROLE_LABELS[p.role] || p.role}
+                        </Badge>
+                      </td>
+                      <td className="py-2 text-muted-foreground">
+                        {p.activity || "—"}
+                      </td>
+                      <td className="py-2 text-muted-foreground">
+                        {p.description || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Non-Functional Requirements */}
         {component.nfr && Object.values(component.nfr).some(Boolean) && (
