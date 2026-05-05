@@ -1049,12 +1049,12 @@ export default function ComponentDetailPage() {
               {diagramRefs.map((d) => (
                 <Link
                   key={d.name}
-                  href={`/diagrams/builder?name=${encodeURIComponent(d.name)}`}
+                  href={`/diagrams?preview=${encodeURIComponent(d.name)}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border bg-white hover:bg-blue-50 hover:border-blue-300 text-sm transition-colors"
                 >
                   <FileImage className="h-3.5 w-3.5 text-blue-600" />
                   {d.name}
-                  <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  <Eye className="h-3 w-3 text-muted-foreground" />
                 </Link>
               ))}
             </div>

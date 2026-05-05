@@ -25,6 +25,7 @@ import { drawioToMermaid } from "@/lib/drawio-preview"
 import { MermaidPreview } from "@/components/mermaid-preview"
 
 export default function DiagramsPage() {
+  const [previewName, setPreviewName] = useState<string | null>(null)
   const [diagrams, setDiagrams] = useState<DiagramWithSha[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -48,7 +49,22 @@ export default function DiagramsPage() {
 
   useEffect(() => {
     fetchDiagrams()
+    // Read ?preview=<name> from the URL once on mount (used when arriving
+    // from a "Diagrams referencing this component" link). Avoids
+    // useSearchParams to keep this page compatible with static
+    // pre-rendering.
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      setPreviewName(params.get("preview"))
+    }
   }, [])
+
+  // Auto-open preview modal when previewName is present and diagrams loaded.
+  useEffect(() => {
+    if (!previewName || diagrams.length === 0) return
+    const match = diagrams.find((d) => d.name === previewName)
+    if (match) setPreviewDiagram(match)
+  }, [previewName, diagrams])
 
   const handleUpload = async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".drawio")) {
