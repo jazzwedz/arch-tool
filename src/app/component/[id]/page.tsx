@@ -8,7 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TypeIcon } from "@/components/TypeIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { TYPE_LABELS, RELATIONSHIP_LABELS, DATA_CLASSIFICATION_LABELS } from "@/lib/constants"
+import {
+  TYPE_LABELS,
+  RELATIONSHIP_LABELS,
+  DATA_CLASSIFICATION_LABELS,
+  CAPABILITY_ROLE_LABELS,
+  CAPABILITY_ROLE_COLORS,
+  DATA_KIND_LABELS,
+  DATA_KIND_COLORS,
+} from "@/lib/constants"
 import type { ComponentWithSha } from "@/lib/types"
 import {
   ArrowLeft,
@@ -550,23 +558,139 @@ export default function ComponentDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Business Capabilities */}
-        {component.business_capabilities && component.business_capabilities.length > 0 && (
+        {/* Capabilities */}
+        {component.capabilities && component.capabilities.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Business Capabilities</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Capabilities
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs text-left">
+                    <p className="font-semibold mb-1">Role this component plays in each capability:</p>
+                    <ul className="text-xs space-y-0.5">
+                      <li><strong>Owner</strong> — implements the capability</li>
+                      <li><strong>Contributor</strong> — assists (logs, metrics)</li>
+                      <li><strong>Consumer</strong> — uses the capability</li>
+                      <li><strong>Indirect</strong> — touches it incidentally</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-1.5">
-                {component.business_capabilities.map((cap) => (
-                  <Badge key={cap} variant="secondary">
-                    {cap}
-                  </Badge>
-                ))}
-              </div>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    <th className="text-left font-medium pb-2">Capability</th>
+                    <th className="text-left font-medium pb-2 w-32">Role</th>
+                    <th className="text-left font-medium pb-2">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {component.capabilities.map((cap, i) => (
+                    <tr key={i} className="border-t">
+                      <td className="py-2 font-medium">{cap.name}</td>
+                      <td className="py-2">
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${CAPABILITY_ROLE_COLORS[cap.role] || ""}`}
+                        >
+                          {CAPABILITY_ROLE_LABELS[cap.role] || cap.role}
+                        </Badge>
+                      </td>
+                      <td className="py-2 text-muted-foreground">
+                        {cap.description || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </CardContent>
           </Card>
         )}
+
+        {/* Data */}
+        {component.data &&
+          (component.data.owns?.length ||
+            component.data.consumes?.length ||
+            component.data.produces?.length) ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Data
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs text-left">
+                    <p className="font-semibold mb-1">Data this component handles:</p>
+                    <ul className="text-xs space-y-0.5">
+                      <li><strong>Owns</strong> — source-of-truth</li>
+                      <li><strong>Consumes</strong> — reads/uses but doesn't own</li>
+                      <li><strong>Produces</strong> — generates (logs, metrics, derived)</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(["owns", "consumes", "produces"] as const).map((bucket) => {
+                const items = component.data?.[bucket] || []
+                if (items.length === 0) return null
+                const label =
+                  bucket === "owns"
+                    ? "Owns"
+                    : bucket === "consumes"
+                    ? "Consumes"
+                    : "Produces"
+                return (
+                  <div key={bucket}>
+                    <h4 className="text-sm font-semibold mb-2">{label}</h4>
+                    <div className="space-y-1.5">
+                      {items.map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex flex-wrap items-center gap-2 text-sm border-b last:border-0 pb-2"
+                        >
+                          <span className="font-mono text-xs font-semibold">
+                            {item.name}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${DATA_KIND_COLORS[item.kind] || ""}`}
+                          >
+                            {DATA_KIND_LABELS[item.kind] || item.kind}
+                          </Badge>
+                          {item.purpose && (
+                            <span className="text-muted-foreground text-xs">
+                              {item.purpose}
+                            </span>
+                          )}
+                          {bucket === "consumes" && item.source && (
+                            <Link
+                              href={`/component/${item.source}`}
+                              className="text-xs text-blue-700 hover:underline ml-auto"
+                            >
+                              source: {item.source}
+                            </Link>
+                          )}
+                          {bucket === "produces" && item.consumers && item.consumers.length > 0 && (
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              consumers: {item.consumers.join(", ")}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Non-Functional Requirements */}
         {component.nfr && Object.values(component.nfr).some(Boolean) && (

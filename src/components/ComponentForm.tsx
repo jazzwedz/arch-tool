@@ -27,14 +27,23 @@ import {
   DATA_CLASSIFICATIONS,
   DATA_CLASSIFICATION_LABELS,
   SCALING_MODELS,
+  CAPABILITY_ROLES,
+  CAPABILITY_ROLE_LABELS,
+  DATA_KINDS,
+  DATA_KIND_LABELS,
 } from "@/lib/constants"
 import type {
   Component,
   ComponentInterface,
   ComponentRelationship,
   ComponentNFR,
+  ComponentCapability,
+  CapabilityRole,
+  DataItem,
+  DataKind,
+  ComponentData,
 } from "@/lib/types"
-import { Plus, Trash2, Save, Loader2, Info, X } from "lucide-react"
+import { Plus, Trash2, Save, Loader2, Info } from "lucide-react"
 import {
   Tooltip,
   TooltipTrigger,
@@ -59,6 +68,19 @@ const emptyRelationship: ComponentRelationship = {
   description: "",
 }
 
+const emptyCapability: ComponentCapability = {
+  name: "",
+  role: "indirect",
+  description: "",
+}
+
+const emptyDataItem: DataItem = {
+  name: "",
+  kind: "business",
+}
+
+type DataBucket = "owns" | "consumes" | "produces"
+
 export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -77,7 +99,8 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     interfaces: [],
     relationships: [],
     risks: [],
-    business_capabilities: [],
+    capabilities: [],
+    data: undefined,
     nfr: {},
     ...(initialData || {}),
   })
@@ -88,7 +111,18 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
   const [risksInput, setRisksInput] = useState(
     initialData?.risks?.join("\n") || ""
   )
-  const [capabilitySearch, setCapabilitySearch] = useState("")
+  // Per-data-row "consumers" string input (UI-only state, parsed to string[] on save).
+  const [producesConsumersInput, setProducesConsumersInput] = useState<
+    Record<number, string>
+  >(() => {
+    const initial: Record<number, string> = {}
+    initialData?.data?.produces?.forEach((item, i) => {
+      if (item.consumers && item.consumers.length > 0) {
+        initial[i] = item.consumers.join(", ")
+      }
+    })
+    return initial
+  })
 
   useEffect(() => {
     fetch("/api/components")
@@ -139,6 +173,61 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     }))
   }
 
+  const updateCapability = (
+    index: number,
+    field: keyof ComponentCapability,
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      capabilities: (prev.capabilities || []).map((cap, i) =>
+        i === index ? { ...cap, [field]: value } : cap
+      ),
+    }))
+  }
+
+  const updateDataItem = (
+    bucket: DataBucket,
+    index: number,
+    field: keyof DataItem,
+    value: string
+  ) => {
+    setForm((prev) => {
+      const dataPrev = prev.data || {}
+      const list = (dataPrev[bucket] || []).map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      )
+      return { ...prev, data: { ...dataPrev, [bucket]: list } }
+    })
+  }
+
+  const addDataItem = (bucket: DataBucket) => {
+    setForm((prev) => {
+      const dataPrev = prev.data || {}
+      const list = [...(dataPrev[bucket] || []), { ...emptyDataItem }]
+      return { ...prev, data: { ...dataPrev, [bucket]: list } }
+    })
+  }
+
+  const removeDataItem = (bucket: DataBucket, index: number) => {
+    setForm((prev) => {
+      const dataPrev = prev.data || {}
+      const list = (dataPrev[bucket] || []).filter((_, i) => i !== index)
+      return { ...prev, data: { ...dataPrev, [bucket]: list } }
+    })
+    if (bucket === "produces") {
+      setProducesConsumersInput((prev) => {
+        const next: Record<number, string> = {}
+        Object.entries(prev).forEach(([k, v]) => {
+          const i = Number(k)
+          if (i < index) next[i] = v
+          else if (i > index) next[i - 1] = v
+        })
+        return next
+      })
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -148,6 +237,61 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
       ? Object.fromEntries(Object.entries(form.nfr).filter(([, v]) => v))
       : undefined
     const hasNfr = cleanNfr && Object.keys(cleanNfr).length > 0
+
+    // Clean capabilities: drop rows with empty name; trim description.
+    const cleanCapabilities: ComponentCapability[] = (form.capabilities || [])
+      .filter((c) => c.name && c.name.trim().length > 0)
+      .map((c) => ({
+        name: c.name.trim(),
+        role: c.role,
+        ...(c.description && c.description.trim()
+          ? { description: c.description.trim() }
+          : {}),
+      }))
+
+    // Clean data: drop rows with empty name in each bucket; parse Produces.consumers
+    // from the per-row textarea state; drop the whole `data` block if everything is empty.
+    const cleanBucket = (
+      bucket: DataBucket,
+      items: DataItem[] | undefined
+    ): DataItem[] | undefined => {
+      const list = (items || [])
+        .map((item, i) => {
+          const name = item.name?.trim() || ""
+          if (!name) return null
+          const out: DataItem = { name, kind: item.kind }
+          if (item.purpose && item.purpose.trim())
+            out.purpose = item.purpose.trim()
+          if (item.description && item.description.trim())
+            out.description = item.description.trim()
+          if (bucket === "consumes" && item.source && item.source.trim())
+            out.source = item.source.trim()
+          if (bucket === "produces") {
+            const raw = producesConsumersInput[i]
+            if (raw && raw.trim()) {
+              const consumers = raw
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+              if (consumers.length > 0) out.consumers = consumers
+            }
+          }
+          return out
+        })
+        .filter((x): x is DataItem => x !== null)
+      return list.length > 0 ? list : undefined
+    }
+
+    const cleanData: ComponentData = {
+      owns: cleanBucket("owns", form.data?.owns),
+      consumes: cleanBucket("consumes", form.data?.consumes),
+      produces: cleanBucket("produces", form.data?.produces),
+    }
+    const hasData = !!(
+      cleanData.owns ||
+      cleanData.consumes ||
+      cleanData.produces
+    )
 
     const component: Component = {
       ...form,
@@ -159,9 +303,10 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
         .split("\n")
         .map((r) => r.trim())
         .filter(Boolean),
-      business_capabilities: (form.business_capabilities || []).length > 0
-        ? form.business_capabilities
-        : undefined,
+      capabilities: cleanCapabilities.length > 0 ? cleanCapabilities : undefined,
+      // Drop any legacy field on save so the YAML is upgraded.
+      business_capabilities: undefined,
+      data: hasData ? cleanData : undefined,
       nfr: hasNfr ? (cleanNfr as ComponentNFR) : undefined,
     }
 
@@ -614,86 +759,230 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
         </CardContent>
       </Card>
 
-      {/* Business Capabilities */}
+      {/* Capabilities */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Business Capabilities
+            Capabilities
             <Tooltip>
               <TooltipTrigger className="cursor-help">
                 <Info className="h-4 w-4 text-muted-foreground" />
               </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs">
-                Which business capabilities does this component support? Select from the predefined list or type to filter.
+              <TooltipContent side="right" className="max-w-xs text-left">
+                <p className="font-semibold mb-1">Which business capabilities this component supports — and the role it plays.</p>
+                <ul className="text-xs space-y-0.5">
+                  <li><strong>Owner</strong> — implements the capability</li>
+                  <li><strong>Contributor</strong> — assists (e.g., logs, metrics)</li>
+                  <li><strong>Consumer</strong> — uses the capability</li>
+                  <li><strong>Indirect</strong> — touches it incidentally (e.g., a gateway routing requests)</li>
+                </ul>
               </TooltipContent>
             </Tooltip>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Selected capabilities */}
-          {(form.business_capabilities?.length ?? 0) > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {form.business_capabilities!.map((cap) => (
-                <Badge key={cap} variant="secondary" className="flex items-center gap-1 pr-1">
-                  {cap}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateField(
-                        "business_capabilities",
-                        form.business_capabilities!.filter((c) => c !== cap)
-                      )
-                    }
-                    className="ml-0.5 hover:bg-muted rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
+          <datalist id="capability-suggestions">
+            {BUSINESS_CAPABILITIES.map((cap) => (
+              <option key={cap} value={cap} />
+            ))}
+          </datalist>
+          {(form.capabilities || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No capabilities defined.
+            </p>
+          ) : (
+            (form.capabilities || []).map((cap, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[1fr,auto,1.5fr,auto] gap-2 items-start"
+              >
+                <Input
+                  list="capability-suggestions"
+                  placeholder="Capability name"
+                  value={cap.name}
+                  onChange={(e) => updateCapability(i, "name", e.target.value)}
+                  className="h-9"
+                />
+                <Select
+                  value={cap.role}
+                  onValueChange={(v) =>
+                    updateCapability(i, "role", v as CapabilityRole)
+                  }
+                >
+                  <SelectTrigger className="h-9 w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CAPABILITY_ROLES.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {CAPABILITY_ROLE_LABELS[r]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Description (optional)"
+                  value={cap.description || ""}
+                  onChange={(e) =>
+                    updateCapability(i, "description", e.target.value)
+                  }
+                  className="h-9"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() =>
+                    updateField(
+                      "capabilities",
+                      (form.capabilities || []).filter((_, idx) => idx !== i)
+                    )
+                  }
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ))
           )}
-          {/* Search + add */}
-          <div className="space-y-1">
-            <Input
-              placeholder="Search capabilities..."
-              value={capabilitySearch}
-              onChange={(e) => setCapabilitySearch(e.target.value)}
-              className="h-9"
-            />
-            {capabilitySearch && (
-              <div className="border rounded-md max-h-40 overflow-y-auto">
-                {BUSINESS_CAPABILITIES
-                  .filter(
-                    (cap) =>
-                      cap.toLowerCase().includes(capabilitySearch.toLowerCase()) &&
-                      !(form.business_capabilities || []).includes(cap)
-                  )
-                  .map((cap) => (
-                    <button
-                      key={cap}
-                      type="button"
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
-                      onClick={() => {
-                        updateField("business_capabilities", [
-                          ...(form.business_capabilities || []),
-                          cap,
-                        ])
-                        setCapabilitySearch("")
-                      }}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              updateField("capabilities", [
+                ...(form.capabilities || []),
+                { ...emptyCapability },
+              ])
+            }
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add capability
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Data */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Data
+            <Tooltip>
+              <TooltipTrigger className="cursor-help">
+                <Info className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs text-left">
+                <p className="font-semibold mb-1">What data does this component own, consume, or produce?</p>
+                <ul className="text-xs space-y-0.5">
+                  <li><strong>Owns</strong> — source-of-truth for this data</li>
+                  <li><strong>Consumes</strong> — reads/uses but doesn't own</li>
+                  <li><strong>Produces</strong> — generates (logs, metrics, derived data)</li>
+                </ul>
+                <p className="mt-2 text-xs">Kind: <em>business / reference / cache / config / transient / logs</em></p>
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {(["owns", "consumes", "produces"] as DataBucket[]).map((bucket) => {
+            const items = form.data?.[bucket] || []
+            const bucketLabel =
+              bucket === "owns" ? "Owns" : bucket === "consumes" ? "Consumes" : "Produces"
+            return (
+              <div key={bucket} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">{bucketLabel}</h4>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => addDataItem(bucket)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+                {items.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No items.</p>
+                ) : (
+                  items.map((item, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-[1.2fr,auto,1.5fr,auto] gap-2 items-start"
                     >
-                      {cap}
-                    </button>
-                  ))}
-                {BUSINESS_CAPABILITIES.filter(
-                  (cap) =>
-                    cap.toLowerCase().includes(capabilitySearch.toLowerCase()) &&
-                    !(form.business_capabilities || []).includes(cap)
-                ).length === 0 && (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">No matching capabilities</p>
+                      <Input
+                        placeholder="Data item name (e.g. JWT Token)"
+                        value={item.name}
+                        onChange={(e) =>
+                          updateDataItem(bucket, i, "name", e.target.value)
+                        }
+                        className="h-9"
+                      />
+                      <Select
+                        value={item.kind}
+                        onValueChange={(v) =>
+                          updateDataItem(bucket, i, "kind", v as DataKind)
+                        }
+                      >
+                        <SelectTrigger className="h-9 w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DATA_KINDS.map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {DATA_KIND_LABELS[k]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="space-y-1.5">
+                        <Input
+                          placeholder="Purpose (optional)"
+                          value={item.purpose || ""}
+                          onChange={(e) =>
+                            updateDataItem(bucket, i, "purpose", e.target.value)
+                          }
+                          className="h-9"
+                        />
+                        {bucket === "consumes" && (
+                          <Input
+                            placeholder="Source component id (optional)"
+                            value={item.source || ""}
+                            onChange={(e) =>
+                              updateDataItem(bucket, i, "source", e.target.value)
+                            }
+                            className="h-9"
+                          />
+                        )}
+                        {bucket === "produces" && (
+                          <Input
+                            placeholder="Consumers, comma-separated (optional)"
+                            value={producesConsumersInput[i] || ""}
+                            onChange={(e) =>
+                              setProducesConsumersInput((prev) => ({
+                                ...prev,
+                                [i]: e.target.value,
+                              }))
+                            }
+                            className="h-9"
+                          />
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => removeDataItem(bucket, i)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))
                 )}
               </div>
-            )}
-          </div>
+            )
+          })}
         </CardContent>
       </Card>
 

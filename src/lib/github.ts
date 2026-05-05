@@ -8,9 +8,10 @@ const owner = process.env.GITHUB_OWNER!
 const repo = process.env.GITHUB_REPO || "arch-data"
 const branch = process.env.GITHUB_BRANCH || "main"
 
-// Backward compatibility: convert old `dependencies` array to new `relationships` format
+// Backward compatibility for legacy YAML shapes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function migrateComponent(raw: Record<string, any>): Component {
+  // Old `dependencies` array → new `relationships` format.
   if (raw.dependencies && Array.isArray(raw.dependencies) && !raw.relationships) {
     raw.relationships = raw.dependencies.map((dep: { id: string; connector?: string }) => ({
       target: dep.id,
@@ -21,6 +22,20 @@ function migrateComponent(raw: Record<string, any>): Component {
   }
   if (!raw.relationships) {
     raw.relationships = []
+  }
+  // Old `business_capabilities: string[]` → new `capabilities: { name, role }[]`.
+  // Conservative default role "indirect" because legacy data carried no role info.
+  if (
+    Array.isArray(raw.business_capabilities) &&
+    !Array.isArray(raw.capabilities)
+  ) {
+    raw.capabilities = raw.business_capabilities
+      .filter((n: unknown) => typeof n === "string" && n.trim().length > 0)
+      .map((name: string) => ({
+        name,
+        role: "indirect" as const,
+      }))
+    delete raw.business_capabilities
   }
   return raw as Component
 }

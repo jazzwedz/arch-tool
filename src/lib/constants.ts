@@ -16,7 +16,12 @@ import {
   AppWindow,
   Puzzle,
 } from "lucide-react"
-import type { ComponentType, ComponentStatus } from "./types"
+import type {
+  ComponentType,
+  ComponentStatus,
+  CapabilityRole,
+  DataKind,
+} from "./types"
 
 export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
   microservice: Cpu,
@@ -157,6 +162,54 @@ export const RELATIONSHIP_LABELS: Record<string, string> = {
   "reads-from": "Reads from",
   "writes-to": "Writes to",
   "fallback": "Fallback for",
+}
+
+export const CAPABILITY_ROLES: CapabilityRole[] = [
+  "owner",
+  "contributor",
+  "consumer",
+  "indirect",
+]
+
+export const CAPABILITY_ROLE_LABELS: Record<CapabilityRole, string> = {
+  owner: "Owner",
+  contributor: "Contributor",
+  consumer: "Consumer",
+  indirect: "Indirect",
+}
+
+export const CAPABILITY_ROLE_COLORS: Record<CapabilityRole, string> = {
+  owner: "bg-blue-100 text-blue-800 border-blue-300",
+  contributor: "bg-green-100 text-green-800 border-green-300",
+  consumer: "bg-gray-100 text-gray-800 border-gray-300",
+  indirect: "bg-amber-100 text-amber-800 border-amber-300",
+}
+
+export const DATA_KINDS: DataKind[] = [
+  "business",
+  "reference",
+  "cache",
+  "config",
+  "transient",
+  "logs",
+]
+
+export const DATA_KIND_LABELS: Record<DataKind, string> = {
+  business: "Business",
+  reference: "Reference",
+  cache: "Cache",
+  config: "Config",
+  transient: "Transient",
+  logs: "Logs",
+}
+
+export const DATA_KIND_COLORS: Record<DataKind, string> = {
+  business: "bg-blue-100 text-blue-800 border-blue-300",
+  reference: "bg-purple-100 text-purple-800 border-purple-300",
+  cache: "bg-green-100 text-green-800 border-green-300",
+  config: "bg-gray-100 text-gray-800 border-gray-300",
+  transient: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  logs: "bg-orange-100 text-orange-800 border-orange-300",
 }
 
 // Colors matching Draw.io library export (drawio.ts typeStyles)

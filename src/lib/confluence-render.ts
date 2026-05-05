@@ -88,6 +88,14 @@ export function pageTitleFor(component: Component): string {
 }
 
 export function capabilityForHierarchy(component: Component): string {
-  const list = component.business_capabilities || []
-  return list[0]?.trim() || "Uncategorized"
+  // Prefer the new rich capabilities field.
+  const caps = component.capabilities || []
+  if (caps.length > 0) {
+    const first = caps[0].name?.trim()
+    if (first) return first
+  }
+  // Legacy fallback for any unmigrated read path in the same request.
+  const legacy =
+    (component as { business_capabilities?: string[] }).business_capabilities || []
+  return legacy[0]?.trim() || "Uncategorized"
 }

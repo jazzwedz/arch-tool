@@ -65,6 +65,37 @@ export interface ComponentNFR {
   scaling?: ScalingModel
 }
 
+export type CapabilityRole = "owner" | "contributor" | "consumer" | "indirect"
+
+export interface ComponentCapability {
+  name: string
+  role: CapabilityRole
+  description?: string
+}
+
+export type DataKind =
+  | "business"
+  | "reference"
+  | "cache"
+  | "config"
+  | "transient"
+  | "logs"
+
+export interface DataItem {
+  name: string
+  kind: DataKind
+  source?: string // component id (for items under `consumes`)
+  consumers?: string[] // component ids (for items under `produces`)
+  purpose?: string
+  description?: string
+}
+
+export interface ComponentData {
+  owns?: DataItem[]
+  consumes?: DataItem[]
+  produces?: DataItem[]
+}
+
 export interface Component {
   id: string
   name: string
@@ -76,7 +107,10 @@ export interface Component {
   interfaces: ComponentInterface[]
   relationships: ComponentRelationship[]
   risks?: string[]
+  /** @deprecated use `capabilities` (rich object) instead. Migrated at read time. */
   business_capabilities?: string[]
+  capabilities?: ComponentCapability[]
+  data?: ComponentData
   nfr?: ComponentNFR
   diagram?: ComponentDiagram
 }
