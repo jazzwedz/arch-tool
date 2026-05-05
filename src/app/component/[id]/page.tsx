@@ -66,6 +66,8 @@ import { MermaidPreview } from "@/components/mermaid-preview"
 import {
   buildInterfacesMermaid,
   buildRelationshipsMermaid,
+  buildCapabilitiesMermaid,
+  buildIOMermaid,
 } from "@/lib/component-mermaid"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -113,6 +115,8 @@ export default function ComponentDetailPage() {
   // Per-section visualization toggles
   const [showInterfacesViz, setShowInterfacesViz] = useState(false)
   const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
+  const [showCapabilitiesViz, setShowCapabilitiesViz] = useState(false)
+  const [showIOViz, setShowIOViz] = useState(false)
   // In-page documentation generator
   const [genAudience, setGenAudience] = useState<"Technical" | "Business" | "Executive">("Technical")
   const [genDocType, setGenDocType] = useState<
@@ -857,23 +861,38 @@ export default function ComponentDetailPage() {
         {component.capabilities && component.capabilities.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Capabilities
-                <Tooltip>
-                  <TooltipTrigger className="cursor-help">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs text-left">
-                    <p className="font-semibold mb-1">Role this component plays in each capability:</p>
-                    <ul className="text-xs space-y-0.5">
-                      <li><strong>Owner</strong> — implements the capability</li>
-                      <li><strong>Contributor</strong> — assists (logs, metrics)</li>
-                      <li><strong>Consumer</strong> — uses the capability</li>
-                      <li><strong>Indirect</strong> — touches it incidentally</li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  Capabilities
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs text-left">
+                      <p className="font-semibold mb-1">Role this component plays in each capability:</p>
+                      <ul className="text-xs space-y-0.5">
+                        <li><strong>Owner</strong> — implements the capability</li>
+                        <li><strong>Contributor</strong> — assists (logs, metrics)</li>
+                        <li><strong>Consumer</strong> — uses the capability</li>
+                        <li><strong>Indirect</strong> — touches it incidentally</li>
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCapabilitiesViz((v) => !v)}
+                  title="Visualize capabilities as a graph"
+                >
+                  {showCapabilitiesViz ? (
+                    <EyeOff className="h-4 w-4 mr-1" />
+                  ) : (
+                    <Eye className="h-4 w-4 mr-1" />
+                  )}
+                  Visualize
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <table className="w-full text-sm">
@@ -903,6 +922,11 @@ export default function ComponentDetailPage() {
                   ))}
                 </tbody>
               </table>
+              {showCapabilitiesViz && (
+                <div className="mt-4 border-t pt-3">
+                  <MermaidPreview chart={buildCapabilitiesMermaid(component)} />
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -914,22 +938,37 @@ export default function ComponentDetailPage() {
             component.data.outputs?.length) ? (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Inputs &amp; Outputs
-                <Tooltip>
-                  <TooltipTrigger className="cursor-help">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs text-left">
-                    <p className="font-semibold mb-1">What this component receives, emits, and owns.</p>
-                    <ul className="text-xs space-y-0.5">
-                      <li><strong>Inputs</strong> — events / commands / data received</li>
-                      <li><strong>Outputs</strong> — events / decisions / documents emitted</li>
-                      <li><strong>Owns</strong> — source-of-truth for this data</li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  Inputs &amp; Outputs
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs text-left">
+                      <p className="font-semibold mb-1">What this component receives, emits, and owns.</p>
+                      <ul className="text-xs space-y-0.5">
+                        <li><strong>Inputs</strong> — events / commands / data received</li>
+                        <li><strong>Outputs</strong> — events / decisions / documents emitted</li>
+                        <li><strong>Owns</strong> — source-of-truth for this data</li>
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowIOViz((v) => !v)}
+                  title="Visualize inputs, outputs and owned data as a flow"
+                >
+                  {showIOViz ? (
+                    <EyeOff className="h-4 w-4 mr-1" />
+                  ) : (
+                    <Eye className="h-4 w-4 mr-1" />
+                  )}
+                  Visualize
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {(["inputs", "outputs", "owns"] as const).map((bucket) => {
@@ -983,6 +1022,11 @@ export default function ComponentDetailPage() {
                   </div>
                 )
               })}
+              {showIOViz && (
+                <div className="mt-4 border-t pt-3">
+                  <MermaidPreview chart={buildIOMermaid(component)} />
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : null}
