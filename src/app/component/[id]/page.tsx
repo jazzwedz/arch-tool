@@ -32,6 +32,13 @@ import {
   ExternalLink,
   RefreshCw,
   Loader2,
+  Eye,
+  EyeOff,
+  Sparkles,
+  FileText,
+  FileImage,
+  X,
+  Send,
 } from "lucide-react"
 import {
   Tooltip,
@@ -46,6 +53,21 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { MermaidPreview } from "@/components/mermaid-preview"
+import {
+  buildInterfacesMermaid,
+  buildRelationshipsMermaid,
+} from "@/lib/component-mermaid"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import yaml from "js-yaml"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -84,6 +106,22 @@ export default function ComponentDetailPage() {
     appliedCount?: number
   }>({ loading: false, showDialog: false, applying: false, selected: {} })
 
+  // "Diagrams this component appears in"
+  const [diagramRefs, setDiagramRefs] = useState<{ name: string }[] | null>(null)
+  // Per-section visualization toggles
+  const [showInterfacesViz, setShowInterfacesViz] = useState(false)
+  const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
+  // In-page documentation generator
+  const [genAudience, setGenAudience] = useState<"Technical" | "Business" | "Executive">("Technical")
+  const [genDocType, setGenDocType] = useState<
+    "audience" | "detailed-solution" | "audit-report" | "security-report"
+  >("audience")
+  const [generating, setGenerating] = useState(false)
+  const [generated, setGenerated] = useState<string | null>(null)
+  const [genError, setGenError] = useState<string | null>(null)
+  const [showDocModal, setShowDocModal] = useState(false)
+  const [docCopied, setDocCopied] = useState(false)
+
   useEffect(() => {
     fetch(`/api/components/${id}`)
       .then((r) => {
@@ -107,7 +145,97 @@ export default function ComponentDetailPage() {
       .then(async (r) => (r.ok ? r.json() : null))
       .then((data) => setConfluence(data))
       .catch(() => setConfluence(null))
+
+    fetch(`/api/components/${encodeURIComponent(id)}/diagrams`)
+      .then(async (r) => (r.ok ? r.json() : []))
+      .then((data) => setDiagramRefs(Array.isArray(data) ? data : []))
+      .catch(() => setDiagramRefs([]))
   }, [id, router])
+
+  const generateDocs = async () => {
+    if (!component) return
+    setGenerating(true)
+    setGenError(null)
+    setGenerated(null)
+    try {
+      const yamlContent = yaml.dump(component, { lineWidth: -1, sortKeys: false })
+      const body: Record<string, unknown> = {
+        componentId: component.id,
+        yamlContent,
+      }
+      if (genDocType === "audience") {
+        body.audience = genAudience
+      } else {
+        body.documentType = genDocType
+        body.documentTypeLabel =
+          genDocType === "detailed-solution"
+            ? "Detailed Solution Description"
+            : genDocType === "audit-report"
+            ? "Audit Report"
+            : "Security Report"
+      }
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setGenError(json.error || `HTTP ${res.status}`)
+      } else {
+        setGenerated(json.generated || "")
+        setShowDocModal(true)
+      }
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : "Unknown error")
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const copyDocMarkdown = () => {
+    if (!generated) return
+    navigator.clipboard.writeText(generated).then(() => {
+      setDocCopied(true)
+      setTimeout(() => setDocCopied(false), 2000)
+    })
+  }
+
+  const publishGeneratedToConfluence = async () => {
+    if (!component || !generated) return
+    try {
+      const audienceLabel =
+        genDocType === "audience"
+          ? genAudience
+          : genDocType === "detailed-solution"
+          ? "Detailed Solution Description"
+          : genDocType === "audit-report"
+          ? "Audit Report"
+          : "Security Report"
+      const res = await fetch("/api/confluence/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          componentId: component.id,
+          audienceLabel,
+          narrativeMarkdown: generated,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert(`Publish failed: ${json.error || `HTTP ${res.status}`}`)
+      } else {
+        // Refresh confluence status so the "Open in Confluence" button appears.
+        const status = await fetch(
+          `/api/confluence/status?componentId=${encodeURIComponent(component.id)}`
+        ).then((r) => (r.ok ? r.json() : null))
+        if (status) setConfluence(status)
+        alert(`Published — open: ${json.pageUrl}`)
+      }
+    } catch (e) {
+      alert(`Publish failed: ${e instanceof Error ? e.message : "Unknown error"}`)
+    }
+  }
 
   const fetchPullDiff = async () => {
     if (!component) return
@@ -388,6 +516,92 @@ export default function ComponentDetailPage() {
         </Button>
       </div>
 
+      {/* Generate documentation — in-page generator */}
+      <Card className="border-blue-200 bg-blue-50/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-5 w-5 text-blue-600" />
+            Generate Documentation
+            <Tooltip>
+              <TooltipTrigger className="cursor-help">
+                <Info className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs">
+                AI-generated documentation for this component. Pick an audience or document type and click Generate. The result opens in a viewer where you can copy, save as PDF, or publish to Confluence.
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={genDocType}
+              onValueChange={(v) =>
+                setGenDocType(
+                  v as "audience" | "detailed-solution" | "audit-report" | "security-report"
+                )
+              }
+            >
+              <SelectTrigger className="h-9 w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="audience">By audience</SelectItem>
+                <SelectItem value="detailed-solution">Detailed Solution Description</SelectItem>
+                <SelectItem value="audit-report">Audit Report</SelectItem>
+                <SelectItem value="security-report">Security Report</SelectItem>
+              </SelectContent>
+            </Select>
+            {genDocType === "audience" && (
+              <Select
+                value={genAudience}
+                onValueChange={(v) =>
+                  setGenAudience(v as "Technical" | "Business" | "Executive")
+                }
+              >
+                <SelectTrigger className="h-9 w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Technical">Technical</SelectItem>
+                  <SelectItem value="Business">Business</SelectItem>
+                  <SelectItem value="Executive">Executive</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <Button
+              onClick={generateDocs}
+              disabled={generating}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate
+                </>
+              )}
+            </Button>
+            {generated && !showDocModal && (
+              <Button
+                variant="outline"
+                onClick={() => setShowDocModal(true)}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Re-open last result
+              </Button>
+            )}
+            {genError && (
+              <span className="text-xs text-destructive">{genError}</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Info */}
         <Card>
@@ -452,17 +666,33 @@ export default function ComponentDetailPage() {
         {/* Interfaces */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Interfaces
-              <Tooltip>
-                <TooltipTrigger className="cursor-help">
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-xs">
-                  What this component exposes to others (provides) and what it consumes from other components. Interfaces describe the API surface — the protocols, directions, and purposes of each connection point.
-                </TooltipContent>
-              </Tooltip>
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                Interfaces
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    What this component exposes to others (provides) and what it consumes from other components. Interfaces describe the API surface — the protocols, directions, and purposes of each connection point.
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowInterfacesViz((v) => !v)}
+                disabled={component.interfaces.length === 0}
+                title="Visualize interfaces as a flow diagram"
+              >
+                {showInterfacesViz ? (
+                  <EyeOff className="h-4 w-4 mr-1" />
+                ) : (
+                  <Eye className="h-4 w-4 mr-1" />
+                )}
+                Visualize
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {component.interfaces.length === 0 ? (
@@ -497,31 +727,52 @@ export default function ComponentDetailPage() {
                 ))}
               </div>
             )}
+            {showInterfacesViz && component.interfaces.length > 0 && (
+              <div className="mt-4 border-t pt-3">
+                <MermaidPreview chart={buildInterfacesMermaid(component)} />
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Relationships */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Relationships
-              <Tooltip>
-                <TooltipTrigger className="cursor-help">
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-xs text-left">
-                  <p className="font-semibold mb-1">How this component relates to others:</p>
-                  <ul className="text-xs space-y-0.5">
-                    <li><strong>Parent of</strong> — contains/owns another component</li>
-                    <li><strong>Child of</strong> — belongs to a parent component</li>
-                    <li><strong>Depends on</strong> — requires another to function</li>
-                    <li><strong>Communicates with</strong> — exchanges data with a peer</li>
-                    <li><strong>Reads / Writes</strong> — directional data flow</li>
-                    <li><strong>Fallback for</strong> — backup when another is unavailable</li>
-                  </ul>
-                </TooltipContent>
-              </Tooltip>
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                Relationships
+                <Tooltip>
+                  <TooltipTrigger className="cursor-help">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs text-left">
+                    <p className="font-semibold mb-1">How this component relates to others:</p>
+                    <ul className="text-xs space-y-0.5">
+                      <li><strong>Parent of</strong> — contains/owns another component</li>
+                      <li><strong>Child of</strong> — belongs to a parent component</li>
+                      <li><strong>Depends on</strong> — requires another to function</li>
+                      <li><strong>Communicates with</strong> — exchanges data with a peer</li>
+                      <li><strong>Reads / Writes</strong> — directional data flow</li>
+                      <li><strong>Fallback for</strong> — backup when another is unavailable</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowRelationshipsViz((v) => !v)}
+                disabled={!component.relationships || component.relationships.length === 0}
+                title="Visualize relationships as a graph"
+              >
+                {showRelationshipsViz ? (
+                  <EyeOff className="h-4 w-4 mr-1" />
+                ) : (
+                  <Eye className="h-4 w-4 mr-1" />
+                )}
+                Visualize
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {(!component.relationships || component.relationships.length === 0) ? (
@@ -555,6 +806,13 @@ export default function ComponentDetailPage() {
                 ))}
               </div>
             )}
+            {showRelationshipsViz &&
+              component.relationships &&
+              component.relationships.length > 0 && (
+                <div className="mt-4 border-t pt-3">
+                  <MermaidPreview chart={buildRelationshipsMermaid(component)} />
+                </div>
+              )}
           </CardContent>
         </Card>
 
@@ -764,6 +1022,46 @@ export default function ComponentDetailPage() {
         )}
       </div>
 
+      {/* Diagrams this component appears in */}
+      <Card className="mt-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <FileImage className="h-4 w-4" />
+            Diagrams referencing this component
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {diagramRefs === null ? (
+            <p className="text-xs text-muted-foreground">Scanning...</p>
+          ) : diagramRefs.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No diagrams reference this component yet.{" "}
+              <Link
+                href="/diagrams"
+                className="underline text-blue-700 hover:no-underline"
+              >
+                Open the diagram builder
+              </Link>{" "}
+              to add it.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {diagramRefs.map((d) => (
+                <Link
+                  key={d.name}
+                  href={`/diagrams/builder?name=${encodeURIComponent(d.name)}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border bg-white hover:bg-blue-50 hover:border-blue-300 text-sm transition-colors"
+                >
+                  <FileImage className="h-3.5 w-3.5 text-blue-600" />
+                  {d.name}
+                  <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Change History */}
       <Card className="mt-6">
         <CardHeader className="pb-3">
@@ -810,6 +1108,109 @@ export default function ComponentDetailPage() {
         onOpenChange={setShowBlastRadius}
         componentId={component.id}
       />
+
+      {/* Generated documentation viewer */}
+      <Dialog open={showDocModal} onOpenChange={setShowDocModal}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 [&>button:last-child]:hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b shrink-0 bg-gray-50">
+            <DialogHeader className="flex-1">
+              <DialogTitle className="flex items-center gap-3">
+                <FileText className="h-5 w-5" />
+                <span>{component.name}</span>
+                <span className="inline-flex items-center px-3 py-1 rounded text-xs font-semibold bg-gray-900 text-white uppercase tracking-wide">
+                  {genDocType === "audience"
+                    ? genAudience
+                    : genDocType === "detailed-solution"
+                    ? "Detailed Solution"
+                    : genDocType === "audit-report"
+                    ? "Audit Report"
+                    : "Security Report"}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={copyDocMarkdown}>
+                {docCopied ? (
+                  <Check className="h-4 w-4 mr-1" />
+                ) : (
+                  <Copy className="h-4 w-4 mr-1" />
+                )}
+                {docCopied ? "Copied" : "Copy Markdown"}
+              </Button>
+              {confluence?.configured && (
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={publishGeneratedToConfluence}
+                  title="Publish this generated documentation to Confluence"
+                >
+                  <Send className="h-4 w-4 mr-1" />
+                  Publish to Confluence
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDocModal(false)}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Close
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-8 py-6 bg-white">
+            <div
+              className="max-w-none
+                [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:border-b-2 [&_h1]:border-gray-800 [&_h1]:pb-2 [&_h1]:mb-4 [&_h1]:text-gray-900
+                [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3 [&_h2]:border-b [&_h2]:border-gray-300 [&_h2]:pb-1 [&_h2]:text-gray-800
+                [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:text-gray-700
+                [&_p]:text-sm [&_p]:leading-relaxed [&_p]:my-2 [&_p]:text-gray-700
+                [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:pl-6 [&_ol]:my-2
+                [&_li]:text-sm [&_li]:my-1 [&_li]:text-gray-700
+                [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-gray-800
+                [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_pre]:my-3
+                [&_pre_code]:bg-transparent [&_pre_code]:p-0
+                [&_table]:w-full [&_table]:border-collapse [&_table]:my-3
+                [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-100 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold
+                [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2 [&_td]:text-sm
+                [&_strong]:font-semibold [&_strong]:text-gray-900
+                [&_hr]:my-4 [&_hr]:border-gray-200"
+            >
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({ className, children, ...props }) {
+                    const isMermaid = /language-mermaid/.test(className || "")
+                    if (isMermaid) {
+                      return <MermaidPreview chart={String(children).trim()} />
+                    }
+                    const isInline = !className
+                    if (isInline) {
+                      return (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      )
+                    }
+                    return (
+                      <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto my-3">
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      </pre>
+                    )
+                  },
+                  pre({ children }) {
+                    return <>{children}</>
+                  },
+                }}
+              >
+                {generated || ""}
+              </ReactMarkdown>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={pullState.showDialog}
