@@ -30,7 +30,6 @@ import {
   Trash2,
   Info,
   History,
-  Radar,
   ExternalLink,
   RefreshCw,
   Loader2,
@@ -47,7 +46,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip"
-import { BlastRadiusDialog } from "@/components/BlastRadiusDialog"
+import { BlastRadiusView } from "@/components/BlastRadiusDialog"
 import {
   Dialog,
   DialogContent,
@@ -85,7 +84,6 @@ export default function ComponentDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [history, setHistory] = useState<{ sha: string; message: string; author: string; date: string }[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
-  const [showBlastRadius, setShowBlastRadius] = useState(false)
   const [confluence, setConfluence] = useState<{
     configured: boolean
     published: boolean
@@ -122,8 +120,21 @@ export default function ComponentDetailPage() {
   // Hero context diagram (Overview tab) — open by default for impact.
   const [showHeroDiagram, setShowHeroDiagram] = useState(true)
   // Active tab on the detail page.
-  type DetailTab = "overview" | "technical" | "business" | "diagrams" | "history"
+  type DetailTab =
+    | "overview"
+    | "technical"
+    | "business"
+    | "blast-radius"
+    | "documentation"
+    | "diagrams"
+    | "history"
   const [tab, setTab] = useState<DetailTab>("overview")
+  const [publishingStandalone, setPublishingStandalone] = useState(false)
+  const [publishStandaloneStatus, setPublishStandaloneStatus] = useState<
+    | { ok: true; pageUrl: string; action: string; capabilityParent: string; warning?: string }
+    | { ok: false; error: string }
+    | null
+  >(null)
   // In-page documentation generator
   const [genAudience, setGenAudience] = useState<"Technical" | "Business" | "Executive">("Technical")
   const [genDocType, setGenDocType] = useState<
@@ -212,6 +223,96 @@ export default function ComponentDetailPage() {
       setDocCopied(true)
       setTimeout(() => setDocCopied(false), 2000)
     })
+  }
+
+  // Standalone "Publish to Confluence" — runs Generate (if needed) + Publish
+  // in a single click. Used by the button on the Documentation tab.
+  const publishToConfluenceStandalone = async () => {
+    if (!component) return
+    setPublishingStandalone(true)
+    setPublishStandaloneStatus(null)
+    try {
+      // Step 1: ensure we have narrative content. If user already generated
+      // something, reuse it; otherwise auto-generate using current selectors.
+      let narrative = generated
+      let audienceLabel: string =
+        genDocType === "audience"
+          ? genAudience
+          : genDocType === "detailed-solution"
+          ? "Detailed Solution Description"
+          : genDocType === "audit-report"
+          ? "Audit Report"
+          : "Security Report"
+
+      if (!narrative) {
+        const yamlContent = yaml.dump(component, { lineWidth: -1, sortKeys: false })
+        const body: Record<string, unknown> = {
+          componentId: component.id,
+          yamlContent,
+        }
+        if (genDocType === "audience") {
+          body.audience = genAudience
+        } else {
+          body.documentType = genDocType
+          body.documentTypeLabel = audienceLabel
+        }
+        const genRes = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const genJson = await genRes.json()
+        if (!genRes.ok) {
+          setPublishStandaloneStatus({
+            ok: false,
+            error: `Generate failed: ${genJson.error || `HTTP ${genRes.status}`}`,
+          })
+          return
+        }
+        narrative = genJson.generated || ""
+        setGenerated(narrative)
+        // Make audienceLabel reflect what we actually generated.
+        audienceLabel = audienceLabel
+      }
+
+      // Step 2: publish.
+      const res = await fetch("/api/confluence/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          componentId: component.id,
+          audienceLabel,
+          narrativeMarkdown: narrative,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setPublishStandaloneStatus({
+          ok: false,
+          error: json.error || `HTTP ${res.status}`,
+        })
+        return
+      }
+      setPublishStandaloneStatus({
+        ok: true,
+        pageUrl: json.pageUrl,
+        action: json.action,
+        capabilityParent: json.capabilityParent,
+        warning: json.warning,
+      })
+      // Refresh confluence status so Open / Pull buttons appear.
+      const status = await fetch(
+        `/api/confluence/status?componentId=${encodeURIComponent(component.id)}`
+      ).then((r) => (r.ok ? r.json() : null))
+      if (status) setConfluence(status)
+    } catch (e) {
+      setPublishStandaloneStatus({
+        ok: false,
+        error: e instanceof Error ? e.message : "Unknown error",
+      })
+    } finally {
+      setPublishingStandalone(false)
+    }
   }
 
   const publishGeneratedToConfluence = async () => {
@@ -529,218 +630,16 @@ export default function ComponentDetailPage() {
         </div>
       )}
 
-      {/* Action toolbar — grouped */}
-      <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
-        {/* Analyse */}
-        <div className="flex items-start gap-3 flex-wrap">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-20 pt-2 shrink-0">
-            Analyse
-          </span>
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              size="sm"
-              className="bg-orange-500 hover:bg-orange-600 text-white"
-              onClick={() => setShowBlastRadius(true)}
-            >
-              <Radar className="h-4 w-4 mr-1.5" />
-              Blast Radius
-            </Button>
-          </div>
-        </div>
-
-        {/* Confluence — only when configured */}
-        {confluence?.configured && (
-          <div className="flex items-start gap-3 flex-wrap">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-20 pt-2 shrink-0">
-              Confluence
-            </span>
-            <div className="flex gap-2 flex-wrap">
-              {confluence.published && confluence.pageUrl ? (
-                <a href={confluence.pageUrl} target="_blank" rel="noreferrer">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1.5" />
-                    Open in Confluence
-                  </Button>
-                </a>
-              ) : (
-                <span className="text-xs text-muted-foreground py-2">
-                  Not yet published — use Generate Documentation below to publish.
-                </span>
-              )}
-              {confluence.published && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                  onClick={fetchPullDiff}
-                  disabled={pullState.loading}
-                >
-                  {pullState.loading ? (
-                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4 mr-1.5" />
-                  )}
-                  Pull from Confluence
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Export & Copy */}
-        <div className="flex items-start gap-3 flex-wrap">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-20 pt-2 shrink-0">
-            Export
-          </span>
-          <div className="flex gap-2 flex-wrap">
-            <a href="/api/export/drawio" download="arch-components.xml">
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-1.5" />
-                Draw.io library
-              </Button>
-            </a>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => copyToClipboard(component.id, "id")}
-            >
-              {copiedField === "id" ? (
-                <Check className="h-3 w-3 mr-1.5" />
-              ) : (
-                <Copy className="h-3 w-3 mr-1.5" />
-              )}
-              Copy ID
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                copyToClipboard(component.description.technical, "technical")
-              }
-            >
-              {copiedField === "technical" ? (
-                <Check className="h-3 w-3 mr-1.5" />
-              ) : (
-                <Copy className="h-3 w-3 mr-1.5" />
-              )}
-              Copy Technical Desc
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                copyToClipboard(component.description.business, "business")
-              }
-            >
-              {copiedField === "business" ? (
-                <Check className="h-3 w-3 mr-1.5" />
-              ) : (
-                <Copy className="h-3 w-3 mr-1.5" />
-              )}
-              Copy Business Desc
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Generate documentation — in-page generator */}
-      <Card className="border-blue-200 bg-blue-50/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-5 w-5 text-blue-600" />
-            Generate Documentation
-            <Tooltip>
-              <TooltipTrigger className="cursor-help">
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs">
-                AI-generated documentation for this component. Pick an audience or document type and click Generate. The result opens in a viewer where you can copy, save as PDF, or publish to Confluence.
-              </TooltipContent>
-            </Tooltip>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={genDocType}
-              onValueChange={(v) =>
-                setGenDocType(
-                  v as "audience" | "detailed-solution" | "audit-report" | "security-report"
-                )
-              }
-            >
-              <SelectTrigger className="h-9 w-[220px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="audience">By audience</SelectItem>
-                <SelectItem value="detailed-solution">Detailed Solution Description</SelectItem>
-                <SelectItem value="audit-report">Audit Report</SelectItem>
-                <SelectItem value="security-report">Security Report</SelectItem>
-              </SelectContent>
-            </Select>
-            {genDocType === "audience" && (
-              <Select
-                value={genAudience}
-                onValueChange={(v) =>
-                  setGenAudience(v as "Technical" | "Business" | "Executive")
-                }
-              >
-                <SelectTrigger className="h-9 w-[160px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Technical">Technical</SelectItem>
-                  <SelectItem value="Business">Business</SelectItem>
-                  <SelectItem value="Executive">Executive</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            <Button
-              onClick={generateDocs}
-              disabled={generating}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Generate
-                </>
-              )}
-            </Button>
-            {generated && !showDocModal && (
-              <Button
-                variant="outline"
-                onClick={() => setShowDocModal(true)}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Re-open last result
-              </Button>
-            )}
-            {genError && (
-              <span className="text-xs text-destructive">{genError}</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Tab nav */}
       <div className="border-b">
-        <nav className="-mb-px flex gap-1" role="tablist">
+        <nav className="-mb-px flex gap-1 flex-wrap" role="tablist">
           {(
             [
               { id: "overview", label: "Overview" },
               { id: "technical", label: "Technical" },
               { id: "business", label: "Business" },
+              { id: "blast-radius", label: "Blast Radius" },
+              { id: "documentation", label: "Documentation" },
               { id: "diagrams", label: "Diagrams" },
               { id: "history", label: "History" },
             ] as { id: DetailTab; label: string }[]
@@ -801,6 +700,269 @@ export default function ComponentDetailPage() {
             )}
           </Card>
         </>
+      )}
+
+      {/* BLAST RADIUS TAB */}
+      {tab === "blast-radius" && (
+        <Card>
+          <CardContent className="pt-6">
+            <BlastRadiusView componentId={component.id} active={tab === "blast-radius"} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* DOCUMENTATION TAB */}
+      {tab === "documentation" && (
+        <div className="space-y-6">
+          {/* Generate */}
+          <Card className="border-blue-200 bg-blue-50/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-5 w-5 text-blue-600" />
+                Generate Documentation
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                AI-generated docs for this component. Pick an audience or document type, click Generate, then publish or export.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={genDocType}
+                  onValueChange={(v) =>
+                    setGenDocType(
+                      v as "audience" | "detailed-solution" | "audit-report" | "security-report"
+                    )
+                  }
+                >
+                  <SelectTrigger className="h-9 w-[220px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="audience">By audience</SelectItem>
+                    <SelectItem value="detailed-solution">Detailed Solution Description</SelectItem>
+                    <SelectItem value="audit-report">Audit Report</SelectItem>
+                    <SelectItem value="security-report">Security Report</SelectItem>
+                  </SelectContent>
+                </Select>
+                {genDocType === "audience" && (
+                  <Select
+                    value={genAudience}
+                    onValueChange={(v) =>
+                      setGenAudience(v as "Technical" | "Business" | "Executive")
+                    }
+                  >
+                    <SelectTrigger className="h-9 w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Technical">Technical</SelectItem>
+                      <SelectItem value="Business">Business</SelectItem>
+                      <SelectItem value="Executive">Executive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button
+                  onClick={generateDocs}
+                  disabled={generating}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+                {generated && !showDocModal && (
+                  <Button variant="outline" onClick={() => setShowDocModal(true)}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Re-open last result
+                  </Button>
+                )}
+                {genError && (
+                  <span className="text-xs text-destructive">{genError}</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Confluence sync */}
+          {confluence?.configured && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Send className="h-5 w-5 text-blue-600" />
+                  Confluence
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {confluence.published ? (
+                    <>
+                      Published. Last sync:{" "}
+                      <strong>
+                        {confluence.lastSyncedAt
+                          ? new Date(confluence.lastSyncedAt).toLocaleString("en-GB", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "—"}
+                      </strong>
+                      .
+                    </>
+                  ) : (
+                    <>Not yet published. Publish to make it visible to your team in Confluence.</>
+                  )}
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={publishToConfluenceStandalone}
+                    disabled={publishingStandalone}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {publishingStandalone ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {generated ? "Publishing..." : "Generating + publishing..."}
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        {confluence.published ? "Re-publish to Confluence" : "Publish to Confluence"}
+                      </>
+                    )}
+                  </Button>
+                  {confluence.published && confluence.pageUrl && (
+                    <a href={confluence.pageUrl} target="_blank" rel="noreferrer">
+                      <Button
+                        variant="outline"
+                        className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open in Confluence
+                      </Button>
+                    </a>
+                  )}
+                  {confluence.published && (
+                    <Button
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      onClick={fetchPullDiff}
+                      disabled={pullState.loading}
+                    >
+                      {pullState.loading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      Pull from Confluence
+                    </Button>
+                  )}
+                </div>
+                {publishStandaloneStatus && (
+                  <div
+                    className={`text-sm rounded-md p-3 border ${
+                      publishStandaloneStatus.ok
+                        ? "bg-green-50 border-green-200 text-green-900"
+                        : "bg-red-50 border-red-200 text-red-900"
+                    }`}
+                  >
+                    {publishStandaloneStatus.ok ? (
+                      <>
+                        Published to Confluence ({publishStandaloneStatus.action}) under capability{" "}
+                        <strong>{publishStandaloneStatus.capabilityParent}</strong>.{" "}
+                        <a
+                          href={publishStandaloneStatus.pageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline font-medium"
+                        >
+                          Open page
+                        </a>
+                        {publishStandaloneStatus.warning && (
+                          <div className="mt-1 text-xs text-amber-700">
+                            Note: {publishStandaloneStatus.warning}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>Publish failed: {publishStandaloneStatus.error}</>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Export & Copy */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Download className="h-5 w-5 text-muted-foreground" />
+                Export &amp; Copy
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Take this component out of arch-tool — into Draw.io, Slack, an email, anywhere.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                <a href="/api/export/drawio" download="arch-components.xml">
+                  <Button variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Draw.io library
+                  </Button>
+                </a>
+                <Button
+                  variant="outline"
+                  onClick={() => copyToClipboard(component.id, "id")}
+                >
+                  {copiedField === "id" ? (
+                    <Check className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  Copy ID
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    copyToClipboard(component.description.technical, "technical")
+                  }
+                >
+                  {copiedField === "technical" ? (
+                    <Check className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  Copy Technical Description
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    copyToClipboard(component.description.business, "business")
+                  }
+                >
+                  {copiedField === "business" ? (
+                    <Check className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  Copy Business Description
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1413,12 +1575,6 @@ export default function ComponentDetailPage() {
         </CardContent>
       </Card>
       )}
-
-      <BlastRadiusDialog
-        open={showBlastRadius}
-        onOpenChange={setShowBlastRadius}
-        componentId={component.id}
-      />
 
       {/* Generated documentation viewer */}
       <Dialog open={showDocModal} onOpenChange={setShowDocModal}>

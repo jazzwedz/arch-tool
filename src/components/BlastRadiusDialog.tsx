@@ -31,14 +31,19 @@ import type {
   ImpactSeverity,
 } from "@/lib/blast-radius"
 
-export function BlastRadiusDialog({
-  open,
-  onOpenChange,
+/**
+ * Inline body view of the blast radius — used directly in the Blast Radius
+ * tab on the component detail page. Shares the same fetch/render logic as
+ * BlastRadiusDialog but without the Dialog wrapper.
+ *
+ * Pass `active` to defer the fetch until the tab becomes visible.
+ */
+export function BlastRadiusView({
   componentId,
+  active = true,
 }: {
-  open: boolean
-  onOpenChange: (v: boolean) => void
   componentId: string
+  active?: boolean
 }) {
   const [data, setData] = useState<BlastRadiusResult | null>(null)
   const [loading, setLoading] = useState(false)
@@ -48,7 +53,7 @@ export function BlastRadiusDialog({
   const [memoError, setMemoError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!open) return
+    if (!active) return
     setData(null)
     setMemo(null)
     setError(null)
@@ -65,7 +70,7 @@ export function BlastRadiusDialog({
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : "Unknown error"))
       .finally(() => setLoading(false))
-  }, [open, componentId])
+  }, [active, componentId])
 
   const generateMemo = async () => {
     if (!data) return
@@ -94,19 +99,18 @@ export function BlastRadiusDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-orange-500" />
-            Blast Radius — {data?.source.name || "..."}
-          </DialogTitle>
-          <DialogDescription>
-            What would be affected if this component fails, changes, or is removed.
-          </DialogDescription>
-        </DialogHeader>
+    <div className="space-y-6">
+      <div>
+        <h2 className="flex items-center gap-2 text-xl font-semibold">
+          <AlertTriangle className="h-5 w-5 text-orange-500" />
+          Blast Radius — {data?.source.name || "..."}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          What would be affected if this component fails, changes, or is removed.
+        </p>
+      </div>
 
-        {loading && (
+      {loading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             <span className="ml-2 text-sm text-muted-foreground">
@@ -236,6 +240,34 @@ export function BlastRadiusDialog({
             )}
           </div>
         )}
+    </div>
+  )
+}
+
+/**
+ * Modal wrapper around BlastRadiusView. Kept for backward compatibility with
+ * any callers that still want the dialog form. The detail page now uses
+ * BlastRadiusView directly inside its Blast Radius tab.
+ */
+export function BlastRadiusDialog({
+  open,
+  onOpenChange,
+  componentId,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  componentId: string
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="sr-only">Blast Radius</DialogTitle>
+          <DialogDescription className="sr-only">
+            What would be affected if this component fails, changes, or is removed.
+          </DialogDescription>
+        </DialogHeader>
+        <BlastRadiusView componentId={componentId} active={open} />
       </DialogContent>
     </Dialog>
   )
