@@ -149,6 +149,87 @@ export function buildIOMermaid(component: Component): string {
 }
 
 /**
+ * Hero "Component context" diagram — combines relationships, inputs,
+ * outputs and owned data into a single flowchart so the user sees the
+ * component in its environment at a glance. Used at the top of the
+ * Overview tab on the detail page.
+ */
+export function buildHeroContextMermaid(component: Component): string {
+  const lines: string[] = ["flowchart LR"]
+  const me = safeId(component.id)
+
+  const inputs = (component.data?.inputs || []).slice(0, 8)
+  const outputs = (component.data?.outputs || []).slice(0, 8)
+  const owns = (component.data?.owns || []).slice(0, 6)
+  const rels = (component.relationships || []).slice(0, 8)
+
+  const total = inputs.length + outputs.length + owns.length + rels.length
+  if (total === 0) {
+    lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
+    lines.push(
+      `  noop["No connections, inputs/outputs or owned data yet — start by adding them in Edit"]:::muted`
+    )
+    lines.push(
+      `  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px`
+    )
+    lines.push(`  classDef muted fill:#f3f4f6,stroke:#9ca3af,color:#6b7280`)
+    return lines.join("\n")
+  }
+
+  // Inputs (left).
+  inputs.forEach((item, i) => {
+    const nid = `in_${i}_${safeId(item.name).slice(0, 18) || "x"}`
+    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
+    lines.push(
+      `  ${nid}["${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>"]:::input`
+    )
+    const edge = item.purpose ? item.purpose.slice(0, 24) : kindLabel
+    lines.push(`  ${nid} -->|${escLabel(edge)}| ${me}`)
+  })
+
+  // Self.
+  lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
+
+  // Outputs (right).
+  outputs.forEach((item, i) => {
+    const nid = `out_${i}_${safeId(item.name).slice(0, 18) || "x"}`
+    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
+    lines.push(
+      `  ${nid}["${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>"]:::output`
+    )
+    const edge = item.purpose ? item.purpose.slice(0, 24) : kindLabel
+    lines.push(`  ${me} -->|${escLabel(edge)}| ${nid}`)
+  })
+
+  // Relationships (peers, gray).
+  rels.forEach((rel, i) => {
+    const nid = `rel_${i}_${safeId(rel.target).slice(0, 18)}`
+    lines.push(`  ${nid}["${escLabel(rel.target)}"]:::peer`)
+    const label = RELATIONSHIP_LABELS[rel.type] || rel.type
+    lines.push(`  ${me} -.${escLabel(label)}.- ${nid}`)
+  })
+
+  // Owned data (cylinders, dotted).
+  owns.forEach((item, i) => {
+    const nid = `own_${i}_${safeId(item.name).slice(0, 18) || "x"}`
+    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
+    lines.push(
+      `  ${nid}[("${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>")]:::owned`
+    )
+    lines.push(`  ${me} -.owns.- ${nid}`)
+  })
+
+  lines.push(
+    `  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px`
+  )
+  lines.push(`  classDef input fill:#dcfce7,stroke:#16a34a,color:#14532d`)
+  lines.push(`  classDef output fill:#fce7f3,stroke:#be185d,color:#831843`)
+  lines.push(`  classDef peer fill:#f9fafb,stroke:#6b7280,color:#374151`)
+  lines.push(`  classDef owned fill:#f5f3ff,stroke:#7c3aed,color:#4c1d95`)
+  return lines.join("\n")
+}
+
+/**
  * Visualise the component's relationships to other components in the catalog.
  * Edges are labelled with the relationship type.
  */

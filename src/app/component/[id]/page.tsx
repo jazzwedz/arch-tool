@@ -68,7 +68,9 @@ import {
   buildRelationshipsMermaid,
   buildCapabilitiesMermaid,
   buildIOMermaid,
+  buildHeroContextMermaid,
 } from "@/lib/component-mermaid"
+import { computeMaturity } from "@/lib/component-maturity"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import yaml from "js-yaml"
@@ -117,6 +119,11 @@ export default function ComponentDetailPage() {
   const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
   const [showCapabilitiesViz, setShowCapabilitiesViz] = useState(false)
   const [showIOViz, setShowIOViz] = useState(false)
+  // Hero context diagram (Overview tab) — open by default for impact.
+  const [showHeroDiagram, setShowHeroDiagram] = useState(true)
+  // Active tab on the detail page.
+  type DetailTab = "overview" | "technical" | "business" | "diagrams" | "history"
+  const [tab, setTab] = useState<DetailTab>("overview")
   // In-page documentation generator
   const [genAudience, setGenAudience] = useState<"Technical" | "Business" | "Executive">("Technical")
   const [genDocType, setGenDocType] = useState<
@@ -412,6 +419,89 @@ export default function ComponentDetailPage() {
         </div>
       </div>
 
+      {/* Identity panel — at-a-glance metadata + documentation maturity */}
+      {(() => {
+        const m = computeMaturity(component)
+        return (
+          <div className="rounded-lg border bg-gradient-to-r from-slate-50 to-blue-50/40 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <div className="flex items-center gap-1.5">
+                <TypeIcon type={component.type} className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground text-xs uppercase tracking-wider">Type</span>
+                <span className="font-medium">{TYPE_LABELS[component.type]}</span>
+              </div>
+              <div className="h-4 w-px bg-border" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground text-xs uppercase tracking-wider">Status</span>
+                <StatusBadge status={component.status} />
+              </div>
+              {component.owner && (
+                <>
+                  <div className="h-4 w-px bg-border" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wider">Owner</span>
+                    <span className="font-medium">{component.owner}</span>
+                  </div>
+                </>
+              )}
+              {component.tags && component.tags.length > 0 && (
+                <>
+                  <div className="h-4 w-px bg-border" />
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wider">Tags</span>
+                    {component.tags.slice(0, 6).map((t) => (
+                      <Badge key={t} variant="secondary" className="text-xs">
+                        {t}
+                      </Badge>
+                    ))}
+                    {component.tags.length > 6 && (
+                      <span className="text-xs text-muted-foreground">
+                        +{component.tags.length - 6}
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground shrink-0">
+                Documentation maturity
+              </span>
+              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden max-w-md">
+                <div
+                  className={`h-full ${m.bandColor} transition-all`}
+                  style={{ width: `${m.percent}%` }}
+                />
+              </div>
+              <span className="text-xs font-semibold whitespace-nowrap">
+                {m.percent}%{" "}
+                <span className="text-muted-foreground font-normal">
+                  ({m.filled}/{m.total} fields · {m.bandLabel})
+                </span>
+              </span>
+              <Tooltip>
+                <TooltipTrigger className="cursor-help">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-xs text-left">
+                  <p className="font-semibold mb-1 text-xs">Fields ({m.filled}/{m.total} filled):</p>
+                  <ul className="text-xs space-y-0.5">
+                    {m.fields.map((f) => (
+                      <li key={f.key}>
+                        <span className={f.filled ? "text-emerald-600" : "text-red-600"}>
+                          {f.filled ? "✓" : "✗"}
+                        </span>{" "}
+                        {f.label}
+                      </li>
+                    ))}
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Delete confirmation */}
       {showDeleteConfirm && (
         <div className="rounded-lg border border-destructive bg-destructive/5 p-4">
@@ -643,8 +733,79 @@ export default function ComponentDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Tab nav */}
+      <div className="border-b">
+        <nav className="-mb-px flex gap-1" role="tablist">
+          {(
+            [
+              { id: "overview", label: "Overview" },
+              { id: "technical", label: "Technical" },
+              { id: "business", label: "Business" },
+              { id: "diagrams", label: "Diagrams" },
+              { id: "history", label: "History" },
+            ] as { id: DetailTab; label: string }[]
+          ).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                tab === t.id
+                  ? "border-blue-600 text-blue-700"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* OVERVIEW TAB */}
+      {tab === "overview" && (
+        <>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Component context
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs text-left">
+                      Auto-rendered hero diagram combining inputs, outputs, owned data and direct relationships. The picture you should see first.
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowHeroDiagram((v) => !v)}
+                >
+                  {showHeroDiagram ? (
+                    <EyeOff className="h-4 w-4 mr-1" />
+                  ) : (
+                    <Eye className="h-4 w-4 mr-1" />
+                  )}
+                  {showHeroDiagram ? "Hide" : "Show"}
+                </Button>
+              </div>
+            </CardHeader>
+            {showHeroDiagram && (
+              <CardContent>
+                <MermaidPreview chart={buildHeroContextMermaid(component)} />
+              </CardContent>
+            )}
+          </Card>
+        </>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Info */}
+        {tab === "overview" && (
         <Card>
           <CardHeader>
             <CardTitle>Details</CardTitle>
@@ -682,8 +843,10 @@ export default function ComponentDetailPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Descriptions */}
+        {tab === "overview" && (
         <Card>
           <CardHeader>
             <CardTitle>Descriptions</CardTitle>
@@ -703,8 +866,10 @@ export default function ComponentDetailPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Interfaces */}
+        {tab === "technical" && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -775,8 +940,10 @@ export default function ComponentDetailPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Relationships */}
+        {tab === "technical" && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -856,9 +1023,10 @@ export default function ComponentDetailPage() {
               )}
           </CardContent>
         </Card>
+        )}
 
         {/* Capabilities */}
-        {component.capabilities && component.capabilities.length > 0 && (
+        {tab === "business" && component.capabilities && component.capabilities.length > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -932,7 +1100,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Inputs & Outputs */}
-        {component.data &&
+        {tab === "business" && component.data &&
           (component.data.owns?.length ||
             component.data.inputs?.length ||
             component.data.outputs?.length) ? (
@@ -1032,7 +1200,7 @@ export default function ComponentDetailPage() {
         ) : null}
 
         {/* Processes */}
-        {component.processes && component.processes.length > 0 && (
+        {tab === "business" && component.processes && component.processes.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1090,7 +1258,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Non-Functional Requirements */}
-        {component.nfr && Object.values(component.nfr).some(Boolean) && (
+        {tab === "technical" && component.nfr && Object.values(component.nfr).some(Boolean) && (
           <Card>
             <CardHeader>
               <CardTitle>Non-Functional Requirements</CardTitle>
@@ -1145,7 +1313,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Risks */}
-        {component.risks && component.risks.length > 0 && (
+        {tab === "overview" && component.risks && component.risks.length > 0 && (
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Risks</CardTitle>
@@ -1162,6 +1330,7 @@ export default function ComponentDetailPage() {
       </div>
 
       {/* Diagrams this component appears in */}
+      {tab === "diagrams" && (
       <Card className="mt-6">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1200,8 +1369,10 @@ export default function ComponentDetailPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Change History */}
+      {tab === "history" && (
       <Card className="mt-6">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1241,6 +1412,7 @@ export default function ComponentDetailPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       <BlastRadiusDialog
         open={showBlastRadius}
