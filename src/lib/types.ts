@@ -124,6 +124,25 @@ export interface ComponentProcess {
   description?: string
 }
 
+export type RuleKind = "formula" | "rule" | "constraint"
+
+export interface ComponentRule {
+  name: string
+  kind: RuleKind
+  /** One-line summary, applies to every kind. */
+  summary?: string
+  /** Optional long-form prose. */
+  description?: string
+  /** Used when kind === "formula" — a single expression line. */
+  formula?: string
+  /** Used when kind === "rule" (Given / When / Then). */
+  given?: string
+  when?: string
+  then?: string
+  /** Used when kind === "constraint" — component ids where this invariant is enforced. */
+  enforced_in?: string[]
+}
+
 export interface Component {
   id: string
   name: string
@@ -140,6 +159,7 @@ export interface Component {
   capabilities?: ComponentCapability[]
   data?: ComponentData
   processes?: ComponentProcess[]
+  rules?: ComponentRule[]
   nfr?: ComponentNFR
   diagram?: ComponentDiagram
 }

@@ -18,6 +18,8 @@ import {
   DATA_KIND_COLORS,
   PROCESS_ROLE_LABELS,
   PROCESS_ROLE_COLORS,
+  RULE_KIND_LABELS,
+  RULE_KIND_COLORS,
 } from "@/lib/constants"
 import type { ComponentWithSha } from "@/lib/types"
 import {
@@ -124,6 +126,7 @@ export default function ComponentDetailPage() {
     | "overview"
     | "technical"
     | "business"
+    | "rules"
     | "blast-radius"
     | "documentation"
     | "diagrams"
@@ -638,6 +641,7 @@ export default function ComponentDetailPage() {
               { id: "overview", label: "Overview" },
               { id: "technical", label: "Technical" },
               { id: "business", label: "Business" },
+              { id: "rules", label: "Rules & Calculations" },
               { id: "blast-radius", label: "Blast Radius" },
               { id: "documentation", label: "Documentation" },
               { id: "diagrams", label: "Diagrams" },
@@ -700,6 +704,139 @@ export default function ComponentDetailPage() {
             )}
           </Card>
         </>
+      )}
+
+      {/* RULES & CALCULATIONS TAB */}
+      {tab === "rules" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              Rules &amp; Calculations
+              <Tooltip>
+                <TooltipTrigger className="cursor-help">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-sm text-left">
+                  <p className="font-semibold mb-1">Business logic this component implements:</p>
+                  <ul className="text-xs space-y-0.5">
+                    <li><strong>Formula</strong> — a calculation or expression</li>
+                    <li><strong>Rule</strong> — Given / When / Then behavior</li>
+                    <li><strong>Constraint</strong> — invariant that must always hold</li>
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Calculations, behavioral rules and invariants. Owners can capture
+              the &quot;what does this component actually do&quot; logic without
+              digging into source code.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {(!component.rules || component.rules.length === 0) ? (
+              <div className="text-sm text-muted-foreground py-4 text-center">
+                No rules defined.{" "}
+                <Link
+                  href={`/edit/${component.id}`}
+                  className="text-blue-700 hover:underline"
+                >
+                  Add the first rule in Edit
+                </Link>
+                .
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {component.rules.map((rule, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-md border p-4 ${
+                      rule.kind === "constraint"
+                        ? "border-red-200 bg-red-50/40"
+                        : rule.kind === "rule"
+                        ? "border-emerald-200 bg-emerald-50/30"
+                        : "border-blue-200 bg-blue-50/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] uppercase tracking-wider ${
+                          RULE_KIND_COLORS[rule.kind] || ""
+                        }`}
+                      >
+                        {RULE_KIND_LABELS[rule.kind] || rule.kind}
+                      </Badge>
+                      <h3 className="font-semibold text-sm">{rule.name}</h3>
+                    </div>
+                    {rule.summary && (
+                      <p className="text-sm text-foreground/80 mb-3">
+                        {rule.summary}
+                      </p>
+                    )}
+
+                    {rule.kind === "formula" && rule.formula && (
+                      <pre className="bg-white border rounded-md p-3 text-xs font-mono overflow-x-auto">
+                        {rule.formula}
+                      </pre>
+                    )}
+
+                    {rule.kind === "rule" && (rule.given || rule.when || rule.then) && (
+                      <div className="space-y-1.5 bg-white border rounded-md p-3 text-sm">
+                        {rule.given && (
+                          <div className="flex gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 w-12 pt-0.5 shrink-0">
+                              Given
+                            </span>
+                            <span className="text-foreground/90">{rule.given}</span>
+                          </div>
+                        )}
+                        {rule.when && (
+                          <div className="flex gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 w-12 pt-0.5 shrink-0">
+                              When
+                            </span>
+                            <span className="text-foreground/90">{rule.when}</span>
+                          </div>
+                        )}
+                        {rule.then && (
+                          <div className="flex gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 w-12 pt-0.5 shrink-0">
+                              Then
+                            </span>
+                            <span className="text-foreground/90">{rule.then}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {rule.kind === "constraint" && rule.enforced_in && rule.enforced_in.length > 0 && (
+                      <div className="text-xs text-muted-foreground mt-2 flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-red-700">
+                          Enforced in
+                        </span>
+                        {rule.enforced_in.map((id) => (
+                          <Link
+                            key={id}
+                            href={`/component/${id}`}
+                            className="font-mono text-blue-700 hover:underline"
+                          >
+                            {id}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+
+                    {rule.description && (
+                      <p className="text-xs text-muted-foreground mt-3 whitespace-pre-line">
+                        {rule.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* BLAST RADIUS TAB */}

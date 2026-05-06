@@ -22,6 +22,7 @@ import type {
   CapabilityRole,
   DataKind,
   ProcessRole,
+  RuleKind,
 } from "./types"
 
 export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
@@ -281,6 +282,26 @@ export const PROCESS_ROLE_COLORS: Record<ProcessRole, string> = {
   participant: "bg-green-100 text-green-800 border-green-300",
   listener: "bg-gray-100 text-gray-800 border-gray-300",
   trigger: "bg-amber-100 text-amber-800 border-amber-300",
+}
+
+export const RULE_KINDS: RuleKind[] = ["formula", "rule", "constraint"]
+
+export const RULE_KIND_LABELS: Record<RuleKind, string> = {
+  formula: "Formula",
+  rule: "Rule",
+  constraint: "Constraint",
+}
+
+export const RULE_KIND_COLORS: Record<RuleKind, string> = {
+  formula: "bg-blue-100 text-blue-800 border-blue-300",
+  rule: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  constraint: "bg-red-100 text-red-800 border-red-300",
+}
+
+export const RULE_KIND_HINTS: Record<RuleKind, string> = {
+  formula: "A calculation or expression — e.g. premium = baseRate * (1 + riskFactor)",
+  rule: "A behavior expressed as Given / When / Then — e.g. when payment is late, cancel order",
+  constraint: "An invariant that must always hold — e.g. order total must equal sum of line items",
 }
 
 // Colors matching Draw.io library export (drawio.ts typeStyles)

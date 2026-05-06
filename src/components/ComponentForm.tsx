@@ -34,6 +34,9 @@ import {
   DATA_KIND_LABELS,
   PROCESS_ROLES,
   PROCESS_ROLE_LABELS,
+  RULE_KINDS,
+  RULE_KIND_LABELS,
+  RULE_KIND_HINTS,
 } from "@/lib/constants"
 import type {
   Component,
@@ -47,6 +50,8 @@ import type {
   ComponentData,
   ComponentProcess,
   ProcessRole,
+  ComponentRule,
+  RuleKind,
 } from "@/lib/types"
 import { Plus, Trash2, Save, Loader2, Info } from "lucide-react"
 import {
@@ -93,6 +98,12 @@ const emptyProcess: ComponentProcess = {
   description: "",
 }
 
+const emptyRule: ComponentRule = {
+  name: "",
+  kind: "formula",
+  summary: "",
+}
+
 export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -114,6 +125,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     capabilities: [],
     data: undefined,
     processes: [],
+    rules: [],
     nfr: {},
     ...(initialData || {}),
   })
@@ -132,6 +144,18 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     initialData?.data?.outputs?.forEach((item, i) => {
       if (item.consumers && item.consumers.length > 0) {
         initial[i] = item.consumers.join(", ")
+      }
+    })
+    return initial
+  })
+  // Per-rule-row "enforced_in" string input for constraint kind.
+  const [ruleEnforcedInput, setRuleEnforcedInput] = useState<
+    Record<number, string>
+  >(() => {
+    const initial: Record<number, string> = {}
+    initialData?.rules?.forEach((rule, i) => {
+      if (rule.enforced_in && rule.enforced_in.length > 0) {
+        initial[i] = rule.enforced_in.join(", ")
       }
     })
     return initial
@@ -254,6 +278,35 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
     }))
   }
 
+  const updateRule = (
+    index: number,
+    field: keyof ComponentRule,
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      rules: (prev.rules || []).map((r, i) =>
+        i === index ? { ...r, [field]: value } : r
+      ),
+    }))
+  }
+
+  const removeRule = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      rules: (prev.rules || []).filter((_, i) => i !== index),
+    }))
+    setRuleEnforcedInput((prev) => {
+      const next: Record<number, string> = {}
+      Object.entries(prev).forEach(([k, v]) => {
+        const i = Number(k)
+        if (i < index) next[i] = v
+        else if (i > index) next[i - 1] = v
+      })
+      return next
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -331,6 +384,36 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
           : {}),
       }))
 
+    // Clean rules: drop rows with empty name; only keep fields relevant to kind.
+    const cleanRules: ComponentRule[] = (form.rules || [])
+      .map((r, i) => {
+        const name = r.name?.trim() || ""
+        if (!name) return null
+        const out: ComponentRule = { name, kind: r.kind }
+        if (r.summary && r.summary.trim()) out.summary = r.summary.trim()
+        if (r.description && r.description.trim()) out.description = r.description.trim()
+        if (r.kind === "formula" && r.formula && r.formula.trim()) {
+          out.formula = r.formula.trim()
+        }
+        if (r.kind === "rule") {
+          if (r.given && r.given.trim()) out.given = r.given.trim()
+          if (r.when && r.when.trim()) out.when = r.when.trim()
+          if (r.then && r.then.trim()) out.then = r.then.trim()
+        }
+        if (r.kind === "constraint") {
+          const raw = ruleEnforcedInput[i]
+          if (raw && raw.trim()) {
+            const ids = raw
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+            if (ids.length > 0) out.enforced_in = ids
+          }
+        }
+        return out
+      })
+      .filter((x): x is ComponentRule => x !== null)
+
     const component: Component = {
       ...form,
       tags: tagsInput
@@ -346,6 +429,7 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
       business_capabilities: undefined,
       data: hasData ? cleanData : undefined,
       processes: cleanProcesses.length > 0 ? cleanProcesses : undefined,
+      rules: cleanRules.length > 0 ? cleanRules : undefined,
       nfr: hasNfr ? (cleanNfr as ComponentNFR) : undefined,
     }
 
@@ -1166,6 +1250,142 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
           >
             <Plus className="h-4 w-4 mr-1" />
             Add process
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Rules & Calculations */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Rules &amp; Calculations
+            <Tooltip>
+              <TooltipTrigger className="cursor-help">
+                <Info className="h-4 w-4 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-sm text-left">
+                <p className="font-semibold mb-1">Business logic this component implements:</p>
+                <ul className="text-xs space-y-0.5">
+                  <li><strong>Formula</strong> — a calculation, e.g. <code>premium = base * (1 + risk)</code></li>
+                  <li><strong>Rule</strong> — Given / When / Then behavior</li>
+                  <li><strong>Constraint</strong> — invariant that must always hold</li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(form.rules || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No rules defined.</p>
+          ) : (
+            (form.rules || []).map((r, i) => (
+              <div
+                key={i}
+                className="rounded-md border bg-muted/20 p-3 space-y-2"
+              >
+                <div className="grid grid-cols-[1.4fr,auto,auto] gap-2 items-start">
+                  <Input
+                    placeholder="Rule name (e.g. Premium calculation)"
+                    value={r.name}
+                    onChange={(e) => updateRule(i, "name", e.target.value)}
+                    className="h-9"
+                  />
+                  <Select
+                    value={r.kind}
+                    onValueChange={(v) => updateRule(i, "kind", v as RuleKind)}
+                  >
+                    <SelectTrigger className="h-9 w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RULE_KINDS.map((k) => (
+                        <SelectItem key={k} value={k}>
+                          {RULE_KIND_LABELS[k]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => removeRule(i)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground italic">
+                  {RULE_KIND_HINTS[r.kind]}
+                </p>
+                <Input
+                  placeholder="Summary (one line)"
+                  value={r.summary || ""}
+                  onChange={(e) => updateRule(i, "summary", e.target.value)}
+                  className="h-9"
+                />
+                {r.kind === "formula" && (
+                  <Input
+                    placeholder="Formula — e.g. premium = baseRate * (1 + riskFactor)"
+                    value={r.formula || ""}
+                    onChange={(e) => updateRule(i, "formula", e.target.value)}
+                    className="h-9 font-mono text-xs"
+                  />
+                )}
+                {r.kind === "rule" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <Input
+                      placeholder="Given (precondition)"
+                      value={r.given || ""}
+                      onChange={(e) => updateRule(i, "given", e.target.value)}
+                      className="h-9"
+                    />
+                    <Input
+                      placeholder="When (trigger)"
+                      value={r.when || ""}
+                      onChange={(e) => updateRule(i, "when", e.target.value)}
+                      className="h-9"
+                    />
+                    <Input
+                      placeholder="Then (outcome)"
+                      value={r.then || ""}
+                      onChange={(e) => updateRule(i, "then", e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                )}
+                {r.kind === "constraint" && (
+                  <Input
+                    placeholder="Enforced in — comma-separated component ids (optional)"
+                    value={ruleEnforcedInput[i] || ""}
+                    onChange={(e) =>
+                      setRuleEnforcedInput((prev) => ({
+                        ...prev,
+                        [i]: e.target.value,
+                      }))
+                    }
+                    className="h-9"
+                  />
+                )}
+                <Textarea
+                  placeholder="Detailed description (optional)"
+                  value={r.description || ""}
+                  onChange={(e) => updateRule(i, "description", e.target.value)}
+                  rows={2}
+                />
+              </div>
+            ))
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              updateField("rules", [...(form.rules || []), { ...emptyRule }])
+            }
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add rule
           </Button>
         </CardContent>
       </Card>

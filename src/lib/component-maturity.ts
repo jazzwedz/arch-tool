@@ -87,6 +87,11 @@ export function computeMaturity(component: Component): MaturityResult {
       label: "Processes",
       filled: (component.processes || []).length > 0,
     },
+    {
+      key: "rules",
+      label: "Rules & calculations",
+      filled: (component.rules || []).length > 0,
+    },
   ]
   const filled = fields.filter((f) => f.filled).length
   const total = fields.length
