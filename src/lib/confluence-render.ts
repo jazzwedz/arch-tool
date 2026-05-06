@@ -9,14 +9,39 @@ const ARCH_TOOL_PUBLIC_URL =
   process.env.ARCH_TOOL_PUBLIC_URL || "https://arch-tool-jaso.up.railway.app"
 
 // Convert markdown produced by /api/generate into Confluence storage XHTML.
+// Confluence Cloud (without a mermaid plugin) renders ```mermaid blocks as
+// raw text — ugly and useless to readers. We strip them before conversion
+// and replace the AI's manual table-of-contents with the native Confluence
+// TOC macro, which auto-builds a clickable navigator from headings.
 export async function markdownToStorage(markdown: string): Promise<string> {
-  const html = await marked.parse(markdown, { async: true, gfm: true, breaks: false })
-  return processCodeBlocks(html as string)
+  const cleaned = stripMermaidBlocks(markdown)
+  const html = await marked.parse(cleaned, { async: true, gfm: true, breaks: false })
+  let storage = processCodeBlocks(html as string)
+  storage = replaceTableOfContents(storage)
+  storage = polishParagraphs(storage)
+  return storage
+}
+
+// Remove ```mermaid ... ``` fenced blocks AND any "leftover" empty paragraph
+// nudges that surrounded them in the AI output (e.g., "Example format:").
+function stripMermaidBlocks(markdown: string): string {
+  let out = markdown
+  // Strip the fenced mermaid blocks themselves.
+  out = out.replace(/```mermaid[\s\S]*?```\s*/gi, "")
+  // Strip prompt-leak phrases that sometimes appear when AI parrots the
+  // instruction template. Keep this surgical to avoid eating real prose.
+  out = out.replace(/^\s*Example format:\s*$/gim, "")
+  out = out.replace(
+    /(?:Include|Add)\s+a\s+mermaid\s+(?:flowchart|diagram|er\s*diagram)[^.\n]*\.?\s*/gi,
+    ""
+  )
+  // Collapse 3+ consecutive blank lines created by the strip.
+  out = out.replace(/\n{3,}/g, "\n\n")
+  return out
 }
 
 // Replace <pre><code class="language-X">...</code></pre> with a Confluence
-// code macro so syntax highlighting works (and mermaid renders if the
-// space has a mermaid plugin or a workspace renderer that consumes it).
+// code macro so syntax highlighting works in Confluence's native renderer.
 function processCodeBlocks(html: string): string {
   return html.replace(
     /<pre><code class="language-([\w+-]+)">([\s\S]*?)<\/code><\/pre>/g,
@@ -29,6 +54,34 @@ function processCodeBlocks(html: string): string {
         `</ac:structured-macro>`
       )
     }
+  )
+}
+
+// Replace the AI's hand-written "## Table of Contents" + numbered list
+// with Confluence's native TOC macro. Cleaner visual, clickable, and
+// auto-stays in sync with H2/H3 headings.
+function replaceTableOfContents(html: string): string {
+  // Match: <h2>Table of Contents</h2> followed by an <ol>/<ul>/<p> block of
+  // chapters. Replace the list with the TOC macro; keep the heading.
+  return html.replace(
+    /<h2[^>]*>\s*Table of Contents\s*<\/h2>\s*(?:<ol[^>]*>[\s\S]*?<\/ol>|<ul[^>]*>[\s\S]*?<\/ul>|<p[^>]*>[\s\S]*?<\/p>)/i,
+    `<h2>Table of Contents</h2>` +
+      `<ac:structured-macro ac:name="toc">` +
+      `<ac:parameter ac:name="minLevel">2</ac:parameter>` +
+      `<ac:parameter ac:name="maxLevel">3</ac:parameter>` +
+      `<ac:parameter ac:name="outline">false</ac:parameter>` +
+      `<ac:parameter ac:name="style">none</ac:parameter>` +
+      `</ac:structured-macro>`
+  )
+}
+
+// Insert a soft <hr/> visual break before every numbered top-level chapter
+// (e.g. "## 1. Version History") so chapters feel like separate sections
+// rather than a single wall of text.
+function polishParagraphs(html: string): string {
+  return html.replace(
+    /(<h2[^>]*>\s*\d+\.\s+[^<]+<\/h2>)/g,
+    (_, heading: string) => `<hr/>${heading}`
   )
 }
 
