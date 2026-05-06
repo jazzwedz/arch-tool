@@ -22,8 +22,10 @@ import type {
   ComponentStatus,
   DataClassification,
   ScalingModel,
+  ComponentRule,
+  RuleKind,
 } from "@/lib/types"
-import { COMPONENT_STATUSES } from "@/lib/constants"
+import { COMPONENT_STATUSES, RULE_KINDS } from "@/lib/constants"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 export const dynamic = "force-dynamic"
@@ -46,8 +48,8 @@ interface PullSmartBody {
   patches?: SmartPatch[]
 }
 
-// Field paths recognised by both proposal and apply phases.
-const ALLOWED_FIELDS = new Set<string>([
+// Scalar field paths recognised by both proposal and apply phases.
+const SCALAR_ALLOWED_FIELDS = new Set<string>([
   "name",
   "status",
   "owner",
@@ -63,6 +65,33 @@ const ALLOWED_FIELDS = new Set<string>([
   "nfr.data_classification",
   "nfr.scaling",
 ])
+
+// Allowed sub-fields on indexed rule paths (rules[N].<field>).
+const ALLOWED_RULE_SUBFIELDS = new Set<string>([
+  "name",
+  "kind",
+  "summary",
+  "description",
+  "formula",
+  "given",
+  "when",
+  "then",
+  "enforced_in",
+])
+
+const RULE_PATH_RE = /^rules\[(\d+)\]\.([a-z_]+)$/
+
+function isAllowedField(field: string): boolean {
+  if (SCALAR_ALLOWED_FIELDS.has(field)) return true
+  const m = field.match(RULE_PATH_RE)
+  if (m && ALLOWED_RULE_SUBFIELDS.has(m[2])) return true
+  return false
+}
+
+// Backwards-compat alias used in places that previously referenced the Set.
+const ALLOWED_FIELDS = {
+  has: isAllowedField,
+}
 
 export async function POST(request: Request) {
   try {
@@ -329,6 +358,19 @@ EDITABLE FIELDS (only propose changes to these — use these exact dot-paths):
 - nfr.data_classification: must be "public", "internal", "confidential", or "restricted"
 - nfr.scaling: must be "horizontal", "vertical", or "none"
 
+INDEXED RULE FIELDS (use the exact 0-based index of the rule as it appears in the YAML's "rules" array):
+- rules[N].name (string)
+- rules[N].kind: must be "formula", "rule", or "constraint"
+- rules[N].summary (string, one-line)
+- rules[N].description (string, may be multi-line; preserve newlines as \\n in the JSON value)
+- rules[N].formula (string — propose only when the existing rule's kind is "formula")
+- rules[N].given (string — propose only when the rule's kind is "rule")
+- rules[N].when (string — propose only when the rule's kind is "rule")
+- rules[N].then (string — propose only when the rule's kind is "rule")
+- rules[N].enforced_in (comma-separated component ids — propose only when the rule's kind is "constraint")
+
+The published Confluence page renders each rule as a coloured panel ("Per-tier rate limit · Formula", "Throttle policy-holders under fraud review · Rule", etc.) below a "Business Rules & Calculations" heading. The order on the page matches the order in the YAML, so rules[0] is the first panel under Formulas, then numbering continues across kinds in YAML order.
+
 RULES:
 - Only propose a change when the page has clear evidence of a value different from the YAML.
 - Do NOT propose unchanged fields.
@@ -408,6 +450,29 @@ async function applyPatches(args: ApplyArgs): Promise<NextResponse> {
         )
       }
     }
+    // Validate indexed rule patches: index in bounds + kind enum.
+    const ruleMatch = p.field.match(RULE_PATH_RE)
+    if (ruleMatch) {
+      const idx = Number(ruleMatch[1])
+      const sub = ruleMatch[2]
+      const rules = component.rules || []
+      if (idx < 0 || idx >= rules.length) {
+        return NextResponse.json(
+          {
+            error: `Rule index out of bounds: ${p.field}. Component has ${rules.length} rules; valid indices are 0..${rules.length - 1}.`,
+          },
+          { status: 400 }
+        )
+      }
+      if (sub === "kind" && p.newValue && !RULE_KINDS.includes(p.newValue as RuleKind)) {
+        return NextResponse.json(
+          {
+            error: `Invalid rule kind "${p.newValue}". Must be one of: ${RULE_KINDS.join(", ")}.`,
+          },
+          { status: 400 }
+        )
+      }
+    }
   }
 
   // Build merged component.
@@ -416,9 +481,34 @@ async function applyPatches(args: ApplyArgs): Promise<NextResponse> {
   // Ensure nested objects exist.
   updated.description = { ...(component.description || { oneliner: "", technical: "", business: "" }) }
   const mergedNfr: ComponentNFR = { ...(component.nfr || {}) }
+  // Deep-clone the rules array so we can mutate per index without aliasing.
+  const mergedRules: ComponentRule[] = (component.rules || []).map((r) => ({ ...r }))
 
   for (const p of patches) {
     const v = p.newValue
+    // Indexed rule patches: rules[N].<field>
+    const ruleMatch = p.field.match(RULE_PATH_RE)
+    if (ruleMatch) {
+      const idx = Number(ruleMatch[1])
+      const sub = ruleMatch[2] as keyof ComponentRule
+      const rule = mergedRules[idx]
+      if (!rule) continue // already validated; defensive
+      if (sub === "enforced_in") {
+        const ids = v
+          ? v.split(",").map((s) => s.trim()).filter(Boolean)
+          : []
+        if (ids.length > 0) rule.enforced_in = ids
+        else delete rule.enforced_in
+      } else if (sub === "kind") {
+        if (v) rule.kind = v as RuleKind
+      } else {
+        // Plain string fields: name, summary, description, formula, given, when, then.
+        const ruleAsRecord = rule as unknown as Record<string, unknown>
+        if (v === "") delete ruleAsRecord[sub as string]
+        else ruleAsRecord[sub as string] = v
+      }
+      continue
+    }
     switch (p.field) {
       case "name":
         updated.name = v
@@ -475,6 +565,12 @@ async function applyPatches(args: ApplyArgs): Promise<NextResponse> {
     updated.nfr = mergedNfr
   } else {
     delete updated.nfr
+  }
+
+  if (mergedRules.length > 0) {
+    updated.rules = mergedRules
+  } else {
+    delete updated.rules
   }
 
   // Strip any leftover sha from spread (already handled but defensive).
