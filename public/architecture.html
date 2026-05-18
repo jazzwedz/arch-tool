@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>arch-tool — Architecture &amp; Migration Plan</title>
+  <title>Retro Team Repository — Architecture Overview</title>
   <style>
     :root {
       --bg: #0f1117;
@@ -30,46 +30,34 @@
       padding: 40px 32px;
       min-height: 100vh;
     }
-    header {
-      text-align: center;
-      margin-bottom: 56px;
-    }
+    header { text-align: center; margin-bottom: 56px; }
     header h1 {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--accent2);
+      font-size: 30px; font-weight: 700; color: var(--accent2);
       letter-spacing: -0.5px;
     }
-    header p {
-      color: var(--muted);
-      margin-top: 6px;
-      font-size: 14px;
+    header .subtitle { color: var(--muted); margin-top: 8px; font-size: 14px; }
+    header .meta {
+      margin-top: 14px; font-size: 11px; color: var(--muted);
+      display: inline-flex; gap: 14px; align-items: center;
+      padding: 6px 14px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 999px;
     }
+    header .meta a { color: #93c5fd; text-decoration: none; }
+    header .meta .sep { color: var(--border); }
 
     .section-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--label);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      font-size: 11px;
-      margin-bottom: 24px;
-      padding-bottom: 10px;
+      font-size: 11px; font-weight: 600; color: var(--label);
+      text-transform: uppercase; letter-spacing: 1.5px;
+      margin-bottom: 24px; padding-bottom: 10px;
       border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      display: flex; align-items: center; gap: 10px;
     }
     .section-title::before {
-      content: '';
-      display: inline-block;
-      width: 3px;
-      height: 14px;
-      background: var(--accent);
+      content: ''; display: inline-block;
+      width: 3px; height: 14px; background: var(--accent);
       border-radius: 2px;
     }
 
-    /* ── DIAGRAM WRAPPER ── */
     .diagram-wrap {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -79,82 +67,34 @@
       overflow-x: auto;
     }
 
-    /* ══════════════════════════════════════════
-       DIAGRAM 1 — TECH STACK (vertical layers)
-    ══════════════════════════════════════════ */
-    .stack {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      max-width: 860px;
-      margin: 0 auto;
-    }
-
-    .layer {
-      display: flex;
-      align-items: stretch;
-      gap: 0;
-      border-radius: 12px;
-      overflow: hidden;
-      min-height: 72px;
-    }
-
+    .stack { display: flex; flex-direction: column; gap: 12px; max-width: 980px; margin: 0 auto; }
+    .layer { display: flex; align-items: stretch; gap: 0; border-radius: 12px; overflow: hidden; min-height: 72px; }
     .layer-label {
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-      transform: rotate(180deg);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: #fff;
-      padding: 12px 10px;
-      min-width: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg);
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      color: #fff; padding: 12px 10px; min-width: 36px;
+      display: flex; align-items: center; justify-content: center;
     }
-
     .layer-content {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 10px;
-      padding: 14px 20px;
-      background: var(--surface2);
+      flex: 1; display: flex; align-items: center; flex-wrap: wrap;
+      gap: 10px; padding: 14px 20px; background: var(--surface2);
     }
-
     .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      border: 1px solid transparent;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 8px;
+      font-size: 13px; font-weight: 500; border: 1px solid transparent;
     }
-    .chip .dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .chip-note {
-      font-size: 10px;
-      color: var(--muted);
-      margin-left: 2px;
-    }
+    .chip .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .chip-note { font-size: 10px; color: var(--muted); margin-left: 2px; }
 
-    /* layer colours */
     .l-client    .layer-label { background: #374151; }
     .l-frontend  .layer-label { background: #1d4ed8; }
     .l-api       .layer-label { background: #0e7490; }
     .l-data      .layer-label { background: #15803d; }
     .l-ai        .layer-label { background: #7c3aed; }
+    .l-ext       .layer-label { background: #be185d; }
     .l-infra     .layer-label { background: #b45309; }
 
-    /* chip styles */
     .chip-blue   { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
     .chip-blue   .dot { background: #3b82f6; }
     .chip-cyan   { background: #0c3344; border-color: #06b6d4; color: #67e8f9; }
@@ -171,204 +111,141 @@
     .chip-pink   .dot { background: #ec4899; }
     .chip-yellow { background: #3b2504; border-color: #f59e0b; color: #fcd34d; }
     .chip-yellow .dot { background: #f59e0b; }
+    .chip-red    { background: #450a0a; border-color: #ef4444; color: #fca5a5; }
+    .chip-red    .dot { background: #ef4444; }
 
-    /* arrows between layers */
-    .layer-arrow {
-      text-align: center;
-      color: var(--muted);
-      font-size: 18px;
-      line-height: 1;
-      margin: -4px 0;
-    }
+    .layer-arrow { text-align: center; color: var(--muted); font-size: 18px; line-height: 1; margin: -4px 0; }
 
-    /* ══════════════════════════════════════════
-       DIAGRAM 2 — APP / COMPONENT
-    ══════════════════════════════════════════ */
-    .app-diagram {
+    .app-grid {
       display: grid;
-      grid-template-columns: 220px 1fr 200px;
-      grid-template-rows: auto auto auto;
-      gap: 0;
-      max-width: 960px;
-      margin: 0 auto;
-      position: relative;
+      grid-template-columns: 240px 1fr 240px;
+      gap: 16px;
+      max-width: 1100px; margin: 0 auto;
     }
-
     .box {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 16px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
     }
     .box-title {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1.2px;
-      color: var(--muted);
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px;
+      color: var(--muted); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
     }
     .box-title .badge {
-      font-size: 9px;
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-weight: 600;
+      font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600;
+      background: #1e3a5f; color: #93c5fd;
     }
-
     .route-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 5px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 12px;
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px;
     }
     .route-item:last-child { border-bottom: none; }
     .method {
-      font-size: 9px;
-      font-weight: 700;
-      padding: 2px 5px;
-      border-radius: 3px;
-      flex-shrink: 0;
-      margin-top: 1px;
+      font-size: 9px; font-weight: 700; padding: 2px 5px;
+      border-radius: 3px; flex-shrink: 0; margin-top: 1px;
     }
     .GET    { background: #14532d; color: #86efac; }
     .POST   { background: #1e3a5f; color: #93c5fd; }
-    .route-path { font-family: 'Consolas', monospace; color: var(--label); flex: 1; }
+    .PUT    { background: #431407; color: #fdba74; }
+    .DELETE { background: #450a0a; color: #fca5a5; }
+    .route-path { font-family: 'Consolas', monospace; color: var(--label); flex: 1; word-break: break-all; }
     .route-desc { color: var(--muted); font-size: 11px; }
 
-    .lib-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 5px 0;
-      font-size: 12px;
-      border-bottom: 1px solid var(--border);
-    }
-    .lib-item:last-child { border-bottom: none; }
-    .lib-file { font-family: 'Consolas', monospace; color: var(--cyan); }
-    .lib-desc { color: var(--muted); font-size: 11px; }
-
-    /* grid layout for app diagram */
-    .col-pages   { grid-column: 1; grid-row: 1 / 4; margin-right: 16px; }
-    .col-api     { grid-column: 2; grid-row: 1; margin-bottom: 12px; }
-    .col-lib     { grid-column: 2; grid-row: 2; margin-bottom: 12px; }
-    .col-types   { grid-column: 2; grid-row: 3; }
-    .col-ext     { grid-column: 3; grid-row: 1 / 4; margin-left: 16px; }
-
-    .ext-service {
-      padding: 10px 12px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      font-size: 12px;
-    }
+    .ext-service { padding: 12px 14px; border-radius: 8px; margin-bottom: 10px; font-size: 12px; }
     .ext-service:last-child { margin-bottom: 0; }
-    .ext-title {
-      font-weight: 600;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .ext-detail { font-size: 11px; color: var(--muted); }
+    .ext-title { font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .ext-detail { font-size: 11px; color: var(--muted); line-height: 1.6; }
+    .ext-github  { background: #1f2937; border: 1px solid #374151; }
+    .ext-ai      { background: #1a0b2e; border: 1px solid #6d28d9; }
+    .ext-confl   { background: #0c2340; border: 1px solid #1d4ed8; }
+    .ext-drawio  { background: #1a1000; border: 1px solid #92400e; }
+    .ext-deploy  { background: #261605; border: 1px solid #b45309; }
 
-    .ext-github { background: #1f2937; border: 1px solid #374151; }
-    .ext-n8n    { background: #1a1040; border: 1px solid #4c1d95; }
-    .ext-ai     { background: #1a0b2e; border: 1px solid #6d28d9; }
-    .ext-drawio { background: #1a1000; border: 1px solid #92400e; }
-    .ext-deploy { background: #0c2340; border: 1px solid #1d4ed8; }
-
-    /* n8n internal flow */
-    .n8n-flow {
-      margin-top: 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-    .n8n-step {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 10px;
-      color: #a78bfa;
-    }
-    .n8n-arrow { color: var(--muted); }
-
-    /* connector arrows (SVG overlay) */
-    .conn-label {
-      font-size: 10px;
-      color: var(--muted);
-      background: var(--surface);
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
-
-    /* model entities */
-    .model-section { margin-top: 8px; }
-    .model-title {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-    .model-fields {
-      font-family: 'Consolas', monospace;
-      font-size: 11px;
-      color: var(--label);
-      line-height: 1.7;
-    }
+    .model-fields { font-family: 'Consolas', monospace; font-size: 11px; color: var(--label); line-height: 1.85; }
     .field-type { color: var(--cyan); }
     .field-opt  { color: var(--muted); }
+    .field-key  { color: var(--accent2); }
 
-    /* legend */
+    .tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .tab {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px; padding: 14px 16px;
+    }
+    .tab-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .tab-desc { font-size: 12px; color: var(--muted); line-height: 1.55; }
+    .tab-tag {
+      display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+    }
+    .t-dev { background: #1e3a5f; color: #93c5fd; }
+    .t-ba  { background: #14532d; color: #86efac; }
+    .t-all { background: #2e1065; color: #c4b5fd; }
+    .t-ops { background: #431407; color: #fdba74; }
+
+    .features { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .feature {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+    }
+    .feature-head { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+    .feature-icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+    .feature-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .feature-tag { font-size: 9px; color: var(--muted); margin-top: 2px; }
+    .feature-body { font-size: 12px; color: var(--muted); line-height: 1.65; }
+
+    .env-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .env-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px;
+    }
+    .env-card h4 { font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--accent2); }
+    .env-var { font-family: 'Consolas', monospace; font-size: 11px; color: var(--label); line-height: 1.8; }
+    .env-var .name { color: #fcd34d; }
+
+    .port-callout {
+      background: linear-gradient(135deg, #1a1040 0%, #0c2340 100%);
+      border: 1px solid var(--accent);
+      border-radius: 12px; padding: 24px; margin-bottom: 24px;
+    }
+    .port-phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+    .port-phase {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px;
+    }
+    .port-phase-name { font-size: 13px; font-weight: 700; color: var(--accent2); margin-bottom: 4px; }
+    .port-phase-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
     .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      margin-top: 24px;
-      padding-top: 16px;
+      display: flex; flex-wrap: wrap; gap: 16px;
+      margin-top: 24px; padding-top: 16px;
       border-top: 1px solid var(--border);
     }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .legend-line {
-      width: 24px;
-      height: 2px;
-      border-radius: 1px;
-    }
-    .legend-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
     .icon { font-size: 14px; }
+    code { font-family: 'Consolas', monospace; font-size: 11px; color: var(--cyan); }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>arch-tool — Architecture &amp; Migration Plan</h1>
-  <p>Tech Stack · App/Component Architecture · Enterprise Migration Plan · Deployment Requirements</p>
+  <h1>Retro Team Repository — Architecture Overview</h1>
+  <div class="subtitle">Tech Stack · App Map · Component Model · Feature Tabs · Confluence Integration · Deployment · Port to Corp</div>
+  <div class="meta">
+    <span>App: <a href="https://arch-tool-jaso.up.railway.app/">arch-tool-jaso.up.railway.app</a></span>
+    <span class="sep">·</span>
+    <span>Code: <a href="https://github.com/jazzwedz/arch-tool">jazzwedz/arch-tool</a></span>
+    <span class="sep">·</span>
+    <span>Data: <a href="https://github.com/jazzwedz/arch-data">jazzwedz/arch-data</a></span>
+  </div>
 </header>
 
-<!-- ══════════════════════════════════════
-     DIAGRAM 1 — TECH STACK
-══════════════════════════════════════ -->
 <div class="section-title">Diagram 1 — Tech Stack</div>
 <div class="diagram-wrap">
   <div class="stack">
 
-    <!-- CLIENT -->
     <div class="layer l-client">
       <div class="layer-label">Client</div>
       <div class="layer-content">
@@ -377,873 +254,491 @@
         <span class="chip chip-gray"><span class="dot"></span>React Client Components <span class="chip-note">'use client'</span></span>
       </div>
     </div>
-
     <div class="layer-arrow">↕</div>
 
-    <!-- FRONTEND -->
     <div class="layer l-frontend">
       <div class="layer-label">Frontend</div>
       <div class="layer-content">
-        <span class="chip chip-blue"><span class="dot"></span>Next.js 14 <span class="chip-note">App Router</span></span>
-        <span class="chip chip-blue"><span class="dot"></span>TypeScript</span>
-        <span class="chip chip-cyan"><span class="dot"></span>Tailwind CSS</span>
-        <span class="chip chip-cyan"><span class="dot"></span>shadcn/ui <span class="chip-note">optional</span></span>
+        <span class="chip chip-blue"><span class="dot"></span>Next.js 14.2 <span class="chip-note">App Router</span></span>
+        <span class="chip chip-blue"><span class="dot"></span>TypeScript 5</span>
+        <span class="chip chip-cyan"><span class="dot"></span>Tailwind CSS 3.4</span>
+        <span class="chip chip-cyan"><span class="dot"></span>shadcn/ui</span>
+        <span class="chip chip-cyan"><span class="dot"></span>Radix UI</span>
+        <span class="chip chip-cyan"><span class="dot"></span>lucide-react</span>
         <span class="chip chip-blue"><span class="dot"></span>js-yaml</span>
+        <span class="chip chip-pink"><span class="dot"></span>mermaid 11</span>
+        <span class="chip chip-pink"><span class="dot"></span>marked</span>
+        <span class="chip chip-pink"><span class="dot"></span>react-markdown <span class="chip-note">+ remark-gfm</span></span>
       </div>
     </div>
-
     <div class="layer-arrow">↕</div>
 
-    <!-- API -->
     <div class="layer l-api">
       <div class="layer-label">API</div>
       <div class="layer-content">
-        <span class="chip chip-cyan"><span class="dot"></span>Next.js API Routes <span class="chip-note">Route Handlers</span></span>
-        <span class="chip chip-cyan"><span class="dot"></span>GET /api/components</span>
-        <span class="chip chip-cyan"><span class="dot"></span>POST /api/components</span>
-        <span class="chip chip-cyan"><span class="dot"></span>POST /api/generate</span>
-        <span class="chip chip-cyan"><span class="dot"></span>GET /api/export/drawio</span>
+        <span class="chip chip-cyan"><span class="dot"></span>Next.js Route Handlers</span>
+        <span class="chip chip-cyan"><span class="dot"></span>middleware.ts <span class="chip-note">password gate + CSRF</span></span>
+        <span class="chip chip-cyan"><span class="dot"></span>Rate limit <span class="chip-note">in-memory 5/min/IP</span></span>
       </div>
     </div>
-
     <div class="layer-arrow">↕</div>
 
-    <!-- DATA -->
     <div class="layer l-data">
       <div class="layer-label">Data</div>
       <div class="layer-content">
-        <span class="chip chip-green"><span class="dot"></span>GitHub API <span class="chip-note">REST v3</span></span>
+        <span class="chip chip-green"><span class="dot"></span>octokit 5 <span class="chip-note">GitHub REST + git trees</span></span>
         <span class="chip chip-green"><span class="dot"></span>arch-data repo <span class="chip-note">jazzwedz/arch-data</span></span>
         <span class="chip chip-green"><span class="dot"></span>YAML per component <span class="chip-note">/components/{id}.yaml</span></span>
+        <span class="chip chip-green"><span class="dot"></span>Drawio diagrams <span class="chip-note">/diagrams/{name}.drawio</span></span>
+        <span class="chip chip-green"><span class="dot"></span>Confluence link side-files <span class="chip-note">/confluence-links/{id}.json</span></span>
         <span class="chip chip-gray"><span class="dot"></span>No DB — Git as storage</span>
       </div>
     </div>
-
     <div class="layer-arrow">↕</div>
 
-    <!-- AI / AUTOMATION -->
     <div class="layer l-ai">
-      <div class="layer-label">AI / Auto</div>
+      <div class="layer-label">AI</div>
       <div class="layer-content">
-        <span class="chip chip-purple"><span class="dot"></span>n8n <span class="chip-note">staging.railway.app</span></span>
-        <span class="chip chip-purple"><span class="dot"></span>Webhook <span class="chip-note">POST /arch-doc-gen</span></span>
-        <span class="chip chip-purple"><span class="dot"></span>Basic LLM Chain</span>
-        <span class="chip chip-pink"><span class="dot"></span>Anthropic Claude <span class="chip-note">claude-sonnet-4-5</span></span>
-        <span class="chip chip-gray"><span class="dot"></span>Header Auth <span class="chip-note">X-N8N-Webhook-Secret</span></span>
+        <span class="chip chip-purple"><span class="dot"></span>@anthropic-ai/sdk 0.80</span>
+        <span class="chip chip-pink"><span class="dot"></span>Claude Sonnet 4 <span class="chip-note">claude-sonnet-4-20250514</span></span>
+        <span class="chip chip-purple"><span class="dot"></span>Use cases <span class="chip-note">Generate · Blast Radius memo · Pull-smart scan</span></span>
       </div>
     </div>
-
     <div class="layer-arrow">↕</div>
 
-    <!-- INFRA -->
+    <div class="layer l-ext">
+      <div class="layer-label">External</div>
+      <div class="layer-content">
+        <span class="chip chip-blue"><span class="dot"></span>Atlassian Cloud Confluence <span class="chip-note">REST v2</span></span>
+        <span class="chip chip-yellow"><span class="dot"></span>Draw.io <span class="chip-note">mxlibrary XML export</span></span>
+      </div>
+    </div>
+    <div class="layer-arrow">↕</div>
+
     <div class="layer l-infra">
       <div class="layer-label">Infra</div>
       <div class="layer-content">
-        <span class="chip chip-orange"><span class="dot"></span>Railway <span class="chip-note">arch-tool-production</span></span>
+        <span class="chip chip-orange"><span class="dot"></span>Railway <span class="chip-note">arch-tool service</span></span>
         <span class="chip chip-orange"><span class="dot"></span>GitHub <span class="chip-note">jazzwedz/arch-tool</span></span>
-        <span class="chip chip-yellow"><span class="dot"></span>Draw.io <span class="chip-note">mxlibrary export</span></span>
-        <span class="chip chip-gray"><span class="dot"></span>Env Vars <span class="chip-note">GITHUB_TOKEN · N8N_ARCH_WEBHOOK_URL</span></span>
+        <span class="chip chip-gray"><span class="dot"></span>Env vars <span class="chip-note">see Deployment</span></span>
       </div>
     </div>
 
-  </div><!-- .stack -->
-</div><!-- .diagram-wrap -->
+  </div>
+</div>
 
-
-<!-- ══════════════════════════════════════
-     DIAGRAM 2 — APP / COMPONENT
-══════════════════════════════════════ -->
-<div class="section-title">Diagram 2 — App / Component Architecture</div>
+<div class="section-title">Diagram 2 — App Map (Routes · API · Integrations)</div>
 <div class="diagram-wrap">
-  <div class="app-diagram">
+  <div class="app-grid">
 
-    <!-- PAGES (left column) -->
-    <div class="box col-pages">
-      <div class="box-title">
-        <span class="icon">🖥</span> Pages / Routes
-        <span class="badge" style="background:#1e3a5f;color:#93c5fd">Next.js App Router</span>
-      </div>
-
-      <div class="route-item">
-        <span class="method GET">GET</span>
-        <div>
-          <div class="route-path">/</div>
-          <div class="route-desc">Dashboard — zoznam komponentov</div>
-        </div>
-      </div>
-      <div class="route-item">
-        <span class="method GET">GET</span>
-        <div>
-          <div class="route-path">/components/[id]</div>
-          <div class="route-desc">Detail komponentu, generovanie doc</div>
-        </div>
-      </div>
-
-      <div class="box-title" style="margin-top:18px">
-        <span class="icon">⚡</span> API Route Handlers
-      </div>
-
-      <div class="route-item">
-        <span class="method GET">GET</span>
-        <div>
-          <div class="route-path">/api/components</div>
-          <div class="route-desc">Načítaj všetky z GitHub</div>
-        </div>
-      </div>
-      <div class="route-item">
-        <span class="method POST">POST</span>
-        <div>
-          <div class="route-path">/api/components</div>
-          <div class="route-desc">Vytvor nový komponent</div>
-        </div>
-      </div>
-      <div class="route-item">
-        <span class="method GET">GET</span>
-        <div>
-          <div class="route-path">/api/components/[id]</div>
-          <div class="route-desc">Načítaj jeden komponent</div>
-        </div>
-      </div>
-      <div class="route-item">
-        <span class="method POST">POST</span>
-        <div>
-          <div class="route-path">/api/generate</div>
-          <div class="route-desc">Volá n8n webhook → AI doc</div>
-        </div>
-      </div>
-      <div class="route-item">
-        <span class="method GET">GET</span>
-        <div>
-          <div class="route-path">/api/export/drawio</div>
-          <div class="route-desc">Generuj .drawio mxlibrary XML</div>
-        </div>
-      </div>
+    <div class="box">
+      <div class="box-title"><span class="icon">🖥</span> Pages <span class="badge">App Router</span></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/login</div><div class="route-desc">Password gate</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/</div><div class="route-desc">Catalog (cards / tiles / list)</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/component/[id]</div><div class="route-desc">Detail — 7 tabs</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/edit/[id]</div><div class="route-desc">Edit component form</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/new</div><div class="route-desc">Create component</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/diagrams</div><div class="route-desc">Diagram list + preview</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/diagrams/builder</div><div class="route-desc">WYSIWYG drawio builder</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/generate</div><div class="route-desc">Diagram-level doc gen</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/export</div><div class="route-desc">Drawio library guide</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/architecture.html</div><div class="route-desc">This page</div></div></div>
     </div>
 
-    <!-- API / LIB / TYPES (centre column) -->
-    <div class="box col-api">
-      <div class="box-title"><span class="icon">📦</span> Lib / Utilities</div>
-
-      <div class="lib-item">
-        <span class="lib-file">lib/github.ts</span>
-        <span class="lib-desc">GitHub API client — read/write YAML</span>
-      </div>
-      <div class="lib-item">
-        <span class="lib-file">lib/drawio.ts</span>
-        <span class="lib-desc">mxlibrary XML generator</span>
-      </div>
-      <div class="lib-item">
-        <span class="lib-file">lib/types.ts</span>
-        <span class="lib-desc">Shared TypeScript interfaces</span>
-      </div>
-      <div class="lib-item">
-        <span class="lib-file">lib/constants.ts</span>
-        <span class="lib-desc">Typy, farby, ikony komponentov</span>
-      </div>
-      <div class="lib-item">
-        <span class="lib-file">lib/utils.ts</span>
-        <span class="lib-desc">Helper funkcie</span>
-      </div>
+    <div class="box">
+      <div class="box-title"><span class="icon">⚡</span> API Route Handlers</div>
+      <div class="route-item"><span class="method POST">POST</span><div><div class="route-path">/api/auth/login</div><div class="route-desc">Password → cookie</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/api/components</div><div class="route-desc">List all</div></div></div>
+      <div class="route-item"><span class="method POST">POST</span><div><div class="route-path">/api/components</div><div class="route-desc">Create</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/api/components/[id]</div><div class="route-desc">Read</div></div></div>
+      <div class="route-item"><span class="method PUT">PUT</span><div><div class="route-path">/api/components/[id]</div><div class="route-desc">Update</div></div></div>
+      <div class="route-item"><span class="method DELETE">DELETE</span><div><div class="route-path">/api/components/[id]</div><div class="route-desc">Delete</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/api/components/[id]/history</div><div class="route-desc">Git commit log</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/api/components/[id]/diagrams</div><div class="route-desc">Refs from diagrams</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/api/components/[id]/blast-radius</div><div class="route-desc">Reverse-graph BFS</div></div></div>
+      <div class="route-item"><span class="method POST">POST</span><div><div class="route-path">/api/components/[id]/blast-radius/memo</div><div class="route-desc">AI Impact Memo</div></div></div>
+      <div class="route-item"><span class="method POST">POST</span><div><div class="route-path">/api/generate</div><div class="route-desc">AI doc (audience / doctype)</div></div></div>
+      <div class="route-item"><span class="method POST">POST</span><div><div class="route-path">/api/confluence/publish</div><div class="route-desc">Render + publish page</div></div></div>
+      <div class="route-item"><span class="method POST">POST</span><div><div class="route-path">/api/confluence/pull-smart</div><div class="route-desc">AI scan → patches</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/api/confluence/status</div><div class="route-desc">Per-component sync state</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/api/diagrams · /[name] · /preview</div><div class="route-desc">CRUD + render</div></div></div>
+      <div class="route-item"><span class="method GET">GET</span><div><div class="route-path">/api/export/drawio</div><div class="route-desc">mxlibrary XML</div></div></div>
     </div>
 
-    <div class="box col-lib">
-      <div class="box-title"><span class="icon">🔷</span> Dátový model — Component</div>
-      <div class="model-fields">
-        <div><span style="color:var(--accent2)">id</span>: <span class="field-type">string</span></div>
-        <div><span style="color:var(--accent2)">name</span>: <span class="field-type">string</span></div>
-        <div><span style="color:var(--accent2)">type</span>: <span class="field-type">ComponentType</span> <span class="field-opt">// microservice | frontend | db | ...</span></div>
-        <div><span style="color:var(--accent2)">status</span>: <span class="field-type">ComponentStatus</span> <span class="field-opt">// draft | production | deprecated</span></div>
-        <div><span style="color:var(--accent2)">owner</span>: <span class="field-type">string</span></div>
-        <div><span style="color:var(--accent2)">description</span>: <span class="field-type">ComponentDescription</span> <span class="field-opt">// oneliner | technical | business</span></div>
-        <div><span style="color:var(--accent2)">interfaces</span>: <span class="field-type">ComponentInterface[]</span> <span class="field-opt">// provides/consumes, type, target</span></div>
-        <div><span style="color:var(--accent2)">dependencies</span>: <span class="field-type">ComponentDependency[]</span></div>
-        <div><span style="color:var(--accent2)">tags</span>: <span class="field-type">string[]</span></div>
-        <div><span style="color:var(--accent2)">risks</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>
-        <div><span style="color:var(--accent2)">diagram</span>: <span class="field-type">ComponentDiagram</span> <span class="field-opt">? // color, shape</span></div>
-      </div>
-    </div>
-
-    <div class="box col-types">
-      <div class="box-title"><span class="icon">💾</span> Storage — GitHub (arch-data)</div>
-      <div style="font-family:Consolas,monospace;font-size:11px;color:var(--label);line-height:1.8">
-        <div>📁 arch-data/</div>
-        <div style="padding-left:16px">📁 components/</div>
-        <div style="padding-left:32px">📄 <span style="color:var(--cyan)">{id}.yaml</span> <span style="color:var(--muted)">← jeden komponent</span></div>
-        <div style="padding-left:32px">📄 <span style="color:var(--cyan)">{id}.yaml</span></div>
-        <div style="padding-left:32px">📄 <span style="color:var(--muted)">...</span></div>
-      </div>
-    </div>
-
-    <!-- EXTERNAL (right column) -->
-    <div class="col-ext">
+    <div>
       <div class="ext-service ext-github">
-        <div class="ext-title">
-          <span>🐙</span> GitHub API
-        </div>
+        <div class="ext-title"><span>🐙</span> GitHub (arch-data)</div>
         <div class="ext-detail">
           repo: jazzwedz/arch-data<br>
           branch: main<br>
-          auth: GITHUB_TOKEN<br>
-          format: YAML per file
-        </div>
-      </div>
-
-      <div class="ext-service ext-n8n">
-        <div class="ext-title">
-          <span>⚙️</span> n8n Workflow
-        </div>
-        <div class="ext-detail">
-          n8n-staging-5eae.up.railway.app<br>
-          POST /webhook/arch-doc-gen<br>
-          auth: X-N8N-Webhook-Secret
-        </div>
-        <div class="n8n-flow">
-          <div class="n8n-step">🔗 Webhook trigger</div>
-          <div class="n8n-step"><span class="n8n-arrow">↓</span> Basic LLM Chain</div>
-          <div class="n8n-step"><span class="n8n-arrow">↓</span> Code (JSON parse)</div>
-          <div class="n8n-step"><span class="n8n-arrow">↓</span> Respond to Webhook</div>
+          auth: GITHUB_TOKEN (PAT)<br>
+          format: YAML per file<br>
+          structure: components/ · diagrams/ · confluence-links/
         </div>
       </div>
 
       <div class="ext-service ext-ai">
-        <div class="ext-title">
-          <span>🤖</span> Anthropic Claude
-        </div>
+        <div class="ext-title"><span>🤖</span> Anthropic Claude</div>
         <div class="ext-detail">
-          model: claude-sonnet-4-5<br>
-          creds v n8n: Anthropic account<br>
-          prompt: per audience<br>
-          output: JSON doc
+          model: claude-sonnet-4-20250514<br>
+          SDK: @anthropic-ai/sdk 0.80<br>
+          auth: ANTHROPIC_API_KEY<br>
+          3 use cases (docs · memo · pull scan)
+        </div>
+      </div>
+
+      <div class="ext-service ext-confl">
+        <div class="ext-title"><span>📘</span> Confluence Cloud</div>
+        <div class="ext-detail">
+          base: jasenovec.atlassian.net<br>
+          space: TR (Team Repository)<br>
+          API: REST v2<br>
+          auth: Basic (email + API token)<br>
+          publish + pull bidirectional
         </div>
       </div>
 
       <div class="ext-service ext-drawio">
-        <div class="ext-title">
-          <span>📐</span> Draw.io Export
-        </div>
+        <div class="ext-title"><span>📐</span> Draw.io Export</div>
         <div class="ext-detail">
           format: mxlibrary XML<br>
-          HTML-encode: &lt; &gt; only<br>
-          download: .drawio file
+          16 component types pre-styled<br>
+          8 connector templates<br>
+          drag-and-drop palette
         </div>
       </div>
 
       <div class="ext-service ext-deploy">
-        <div class="ext-title">
-          <span>🚂</span> Railway
-        </div>
+        <div class="ext-title"><span>🚂</span> Railway</div>
         <div class="ext-detail">
-          project: modest-charisma<br>
-          repo: jazzwedz/arch-tool<br>
-          url: arch-tool-production<br>&nbsp;&nbsp;&nbsp;&nbsp;.up.railway.app
+          service: arch-tool<br>
+          repo: jazzwedz/arch-tool · main<br>
+          url: arch-tool-jaso.up.railway.app<br>
+          auto-deploy on push to main
         </div>
       </div>
     </div>
 
-  </div><!-- .app-diagram -->
+  </div>
 
-  <!-- LEGEND -->
   <div class="legend">
-    <div class="legend-item">
-      <div class="legend-line" style="background:#3b82f6"></div>
-      Next.js / frontend
-    </div>
-    <div class="legend-item">
-      <div class="legend-line" style="background:#06b6d4"></div>
-      API Routes
-    </div>
-    <div class="legend-item">
-      <div class="legend-line" style="background:#22c55e"></div>
-      GitHub / Data
-    </div>
-    <div class="legend-item">
-      <div class="legend-line" style="background:#8b5cf6"></div>
-      n8n / AI Automation
-    </div>
-    <div class="legend-item">
-      <div class="legend-line" style="background:#f97316"></div>
-      Infrastructure
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:#86efac"></div>
-      GET request
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:#93c5fd"></div>
-      POST request
-    </div>
+    <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div>GET</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#93c5fd"></div>POST</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div>PUT</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div>DELETE</div>
   </div>
+</div>
 
-</div><!-- .diagram-wrap -->
+<div class="section-title">Component Model — Catalog Schema</div>
+<div class="diagram-wrap">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
 
-<!-- ══════════════════════════════════════
-     MIGRATION PLAN — ENTERPRISE EDITION
-══════════════════════════════════════ -->
-<div class="section-title" style="margin-top:8px;">Migration Plan — Enterprise / Angular</div>
-<div class="diagram-wrap" style="margin-bottom:48px;">
-
-  <!-- HEADER NOTE -->
-  <div style="background:#1a1d27;border:1px solid #2e3350;border-radius:10px;padding:16px 20px;margin-bottom:28px;display:flex;gap:16px;align-items:flex-start;">
-    <span style="font-size:20px;flex-shrink:0;">📋</span>
     <div>
-      <div style="font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:6px;">O čom je tento plán</div>
-      <div style="font-size:12px;color:#64748b;line-height:1.7;">
-        Aktuálna aplikácia beží ako <strong style="color:#93c5fd;">Next.js monolith</strong> (frontend + API v jednom) s dátami uloženými ako YAML súbory v GitHub.
-        Tento plán opisuje migráciu na <strong style="color:#86efac;">Angular (frontend)</strong> + <strong style="color:#fdba74;">REST API backend</strong> + <strong style="color:#c4b5fd;">PostgreSQL</strong>
-        — vhodné pre korporátne prostredie, interný Git a podnikové štandardy.
-        Backend je zatiaľ otvorená otázka — závislá od firemného stacku. <strong style="color:#fcd34d;">Technický owner vyberie variantu.</strong>
-      </div>
-    </div>
-  </div>
-
-  <!-- CURRENT VS TARGET -->
-  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:center;margin-bottom:32px;">
-
-    <!-- CURRENT -->
-    <div style="background:#22263a;border:1px solid #2e3350;border-radius:12px;padding:20px;">
-      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;">Aktuálny stav (PoC)</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;"></span>
-          Next.js 14 — frontend + API v jednom
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
-          GitHub.com ako dátové úložisko
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
-          YAML súbory — jeden komponent / súbor
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
-          Žiadna autentifikácia
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;flex-shrink:0;"></span>
-          n8n + Claude pre doc generovanie
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0;"></span>
-          Railway (public cloud)
-        </div>
+      <div class="box-title" style="margin-bottom:14px"><span class="icon">🔷</span> Core fields</div>
+      <div class="model-fields">
+        <div><span class="field-key">id</span>: <span class="field-type">string</span> <span class="field-opt">// kebab-case</span></div>
+        <div><span class="field-key">name</span>: <span class="field-type">string</span></div>
+        <div><span class="field-key">type</span>: <span class="field-type">ComponentType</span></div>
+        <div style="padding-left:20px"><span class="field-opt">16 types: microservice · frontend · database · queue · gateway · external · platform · library · data-pipeline · storage · batch-job · cache · context · boundary · application · module</span></div>
+        <div><span class="field-key">status</span>: <span class="field-type">ComponentStatus</span> <span class="field-opt">// draft · production · deprecated</span></div>
+        <div><span class="field-key">owner</span>: <span class="field-type">string</span></div>
+        <div><span class="field-key">tags</span>: <span class="field-type">string[]</span></div>
+        <div><span class="field-key">description</span>: { oneliner · technical · business }</div>
+        <div><span class="field-key">interfaces</span>: <span class="field-type">ComponentInterface[]</span></div>
+        <div style="padding-left:20px"><span class="field-opt">direction (provides | consumes) · type · target</span></div>
+        <div><span class="field-key">relationships</span>: <span class="field-type">ComponentRelationship[]</span></div>
+        <div style="padding-left:20px"><span class="field-opt">7 types: parent-of · child-of · depends-on · communicates-with · reads-from · writes-to · fallback</span></div>
+        <div><span class="field-key">risks</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>
+        <div><span class="field-key">nfr</span>: <span class="field-type">ComponentNFR</span> <span class="field-opt">?</span></div>
+        <div style="padding-left:20px"><span class="field-opt">availability · rto · rpo · max_latency · throughput · data_classification · scaling</span></div>
+        <div><span class="field-key">diagram</span>: <span class="field-type">ComponentDiagram</span> <span class="field-opt">? // color · shape</span></div>
       </div>
     </div>
 
-    <!-- ARROW -->
-    <div style="text-align:center;padding:0 24px;">
-      <div style="font-size:28px;color:#6366f1;">→</div>
-      <div style="font-size:10px;color:#64748b;margin-top:4px;">migrácia</div>
-    </div>
+    <div>
+      <div class="box-title" style="margin-bottom:14px"><span class="icon">🌿</span> Rich modelling fields</div>
+      <div class="model-fields">
+        <div><span class="field-key">capabilities</span>: <span class="field-type">ComponentCapability[]</span> <span class="field-opt">?</span></div>
+        <div style="padding-left:20px"><span class="field-opt">{ name · role · description? }</span></div>
+        <div style="padding-left:20px"><span class="field-opt">role: owner · contributor · consumer · indirect</span></div>
 
-    <!-- TARGET -->
-    <div style="background:#22263a;border:1px solid #6366f1;border-radius:12px;padding:20px;">
-      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#818cf8;text-transform:uppercase;margin-bottom:14px;">Cieľový stav (Enterprise)</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0;"></span>
-          Angular 17+ — dedikovaný frontend
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#f97316;flex-shrink:0;"></span>
-          REST API backend — firemný stack (viď varianty nižšie)
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#c084fc;flex-shrink:0;"></span>
-          PostgreSQL — relačná databáza
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
-          SSO / LDAP / Azure AD autentifikácia
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
-          Interný Git (GitLab / Azure DevOps)
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;"></span>
-          On-prem / interný PaaS / Kubernetes
-        </div>
-      </div>
-    </div>
-  </div>
+        <div style="margin-top:8px"><span class="field-key">data</span>: <span class="field-type">ComponentData</span> <span class="field-opt">? // inputs[] · outputs[] · owns[]</span></div>
+        <div style="padding-left:20px"><span class="field-opt">DataItem: name · kind · source? · consumers? · purpose? · description?</span></div>
+        <div style="padding-left:20px"><span class="field-opt"><strong>Format</strong>: table · file · stream · message · form</span></div>
+        <div style="padding-left:20px"><span class="field-opt"><strong>Business</strong>: event · command · document · decision · signal</span></div>
+        <div style="padding-left:20px"><span class="field-opt"><strong>Technical</strong>: business · reference · cache · config · transient · logs</span></div>
 
-  <!-- TARGET ARCHITECTURE DIAGRAM -->
-  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">Cieľová architektúra</div>
-  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:32px;max-width:780px;margin-left:auto;margin-right:auto;">
+        <div style="margin-top:8px"><span class="field-key">processes</span>: <span class="field-type">ComponentProcess[]</span> <span class="field-opt">?</span></div>
+        <div style="padding-left:20px"><span class="field-opt">{ name · role · activity? · description? }</span></div>
+        <div style="padding-left:20px"><span class="field-opt">role: owner · participant · listener · trigger</span></div>
 
-    <div style="width:100%;background:#1e3a5f;border:1px solid #3b82f6;border-radius:10px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:16px;">🌐</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#93c5fd;">Browser</div>
-          <div style="font-size:11px;color:#64748b;">Angular SPA — HTML/CSS/JS statické súbory</div>
-        </div>
+        <div style="margin-top:8px"><span class="field-key">rules</span>: <span class="field-type">ComponentRule[]</span> <span class="field-opt">? // business logic</span></div>
+        <div style="padding-left:20px"><span class="field-opt">kind: <strong>formula</strong> (expression) · <strong>rule</strong> (Given/When/Then) · <strong>constraint</strong> (invariant + enforced_in)</span></div>
       </div>
-      <span style="font-size:10px;color:#3b82f6;background:#0f172a;padding:2px 8px;border-radius:4px;">port 80/443</span>
-    </div>
 
-    <div style="font-size:18px;color:#4b5563;">↕ HTTP/S REST</div>
-
-    <div style="width:100%;background:#431407;border:1px solid #f97316;border-radius:10px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:16px;">⚙️</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#fdba74;">REST API Backend</div>
-          <div style="font-size:11px;color:#64748b;">Všetky endpointy: /api/components · /api/generate · /api/export — viď varianty nižšie</div>
-        </div>
-      </div>
-      <span style="font-size:10px;color:#f97316;background:#0f172a;padding:2px 8px;border-radius:4px;">port 8080</span>
-    </div>
-
-    <div style="font-size:18px;color:#4b5563;">↕ SQL</div>
-
-    <div style="width:100%;background:#2e1065;border:1px solid #7c3aed;border-radius:10px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:16px;">🐘</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:#c4b5fd;">PostgreSQL</div>
-          <div style="font-size:11px;color:#64748b;">Tabuľky: components · interfaces · dependencies · tags</div>
-        </div>
-      </div>
-      <span style="font-size:10px;color:#7c3aed;background:#0f172a;padding:2px 8px;border-radius:4px;">port 5432</span>
-    </div>
-
-  </div>
-
-  <!-- BACKEND OPTIONS -->
-  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">Backend varianty — na rozhodnutie technical ownera</div>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:32px;">
-
-    <!-- NestJS -->
-    <div style="background:#22263a;border:1px solid #f97316;border-radius:10px;padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#fdba74;">NestJS</div>
-          <div style="font-size:11px;color:#64748b;">TypeScript · Node.js</div>
-        </div>
-        <span style="font-size:9px;background:#14532d;color:#86efac;padding:3px 8px;border-radius:4px;font-weight:700;">ODPORÚČANÉ</span>
-      </div>
-      <div style="font-size:11px;color:#e2e8f0;line-height:1.8;margin-bottom:10px;">
-        Rovnaký jazyk ako Angular (TypeScript). Rovnaký Dependency Injection vzor. Prirodzená dvojica — tím sa naučí oba frameworky súčasne.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        <div style="font-size:11px;color:#86efac;">✓ TypeScript end-to-end</div>
-        <div style="font-size:11px;color:#86efac;">✓ Angular-like DI pattern</div>
-        <div style="font-size:11px;color:#86efac;">✓ Prisma ORM integrácia</div>
-        <div style="font-size:11px;color:#fca5a5;">✗ Menej bežný v starých korporátoch</div>
-      </div>
-    </div>
-
-    <!-- Express.js -->
-    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#e2e8f0;">Express.js</div>
-          <div style="font-size:11px;color:#64748b;">JavaScript/TypeScript · Node.js</div>
-        </div>
-        <span style="font-size:9px;background:#1e3a5f;color:#93c5fd;padding:3px 8px;border-radius:4px;font-weight:700;">JEDNODUCHÝ</span>
-      </div>
-      <div style="font-size:11px;color:#e2e8f0;line-height:1.8;margin-bottom:10px;">
-        Minimalistický Node.js framework. Veľmi jednoduchá migrácia z Next.js API routes — takmer rovnaká syntax.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        <div style="font-size:11px;color:#86efac;">✓ Najrýchlejšia migrácia z Next.js</div>
-        <div style="font-size:11px;color:#86efac;">✓ Minimálna krivka učenia</div>
-        <div style="font-size:11px;color:#fca5a5;">✗ Menej štruktúry, viac manuálneho kódu</div>
-        <div style="font-size:11px;color:#fca5a5;">✗ Slabšie pre veľké tímy</div>
-      </div>
-    </div>
-
-    <!-- .NET Core -->
-    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#e2e8f0;">.NET / ASP.NET Core</div>
-          <div style="font-size:11px;color:#64748b;">C# · .NET 8+</div>
-        </div>
-        <span style="font-size:9px;background:#1a1040;color:#a5b4fc;padding:3px 8px;border-radius:4px;font-weight:700;">KORPORÁT</span>
-      </div>
-      <div style="font-size:11px;color:#e2e8f0;line-height:1.8;margin-bottom:10px;">
-        Najbežnejší enterprise backend v Microsoft ekosystéme. Ak firma používa Azure alebo C#, toto je prirodzená voľba.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        <div style="font-size:11px;color:#86efac;">✓ Enterprise štandard (Microsoft)</div>
-        <div style="font-size:11px;color:#86efac;">✓ Entity Framework ORM</div>
-        <div style="font-size:11px;color:#86efac;">✓ Azure AD integrácia out-of-box</div>
-        <div style="font-size:11px;color:#fca5a5;">✗ Iný jazyk ako Angular (C# vs TS)</div>
-      </div>
-    </div>
-
-    <!-- Spring Boot -->
-    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#e2e8f0;">Spring Boot</div>
-          <div style="font-size:11px;color:#64748b;">Java / Kotlin · JVM</div>
-        </div>
-        <span style="font-size:9px;background:#1a1040;color:#a5b4fc;padding:3px 8px;border-radius:4px;font-weight:700;">KORPORÁT</span>
-      </div>
-      <div style="font-size:11px;color:#e2e8f0;line-height:1.8;margin-bottom:10px;">
-        Dominantný backend v Java korporátoch. Ak firma má Java tím, je to najlepšia voľba z pohľadu údržby.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        <div style="font-size:11px;color:#86efac;">✓ Zrelý enterprise ekosystém</div>
-        <div style="font-size:11px;color:#86efac;">✓ JPA / Hibernate ORM</div>
-        <div style="font-size:11px;color:#86efac;">✓ Spring Security (SSO/OAuth2)</div>
-        <div style="font-size:11px;color:#fca5a5;">✗ Najväčší overhead pre malé projekty</div>
+      <div style="margin-top:20px;padding:12px;background:#0c2340;border:1px solid #1d4ed8;border-radius:8px;font-size:11px;color:#93c5fd;line-height:1.6">
+        <strong>Storage:</strong> each component is one <code>{id}.yaml</code> file. Git history = audit log. Backward-compat: legacy <code>business_capabilities: string[]</code> auto-migrates to <code>capabilities: [{name, role: indirect}]</code> on read; legacy <code>data.consumes / produces</code> → <code>data.inputs / outputs</code>.
       </div>
     </div>
 
   </div>
+</div>
 
-  <!-- DB SCHEMA -->
-  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">PostgreSQL — navrhovaná schéma</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:32px;">
-    <div style="background:#0f172a;border:1px solid #2e1065;border-radius:10px;padding:16px;font-family:Consolas,monospace;font-size:11px;line-height:1.8;">
-      <div style="color:#94a3b8;margin-bottom:8px;font-family:'Segoe UI',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Tabuľka: components</div>
-      <div><span style="color:#c4b5fd;">id</span>          <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">PRIMARY KEY</span></div>
-      <div><span style="color:#c4b5fd;">name</span>        <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">NOT NULL</span></div>
-      <div><span style="color:#c4b5fd;">type</span>        <span style="color:#06b6d4;">component_type</span> <span style="color:#64748b;">ENUM</span></div>
-      <div><span style="color:#c4b5fd;">status</span>      <span style="color:#06b6d4;">component_status</span> <span style="color:#64748b;">ENUM</span></div>
-      <div><span style="color:#c4b5fd;">owner</span>       <span style="color:#06b6d4;">VARCHAR</span></div>
-      <div><span style="color:#c4b5fd;">desc_one</span>    <span style="color:#06b6d4;">TEXT</span> <span style="color:#64748b;">-- oneliner</span></div>
-      <div><span style="color:#c4b5fd;">desc_tech</span>   <span style="color:#06b6d4;">TEXT</span> <span style="color:#64748b;">-- technical</span></div>
-      <div><span style="color:#c4b5fd;">desc_biz</span>    <span style="color:#06b6d4;">TEXT</span> <span style="color:#64748b;">-- business</span></div>
-      <div><span style="color:#c4b5fd;">tags</span>        <span style="color:#06b6d4;">TEXT[]</span></div>
-      <div><span style="color:#c4b5fd;">risks</span>       <span style="color:#06b6d4;">TEXT[]</span></div>
-      <div><span style="color:#c4b5fd;">created_at</span>  <span style="color:#06b6d4;">TIMESTAMP</span></div>
-      <div><span style="color:#c4b5fd;">updated_at</span>  <span style="color:#06b6d4;">TIMESTAMP</span></div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div style="background:#0f172a;border:1px solid #2e1065;border-radius:10px;padding:14px;font-family:Consolas,monospace;font-size:11px;line-height:1.8;">
-        <div style="color:#94a3b8;margin-bottom:6px;font-family:'Segoe UI',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">component_interfaces</div>
-        <div><span style="color:#c4b5fd;">id</span>             <span style="color:#06b6d4;">SERIAL PK</span></div>
-        <div><span style="color:#c4b5fd;">component_id</span>   <span style="color:#06b6d4;">VARCHAR FK</span></div>
-        <div><span style="color:#c4b5fd;">direction</span>      <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">-- provides/consumes</span></div>
-        <div><span style="color:#c4b5fd;">iface_type</span>     <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">-- REST/gRPC/queue</span></div>
-        <div><span style="color:#c4b5fd;">target</span>         <span style="color:#06b6d4;">VARCHAR</span></div>
-      </div>
-      <div style="background:#0f172a;border:1px solid #2e1065;border-radius:10px;padding:14px;font-family:Consolas,monospace;font-size:11px;line-height:1.8;">
-        <div style="color:#94a3b8;margin-bottom:6px;font-family:'Segoe UI',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">component_dependencies</div>
-        <div><span style="color:#c4b5fd;">component_id</span>   <span style="color:#06b6d4;">VARCHAR FK</span></div>
-        <div><span style="color:#c4b5fd;">depends_on</span>     <span style="color:#06b6d4;">VARCHAR FK</span></div>
-        <div><span style="color:#c4b5fd;">dep_type</span>       <span style="color:#06b6d4;">VARCHAR</span> <span style="color:#64748b;">-- hard/soft</span></div>
-      </div>
-    </div>
+<div class="section-title">Component Detail Page — 7 Tabs</div>
+<div class="diagram-wrap">
+  <div style="margin-bottom:20px;padding:14px 18px;background:#1a1d27;border:1px solid #2e3350;border-radius:8px;display:flex;gap:14px;align-items:center;font-size:12px;color:#94a3b8;">
+    <span style="font-size:18px">📊</span>
+    <div>Above every tab: <strong style="color:#e2e8f0">Identity panel</strong> (type · status · owner · tags) + <strong style="color:#e2e8f0">Documentation maturity %</strong> (13 fields scored, banded Skeletal / Drafted / Solid / Complete).</div>
   </div>
 
-  <!-- MIGRATION PHASES -->
-  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">Fázy migrácie</div>
-  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:32px;">
+  <div class="tabs">
+    <div class="tab">
+      <div class="tab-name">Overview <span class="tab-tag t-all">All</span></div>
+      <div class="tab-desc">Hero Component Context diagram (mermaid: inputs · outputs · owned data · relationships in one), Details, Descriptions, Risks.</div>
+    </div>
+    <div class="tab">
+      <div class="tab-name">Technical <span class="tab-tag t-dev">Dev</span></div>
+      <div class="tab-desc">Interfaces (with Visualize toggle), Relationships (with Visualize toggle), Non-Functional Requirements.</div>
+    </div>
+    <div class="tab">
+      <div class="tab-name">Business <span class="tab-tag t-ba">BA</span></div>
+      <div class="tab-desc">Capabilities (table with role badges, Visualize toggle), Inputs &amp; Outputs (3 sub-tables, Visualize toggle), Processes.</div>
+    </div>
+    <div class="tab">
+      <div class="tab-name">Rules &amp; Calculations <span class="tab-tag t-ba">BA</span></div>
+      <div class="tab-desc">Formula cards (monospace), Behavioural rules (Given/When/Then), Constraints (red, with enforced_in component links).</div>
+    </div>
+    <div class="tab">
+      <div class="tab-name">Blast Radius <span class="tab-tag t-ops">Ops</span></div>
+      <div class="tab-desc">Reverse-graph BFS over relationships. Severity HIGH (depends-on, child-of, reads-from, writes-to) / MEDIUM (others). Stat cards + mermaid graph + layered impact list + AI Impact Memo.</div>
+    </div>
+    <div class="tab">
+      <div class="tab-name">Documentation <span class="tab-tag t-all">All</span></div>
+      <div class="tab-desc">Generate (audience or doctype), Confluence (Publish + Open + Pull), Export (Draw.io library, Copy ID / Tech / Business descriptions).</div>
+    </div>
+    <div class="tab">
+      <div class="tab-name">Diagrams <span class="tab-tag t-all">All</span></div>
+      <div class="tab-desc">List of diagrams in /diagrams that reference this component (matched by arch_id attribute). Click → open preview modal.</div>
+    </div>
+    <div class="tab">
+      <div class="tab-name">History <span class="tab-tag t-ops">Ops</span></div>
+      <div class="tab-desc">Git commit log for the component's YAML file — who, when, what message. Last 50 commits.</div>
+    </div>
+  </div>
+</div>
 
-    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
-      <div style="min-width:36px;height:36px;background:#1e3a5f;border:2px solid #3b82f6;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#93c5fd;flex-shrink:0;">1</div>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#93c5fd;margin-bottom:4px;">Rozhodnutie o backende <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">1–2 dni</span></div>
-        <div style="font-size:11px;color:#64748b;line-height:1.7;">Technical owner vyberie backend variantu podľa firemného stacku. Zároveň: dostupnosť PostgreSQL instancie, interný Git server, CI/CD pipeline.</div>
+<div class="section-title">Feature Highlights</div>
+<div class="diagram-wrap">
+  <div class="features">
+
+    <div class="feature">
+      <div class="feature-head">
+        <div class="feature-icon">⚡</div>
+        <div><div class="feature-name">AI Documentation Generator</div>
+        <div class="feature-tag">Claude Sonnet 4 · 3 audiences · 3 doctypes · attachments</div></div>
+      </div>
+      <div class="feature-body">
+        Component or diagram → audience (Technical / Business / Executive) or doctype (Detailed Solution / Audit Report / Security Report). Output is markdown with mermaid blocks rendered client-side. Optional attachments: PDF business req, ERD, BPMN — enrich the prompt.
       </div>
     </div>
 
-    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
-      <div style="min-width:36px;height:36px;background:#2e1065;border:2px solid #7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#c4b5fd;flex-shrink:0;">2</div>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#c4b5fd;margin-bottom:4px;">Backend + databáza <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">1 týždeň</span></div>
-        <div style="font-size:11px;color:#64748b;line-height:1.7;">PostgreSQL schéma + migrácie. REST API endpointy identické s aktuálnymi Next.js route handlers. ORM podľa zvoleného backendu (Prisma / EF Core / JPA).</div>
+    <div class="feature">
+      <div class="feature-head">
+        <div class="feature-icon">💥</div>
+        <div><div class="feature-name">Blast Radius Analysis</div>
+        <div class="feature-tag">Reverse-graph BFS · NFR gap detection · AI Impact Memo</div></div>
+      </div>
+      <div class="feature-body">
+        Click component → walk reverse-relationship graph (max depth 3). Direct + transitive impactors, severity per relationship type, NFR gaps (production without RTO), confidential-data flags. Mermaid graph + layered list. One-click "Generate AI Impact Memo" → 1-page exec-style brief.
       </div>
     </div>
 
-    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
-      <div style="min-width:36px;height:36px;background:#431407;border:2px solid #f97316;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fdba74;flex-shrink:0;">3</div>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#fdba74;margin-bottom:4px;">Angular frontend <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">2–3 týždne</span></div>
-        <div style="font-size:11px;color:#64748b;line-height:1.7;">Angular 17+ projekt. Komponenty, routing, services. Tailwind CSS (funguje rovnako). UI library: Angular Material alebo PrimeNG (shadcn/Radix neexistuje pre Angular).</div>
+    <div class="feature">
+      <div class="feature-head">
+        <div class="feature-icon">📤</div>
+        <div><div class="feature-name">Confluence Publish</div>
+        <div class="feature-tag">Storage XHTML · tables + panels · TOC macro</div></div>
+      </div>
+      <div class="feature-body">
+        Renders structured Component Reference (At a glance · Capabilities · Interfaces · Relationships · I/O · Processes · Rules · NFR · Risks) as native Confluence tables. Rules use info / tip / warning panel macros. AI narrative above. Mermaid blocks stripped (no plugin). Hierarchy mirrors first capability.
       </div>
     </div>
 
-    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
-      <div style="min-width:36px;height:36px;background:#14532d;border:2px solid #22c55e;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#86efac;flex-shrink:0;">4</div>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#86efac;margin-bottom:4px;">Auth + Korporátna integrácia <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">1 týždeň</span></div>
-        <div style="font-size:11px;color:#64748b;line-height:1.7;">SSO: Azure AD / Okta / LDAP podľa firemného štandardu. Secrets management (Vault / Key Vault). Interný Git namiesto github.com.</div>
+    <div class="feature">
+      <div class="feature-head">
+        <div class="feature-icon">🔄</div>
+        <div><div class="feature-name">Confluence Pull-smart</div>
+        <div class="feature-tag">Claude scan · scalar + indexed rule patches · diff dialog</div></div>
+      </div>
+      <div class="feature-body">
+        AI compares Confluence page text to catalog YAML, proposes field-level patches (scalar fields + indexed <code>rules[N].field</code> paths). Each patch has confidence + evidence quote. User ticks per-patch, "Apply &amp; commit" pushes to arch-data. Bidirectional sync without leaving arch-tool.
       </div>
     </div>
 
-    <div style="display:flex;gap:16px;align-items:flex-start;background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:14px 18px;">
-      <div style="min-width:36px;height:36px;background:#3b2504;border:2px solid #f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fcd34d;flex-shrink:0;">5</div>
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#fcd34d;margin-bottom:4px;">Deploy + testing <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:8px;">1 týždeň</span></div>
-        <div style="font-size:11px;color:#64748b;line-height:1.7;">Docker build (frontend + backend separátne). Kubernetes / interný PaaS deployment. CI/CD pipeline (GitLab CI / Azure DevOps / Jenkins). E2E testy.</div>
+    <div class="feature">
+      <div class="feature-head">
+        <div class="feature-icon">📐</div>
+        <div><div class="feature-name">WYSIWYG Diagram Builder</div>
+        <div class="feature-tag">drawio palette · 8 connector types · save to repo</div></div>
+      </div>
+      <div class="feature-body">
+        Drag pre-styled components (matching catalog types) onto canvas, click-to-connect with 8 typed connectors (rest · grpc · async · db · file · human · info · link). Save .drawio XML to <code>diagrams/</code> in arch-data. Each diagram is preview-able as mermaid (drawio → mermaid conversion).
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-head">
+        <div class="feature-icon">📊</div>
+        <div><div class="feature-name">Hero Context Diagram</div>
+        <div class="feature-tag">Per-component mermaid · auto-rendered · 5 dimensions</div></div>
+      </div>
+      <div class="feature-body">
+        On every component's Overview tab, an auto-rendered mermaid flowchart combines inputs (left, green) · outputs (right, pink) · owned data (bottom, purple cylinders) · relationships (top, gray dotted). The picture you see first.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section-title">Confluence Integration — Bidirectional Sync Flow</div>
+<div class="diagram-wrap">
+  <div style="max-width:960px;margin:0 auto;">
+
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:stretch;margin-bottom:24px;">
+
+      <div style="background:#0c2340;border:1px solid #1d4ed8;border-radius:10px;padding:16px;">
+        <div style="font-size:11px;font-weight:700;color:#93c5fd;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📤 Publish flow</div>
+        <ol style="margin:0;padding-left:20px;font-size:12px;color:#cbd5e1;line-height:1.85">
+          <li>Generate AI markdown (or reuse existing draft)</li>
+          <li>Strip mermaid blocks (no plugin in target Confluence)</li>
+          <li>marked → HTML → Confluence storage format</li>
+          <li>Replace manual TOC with native <code>toc</code> macro</li>
+          <li>Append "Component Reference" — auto tables + rule panels</li>
+          <li>Find-or-create capability parent page (page-tree hierarchy)</li>
+          <li>Find existing page (side-file → title fallback) → update; else create</li>
+          <li>Persist side-file <code>confluence-links/{id}.json</code> (best-effort)</li>
+        </ol>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:28px">⇄</div>
+
+      <div style="background:#14532d;border:1px solid #22c55e;border-radius:10px;padding:16px;">
+        <div style="font-size:11px;font-weight:700;color:#86efac;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📥 Pull-smart flow</div>
+        <ol style="margin:0;padding-left:20px;font-size:12px;color:#cbd5e1;line-height:1.85">
+          <li>Resolve page id (side-file → title-based fallback)</li>
+          <li>Fetch page storage body</li>
+          <li>Convert storage XHTML to plain text (strip macros)</li>
+          <li>Send to Claude with current YAML + editable schema (scalar + <code>rules[N].*</code>)</li>
+          <li>Claude returns JSON: per-field patches with confidence + evidence</li>
+          <li>UI: checkbox dialog (low-confidence unticked by default)</li>
+          <li>Apply selected → validate enums → save YAML → commit to git</li>
+        </ol>
+      </div>
+
+    </div>
+
+    <div style="background:#1a1d27;border:1px solid #2e3350;border-radius:8px;padding:14px 18px;font-size:11px;color:#94a3b8;line-height:1.65">
+      <strong style="color:#e2e8f0">Patch protocol limits today:</strong> scalar fields (name · status · owner · tags · description.* · nfr.*) and indexed rule fields (<code>rules[N].name · kind · summary · description · formula · given · when · then · enforced_in</code>). Out of scope: add/remove rules in Confluence; capabilities · data · processes · interfaces · relationships round-trip — edit those in arch-tool's editor.
+    </div>
+
+  </div>
+</div>
+
+<div class="section-title">Deployment — Railway · Env Vars</div>
+<div class="diagram-wrap">
+  <div class="env-grid">
+
+    <div class="env-card">
+      <h4>GitHub (storage)</h4>
+      <div class="env-var">
+        <span class="name">GITHUB_TOKEN</span>=ghp_… <span class="field-opt">// fine-grained PAT, Contents R/W on arch-data</span><br>
+        <span class="name">GITHUB_OWNER</span>=jazzwedz<br>
+        <span class="name">GITHUB_REPO</span>=arch-data<br>
+        <span class="name">GITHUB_BRANCH</span>=main
+      </div>
+    </div>
+
+    <div class="env-card">
+      <h4>Anthropic Claude</h4>
+      <div class="env-var">
+        <span class="name">ANTHROPIC_API_KEY</span>=sk-ant-…<br>
+        <span class="field-opt">// model hardcoded: claude-sonnet-4-20250514</span>
+      </div>
+    </div>
+
+    <div class="env-card">
+      <h4>Confluence Cloud</h4>
+      <div class="env-var">
+        <span class="name">CONFLUENCE_BASE_URL</span>=https://jasenovec.atlassian.net<br>
+        <span class="name">CONFLUENCE_EMAIL</span>=jasenovec@gmail.com<br>
+        <span class="name">CONFLUENCE_API_TOKEN</span>=ATATT…<br>
+        <span class="name">CONFLUENCE_SPACE_ID</span>=229575<br>
+        <span class="name">CONFLUENCE_SPACE_KEY</span>=TR
+      </div>
+    </div>
+
+    <div class="env-card">
+      <h4>App self-reference</h4>
+      <div class="env-var">
+        <span class="name">ARCH_TOOL_PUBLIC_URL</span>=https://arch-tool-jaso.up.railway.app<br>
+        <span class="name">SITE_PASSWORD</span>=… <span class="field-opt">// password gate (middleware.ts)</span>
       </div>
     </div>
 
   </div>
 
-  <!-- EFFORT TABLE -->
-  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#64748b;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #2e3350;">Odhad náročnosti</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;text-align:center;">
-      <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Solo developer</div>
-      <div style="font-size:28px;font-weight:700;color:#f97316;">6</div>
-      <div style="font-size:12px;color:#fdba74;margin-bottom:4px;">týždňov</div>
-      <div style="font-size:11px;color:#64748b;">sekvenčná práca</div>
-    </div>
-    <div style="background:#22263a;border:1px solid #6366f1;border-radius:10px;padding:16px;text-align:center;">
-      <div style="font-size:11px;color:#64748b;margin-bottom:8px;">2 devs (FE + BE)</div>
-      <div style="font-size:28px;font-weight:700;color:#818cf8;">3–4</div>
-      <div style="font-size:12px;color:#a5b4fc;margin-bottom:4px;">týždne</div>
-      <div style="font-size:11px;color:#64748b;">paralelná práca</div>
-    </div>
-    <div style="background:#22263a;border:1px solid #2e3350;border-radius:10px;padding:16px;text-align:center;">
-      <div style="font-size:11px;color:#64748b;margin-bottom:8px;">S Claude Code</div>
-      <div style="font-size:28px;font-weight:700;color:#22c55e;">↓50%</div>
-      <div style="font-size:12px;color:#86efac;margin-bottom:4px;">rýchlejšie</div>
-      <div style="font-size:11px;color:#64748b;">generovanie kódu + review</div>
-    </div>
+  <div style="margin-top:20px;padding:14px 18px;background:#1a1d27;border:1px solid #2e3350;border-radius:8px;font-size:11px;color:#94a3b8;line-height:1.7;">
+    <strong style="color:#e2e8f0">Deploy:</strong> push to <code>main</code> → Railway auto-builds Next.js → serves on internal port (8080). Public URL via Railway-managed TLS. Single replica (in-memory rate limiter not yet Redis-backed). Watch-branch <code>main</code>; if pushing to <code>master</code>, also push to <code>main</code> for the build to fire.
   </div>
+</div>
 
-  <!-- WHAT STAYS THE SAME -->
-  <div style="margin-top:24px;background:#14532d22;border:1px solid #14532d;border-radius:10px;padding:16px 20px;">
-    <div style="font-size:12px;font-weight:600;color:#86efac;margin-bottom:10px;">✓ Čo sa NEMENÍ — rovnaké vo všetkých variantách</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;">
-      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">TypeScript</span>
-      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">Tailwind CSS</span>
-      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">REST API štruktúra (rovnaké endpointy)</span>
-      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">Dátový model (Component, Interface, Dependency...)</span>
-      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">Draw.io export</span>
-      <span style="font-size:11px;background:#14532d;color:#86efac;padding:3px 10px;border-radius:5px;">Celková business logika</span>
-    </div>
-  </div>
-
-</div><!-- .diagram-wrap / migration plan -->
-
-<!-- DIAGRAM 3 — DEPLOYMENT REQUIREMENTS -->
-<div class="section-title">Diagram 3 — Deployment Requirements</div>
+<div class="section-title">Roadmap — Port to Corporate Environment</div>
 <div class="diagram-wrap">
 
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-top:1rem;">
-
-    <!-- Runtime -->
-    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.25rem;">
-      <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#94a3b8;margin-bottom:1rem;text-transform:uppercase;">Runtime</div>
-      <div style="display:flex;flex-direction:column;gap:0.6rem;">
-        <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:0.6rem 0.9rem;display:flex;justify-content:space-between;align-items:center;">
-          <span style="color:#60a5fa;font-weight:600;">Node.js</span>
-          <span style="font-size:0.72rem;color:#94a3b8;background:#1e3a5f;padding:2px 8px;border-radius:4px;">≥ 18, odp. 22+</span>
-        </div>
-        <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:0.6rem 0.9rem;display:flex;justify-content:space-between;align-items:center;">
-          <span style="color:#60a5fa;font-weight:600;">npm</span>
-          <span style="font-size:0.72rem;color:#94a3b8;background:#1e3a5f;padding:2px 8px;border-radius:4px;">≥ 9 (s Node.js)</span>
-        </div>
-        <div style="margin-top:0.5rem;font-size:0.72rem;color:#64748b;line-height:1.5;">
-          Žiadna DB · Žiadny Redis · Žiadny Docker<br>Len Node.js
-        </div>
-        <div style="margin-top:0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:0.75rem;">
-          <div style="font-size:0.68rem;color:#64748b;margin-bottom:0.4rem;">Build &amp; Start</div>
-          <code style="font-size:0.72rem;color:#86efac;display:block;line-height:1.8;">
-            npm install<br>
-            npm run build<br>
-            npm start
-          </code>
-        </div>
-      </div>
+  <div class="port-callout">
+    <div style="font-size:14px;font-weight:700;color:var(--accent2);margin-bottom:10px">Goal</div>
+    <div style="font-size:13px;color:#cbd5e1;line-height:1.7;margin-bottom:14px">
+      Move the running app from Railway + GitHub.com + Anthropic.com + Atlassian Cloud into a regulated corporate environment where storage, LLM access, and auth go through internal endpoints. Code path is largely adapter-swap; the costly part is corporate process (provisioning, security review, sign-offs).
     </div>
-
-    <!-- Environment variables -->
-    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.25rem;">
-      <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#94a3b8;margin-bottom:1rem;text-transform:uppercase;">Environment Variables</div>
-      <div style="display:flex;flex-direction:column;gap:0.5rem;">
-        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-            <code style="color:#86efac;font-size:0.78rem;">GITHUB_TOKEN</code>
-            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
-          </div>
-          <div style="font-size:0.68rem;color:#64748b;">PAT s repo scope</div>
-        </div>
-        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-            <code style="color:#86efac;font-size:0.78rem;">GITHUB_OWNER</code>
-            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
-          </div>
-          <div style="font-size:0.68rem;color:#64748b;">vlastník GitHub repo</div>
-        </div>
-        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-            <code style="color:#86efac;font-size:0.78rem;">GITHUB_REPO</code>
-            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
-          </div>
-          <div style="font-size:0.68rem;color:#64748b;">repo s YAML komponentmi</div>
-        </div>
-        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-            <code style="color:#86efac;font-size:0.78rem;">GITHUB_BRANCH</code>
-            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
-          </div>
-          <div style="font-size:0.68rem;color:#64748b;">napr. main</div>
-        </div>
-        <div style="background:#0f172a;border:1px solid #312e81;border-radius:8px;padding:0.6rem 0.9rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-            <code style="color:#a5b4fc;font-size:0.78rem;">N8N_ARCH_WEBHOOK_URL</code>
-            <span style="font-size:0.65rem;color:#64748b;font-weight:600;">voliteľné</span>
-          </div>
-          <div style="font-size:0.68rem;color:#64748b;">URL n8n webhooku pre doc gen</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- External dependencies -->
-    <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.25rem;">
-      <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;color:#94a3b8;margin-bottom:1rem;text-transform:uppercase;">Externé závislosti</div>
-      <div style="display:flex;flex-direction:column;gap:0.6rem;">
-        <div style="background:#0f172a;border:1px solid #14532d;border-radius:8px;padding:0.6rem 0.9rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="color:#22c55e;font-weight:600;font-size:0.85rem;">GitHub repo</span>
-            <span style="font-size:0.65rem;color:#ef4444;font-weight:600;">povinné</span>
-          </div>
-          <div style="font-size:0.68rem;color:#64748b;">Úložisko komponentov<br>(YAML súbory)</div>
-        </div>
-        <div style="background:#0f172a;border:1px solid #312e81;border-radius:8px;padding:0.6rem 0.9rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="color:#8b5cf6;font-weight:600;font-size:0.85rem;">n8n instance</span>
-            <span style="font-size:0.65rem;color:#64748b;font-weight:600;">voliteľné</span>
-          </div>
-          <div style="font-size:0.68rem;color:#64748b;">Generovanie POC dokumentácie<br>(self-hosted alebo cloud)</div>
-        </div>
-        <div style="background:#0f172a;border:1px solid #312e81;border-radius:8px;padding:0.6rem 0.9rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="color:#c084fc;font-weight:600;font-size:0.85rem;">Anthropic API</span>
-            <span style="font-size:0.65rem;color:#64748b;font-weight:600;">voliteľné</span>
-          </div>
-          <div style="font-size:0.68rem;color:#64748b;">LLM v n8n workflow<br>(nastavené v n8n, nie v app)</div>
-        </div>
-        <div style="margin-top:0.75rem;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:0.75rem;">
-          <div style="font-size:0.68rem;color:#64748b;margin-bottom:0.5rem;">Kompatibilné platformy</div>
-          <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
-            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">Railway</span>
-            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">Vercel</span>
-            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">Render</span>
-            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">Docker</span>
-            <span style="font-size:0.7rem;background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;">VPS</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    <div style="font-size:12px;color:#94a3b8">Total estimate: <strong style="color:#fcd34d">~3.5–5 person-days</strong> assuming prerequisites are done and no corp blocker surfaces. Standalone migration plan + architecture-questions checklist live in <code>Downloads/team-repo-port-*.md</code>.</div>
   </div>
-</div><!-- .diagram-wrap -->
 
-<!-- DIAGRAM 4 — ENVIRONMENT CHECKS (PowerShell) -->
-<div class="section-title">Diagram 4 — Environment Checks (PowerShell)</div>
-<div class="diagram-wrap">
-  <p style="font-size:0.78rem;color:#64748b;margin:0.5rem 0 1.25rem;">Každý príkaz vlož samostatne do PowerShell konzoly. Zelený výstup = OK, červený = treba doinštalovať.</p>
-
-  <div style="display:flex;flex-direction:column;gap:1.25rem;">
-
-    <!-- Node.js -->
-    <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;">
-      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3a5f;">
-        <span style="color:#60a5fa;font-weight:700;font-size:0.85rem;">① Node.js</span>
-        <span style="font-size:0.68rem;color:#ef4444;font-weight:600;">povinné · min. v18</span>
-      </div>
-      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Skontroluj verziu Node.js</span>
-$v = node --version 2&gt;&amp;1
-if ($LASTEXITCODE -eq 0) {
-    $major = [int]($v -replace 'v(\d+).*','$1')
-    if ($major -ge 18) { Write-Host "✅ Node.js $v (OK)" -ForegroundColor Green }
-    else { Write-Host "❌ Node.js $v — potrebuješ v18+" -ForegroundColor Red }
-} else { Write-Host "❌ Node.js nie je nainštalovaný — https://nodejs.org" -ForegroundColor Red }</code></pre>
+  <div style="margin-bottom:14px;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">Six phases</div>
+  <div class="port-phases">
+    <div class="port-phase">
+      <div class="port-phase-name">A — Foundation</div>
+      <div class="port-phase-desc">Refactor external calls behind interfaces: LLMClient · StorageClient · ConfluenceClient · AuthMiddleware. ~0.5 MD</div>
     </div>
-
-    <!-- npm -->
-    <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;overflow:hidden;">
-      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3a5f;">
-        <span style="color:#60a5fa;font-weight:700;font-size:0.85rem;">② npm</span>
-        <span style="font-size:0.68rem;color:#ef4444;font-weight:600;">povinné · min. v9</span>
-      </div>
-      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Skontroluj verziu npm</span>
-$v = npm --version 2&gt;&amp;1
-if ($LASTEXITCODE -eq 0) {
-    $major = [int]($v -split '\.')[0]
-    if ($major -ge 9) { Write-Host "✅ npm $v (OK)" -ForegroundColor Green }
-    else { Write-Host "❌ npm $v — potrebuješ v9+" -ForegroundColor Red }
-} else { Write-Host "❌ npm nie je nainštalovaný — príde s Node.js" -ForegroundColor Red }</code></pre>
+    <div class="port-phase">
+      <div class="port-phase-name">B — Storage adapter</div>
+      <div class="port-phase-desc">Implement StorageClient against corp Git provider; bootstrap empty arch-data repo. ~0.5–1 MD</div>
     </div>
-
-    <!-- GitHub token -->
-    <div style="background:#0f172a;border:1px solid #14532d;border-radius:10px;overflow:hidden;">
-      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #14532d;">
-        <span style="color:#22c55e;font-weight:700;font-size:0.85rem;">③ GitHub Token</span>
-        <span style="font-size:0.68rem;color:#ef4444;font-weight:600;">povinné · repo scope</span>
-      </div>
-      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Nastav token a otestuj GitHub API autentifikáciu</span>
-$token = $env:GITHUB_TOKEN  <span style="color:#64748b"># alebo vlož priamo: $token = "ghp_..."</span>
-$r = Invoke-RestMethod -Uri "https://api.github.com/user" `
-     -Headers @{ Authorization="token $token"; "User-Agent"="arch-tool-check" } `
-     -ErrorAction SilentlyContinue
-if ($r.login) { Write-Host "✅ GitHub Token OK — prihlásený ako: $($r.login)" -ForegroundColor Green }
-else { Write-Host "❌ GitHub Token neplatný alebo chýba GITHUB_TOKEN env var" -ForegroundColor Red }</code></pre>
+    <div class="port-phase">
+      <div class="port-phase-name">C — LLM gateway</div>
+      <div class="port-phase-desc">Route all AI calls through corp gateway; re-tune prompts if model isn't Claude-class. ~1 MD</div>
     </div>
-
-    <!-- GitHub repo access -->
-    <div style="background:#0f172a;border:1px solid #14532d;border-radius:10px;overflow:hidden;">
-      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #14532d;">
-        <span style="color:#22c55e;font-weight:700;font-size:0.85rem;">④ GitHub Repo prístup</span>
-        <span style="font-size:0.68rem;color:#ef4444;font-weight:600;">povinné · read+write</span>
-      </div>
-      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Skontroluj prístup k dátovému repozitáru</span>
-$token = $env:GITHUB_TOKEN
-$owner = $env:GITHUB_OWNER  <span style="color:#64748b"># alebo vlož priamo: $owner = "jazzwedz"</span>
-$repo  = $env:GITHUB_REPO   <span style="color:#64748b"># alebo vlož priamo: $repo  = "arch-data"</span>
-$r = Invoke-RestMethod -Uri "https://api.github.com/repos/$owner/$repo" `
-     -Headers @{ Authorization="token $token"; "User-Agent"="arch-tool-check" } `
-     -ErrorAction SilentlyContinue
-if ($r.full_name) {
-    $push = if ($r.permissions.push) {"✅ push"} else {"⚠️ len read"}
-    Write-Host "✅ Repo $($r.full_name) dostupný — oprávnenia: $push" -ForegroundColor Green
-} else { Write-Host "❌ Repo nedostupný — skontroluj GITHUB_OWNER, GITHUB_REPO, token scope" -ForegroundColor Red }</code></pre>
+    <div class="port-phase">
+      <div class="port-phase-name">D — Auth &amp; ingress</div>
+      <div class="port-phase-desc">Swap password gate for SSO (ingress-based header read or SDK). ~0.5 MD</div>
     </div>
-
-    <!-- n8n webhook -->
-    <div style="background:#0f172a;border:1px solid #312e81;border-radius:10px;overflow:hidden;">
-      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #312e81;">
-        <span style="color:#a5b4fc;font-weight:700;font-size:0.85rem;">⑤ n8n Webhook</span>
-        <span style="font-size:0.68rem;color:#64748b;font-weight:600;">voliteľné</span>
-      </div>
-      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Otestuj dostupnosť n8n webhook URL</span>
-$url = $env:N8N_ARCH_WEBHOOK_URL  <span style="color:#64748b"># alebo vlož priamo: $url = "https://..."</span>
-if (-not $url) { Write-Host "⏭️  N8N_ARCH_WEBHOOK_URL nie je nastavené — doc generovanie nebude fungovať" -ForegroundColor Yellow }
-else {
-    try {
-        $r = Invoke-WebRequest -Uri $url -Method POST `
-             -Headers @{ "Content-Type"="application/json"; "X-N8N-Webhook-Secret"="arch-tool-secret-2024" } `
-             -Body '{"test":true}' -TimeoutSec 10 -ErrorAction Stop
-        Write-Host "✅ n8n webhook dostupný (HTTP $($r.StatusCode))" -ForegroundColor Green
-    } catch {
-        Write-Host "❌ n8n webhook nedostupný — $($_.Exception.Message)" -ForegroundColor Red
-    }
-}</code></pre>
+    <div class="port-phase">
+      <div class="port-phase-name">E — Deploy</div>
+      <div class="port-phase-desc">Containerise, corp secrets / registry / manifests, smoke test in dev + test envs. ~0.5–1 MD</div>
     </div>
-
-    <!-- Build test -->
-    <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;overflow:hidden;">
-      <div style="background:#1e293b;padding:0.5rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;">
-        <span style="color:#e2e8f0;font-weight:700;font-size:0.85rem;">⑥ Build test (voliteľné)</span>
-        <span style="font-size:0.68rem;color:#64748b;font-weight:600;">spusti v root priečinku projektu</span>
-      </div>
-      <pre style="margin:0;padding:1rem;font-size:0.8rem;line-height:1.8;color:#e2e8f0;white-space:pre-wrap;"><code><span style="color:#64748b"># Otestuj či sa projekt dá zbuildovať (spusti v koreňovom priečinku arch-tool)</span>
-Push-Location &lt;cesta-k-arch-tool&gt;  <span style="color:#64748b"># napr. Push-Location C:\SRDEV\arch-tool</span>
-npm install --silent
-if ($LASTEXITCODE -eq 0) { Write-Host "✅ npm install OK" -ForegroundColor Green }
-else { Write-Host "❌ npm install zlyhalo" -ForegroundColor Red; Pop-Location; return }
-npm run build 2&gt;&amp;1 | Select-Object -Last 5
-if ($LASTEXITCODE -eq 0) { Write-Host "✅ Build úspešný" -ForegroundColor Green }
-else { Write-Host "❌ Build zlyhal — skontroluj výstup vyššie" -ForegroundColor Red }
-Pop-Location</code></pre>
+    <div class="port-phase">
+      <div class="port-phase-name">F — Handover</div>
+      <div class="port-phase-desc">User / admin / runbook docs, prod promote, sign-offs from security · IT ops · line manager. ~0.5 MD</div>
     </div>
-
   </div>
-</div><!-- .diagram-wrap -->
+
+  <div style="margin-top:20px;padding:14px 18px;background:#1a0b2e;border:1px solid #6d28d9;border-radius:8px;font-size:11px;color:#c4b5fd;line-height:1.7;">
+    <strong style="color:#e2e8f0">Prerequisites (before Phase A):</strong> signed ADR with architecture decisions · senior-dev pairing scheduled · corp infra tickets open (Git repo · K8s namespace · SSO group · secret store) · naming convention + default capability list + team identifiers agreed. Architecture-questions checklist exposes ~110 items to triage — half are typically relevant.
+  </div>
+</div>
+
+<footer style="text-align:center;color:var(--muted);font-size:11px;padding:24px 0 0;">
+  Generated for Retro Team Repository · arch-tool · single-team architecture catalog with AI documentation and Confluence sync.
+</footer>
 
 </body>
 </html>
