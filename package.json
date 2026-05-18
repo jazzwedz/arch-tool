@@ -2,11 +2,35 @@
   "name": "arch-tool",
   "version": "0.1.0",
   "private": true,
+  "description": "Team Repository — AI-powered architecture catalog for a single team. Components, capabilities, data flows, business rules and bidirectional Confluence sync, kept as YAML in a Git repo.",
+  "license": "MIT",
+  "author": "Peter Jasenovec",
+  "homepage": "https://github.com/jazzwedz/arch-tool",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jazzwedz/arch-tool.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jazzwedz/arch-tool/issues"
+  },
+  "keywords": [
+    "architecture",
+    "catalog",
+    "documentation",
+    "team-tools",
+    "nextjs",
+    "claude",
+    "confluence",
+    "c4-model",
+    "ddd",
+    "yaml"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
