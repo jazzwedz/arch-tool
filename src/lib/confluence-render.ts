@@ -95,12 +95,14 @@ function polishParagraphs(html: string): string {
 }
 
 function decodeHtmlEntities(s: string): string {
+  // Decode `&amp;` LAST so `&amp;lt;` stays as `&lt;` instead of collapsing
+  // to `<` (codeql: js/double-escaping).
   return s
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
 }
 
 function cdataSafe(s: string): string {

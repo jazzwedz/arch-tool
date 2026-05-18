@@ -7,16 +7,25 @@ export function drawioToMermaid(xml: string, highlightArchId?: string): string |
     const nodeArchIds = new Map<string, string>() // drawio id -> arch_id
     const edges: { source: string; target: string; label: string }[] = []
 
-    const stripHtml = (s: string) =>
-      s
-        .replace(/<br\s*\/?>/gi, " ")
-        .replace(/<[^>]+>/g, "")
-        .replace(/&amp;/g, "&")
+    const stripHtml = (s: string) => {
+      // Loop tag-strip until idempotent so nested fragments like "<<b>foo>"
+      // don't survive a single pass (codeql: js/incomplete-multi-character-sanitization).
+      let prev: string
+      let cur = s.replace(/<br\s*\/?>/gi, " ")
+      do {
+        prev = cur
+        cur = cur.replace(/<[^>]+>/g, "")
+      } while (cur !== prev)
+      // Decode `&amp;` LAST so `&amp;lt;` stays as `&lt;` instead of collapsing
+      // to `<` (codeql: js/double-escaping).
+      return cur
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
+        .replace(/&amp;/g, "&")
         .trim()
+    }
 
     // Process UserObject/object wrappers (draw.io uses these for custom properties)
     doc.querySelectorAll("UserObject, object").forEach((obj) => {

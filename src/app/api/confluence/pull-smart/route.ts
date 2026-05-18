@@ -303,13 +303,22 @@ function storageToText(storage: string): string {
 }
 
 function stripInlineTags(s: string): string {
-  return s.replace(/<[^>]+>/g, "")
+  // Loop until idempotent so nested/malformed fragments like "<<b>foo>"
+  // don't survive a single pass (codeql: js/incomplete-multi-character-sanitization).
+  let prev: string
+  let cur = s
+  do {
+    prev = cur
+    cur = cur.replace(/<[^>]+>/g, "")
+  } while (cur !== prev)
+  return cur
 }
 
 function decodeEntities(s: string): string {
+  // Decode `&amp;` LAST so `&amp;lt;` stays as `&lt;` instead of collapsing
+  // to `<` (codeql: js/double-escaping).
   return s
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -318,6 +327,7 @@ function decodeEntities(s: string): string {
     .replace(/&middot;/g, "·")
     .replace(/&mdash;/g, "—")
     .replace(/&ndash;/g, "–")
+    .replace(/&amp;/g, "&")
 }
 
 function extractJson(raw: string): { patches?: unknown[] } | null {
