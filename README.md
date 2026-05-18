@@ -3,6 +3,7 @@
 AI-powered architecture catalog for a single team — components, capabilities, data flows, business rules and Confluence sync, all kept as YAML in a Git repo.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/jazzwedz/arch-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/jazzwedz/arch-tool/actions/workflows/ci.yml)
 ![Status: best-effort](https://img.shields.io/badge/status-best--effort-blue)
 
 ---
@@ -79,9 +80,20 @@ If unset, Publish / Pull / Open in Confluence buttons are hidden.
 
 The app is a standard Next.js 14 deployment — anything that runs Node.js works.
 
+- **Docker** — see [`Dockerfile`](Dockerfile):
+
+  ```bash
+  docker build -t team-repository .
+  docker run --rm -p 3000:3000 --env-file .env.local team-repository
+  ```
+
 - **Railway** (used by the demo) — push to GitHub, set env vars in the dashboard, auto-deploy on `main`.
+
+  [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/jazzwedz/arch-tool)
+
 - **Vercel** — works out of the box for Next.js.
-- **Self-host** — wrap in a Dockerfile (sample coming, contributions welcome).
+
+  [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jazzwedz/arch-tool)
 
 The catalog uses GitHub as storage, so there is no database to run.
 

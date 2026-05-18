@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
-import Anthropic from "@anthropic-ai/sdk"
 import yaml from "js-yaml"
+import {
+  getAnthropicClient,
+  isAnthropicConfigured,
+  AI_DISABLED_MESSAGE,
+} from "@/lib/anthropic-client"
 import {
   getComponent,
   saveComponent,
@@ -29,8 +33,6 @@ import { COMPONENT_STATUSES, RULE_KINDS } from "@/lib/constants"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 export const dynamic = "force-dynamic"
-
-const anthropic = new Anthropic()
 
 type Confidence = "high" | "medium" | "low"
 
@@ -152,6 +154,12 @@ export async function POST(request: Request) {
 
     // PROPOSE phase: AI scans the whole page text against the catalog YAML
     // and proposes precise field-level patches.
+    if (!isAnthropicConfigured()) {
+      return NextResponse.json(
+        { error: AI_DISABLED_MESSAGE },
+        { status: 503 }
+      )
+    }
     const clientIp = request.headers.get("x-forwarded-for") || "unknown"
     if (!checkRateLimit(clientIp)) {
       return NextResponse.json(
@@ -183,6 +191,8 @@ async function computeAiPatches(
   storageBody: string,
   component: unknown
 ): Promise<SmartPatch[]> {
+  if (!isAnthropicConfigured()) return []
+  const anthropic = getAnthropicClient()
   const pageText = storageToText(storageBody)
   const yamlText = yaml.dump(component, { lineWidth: -1, sortKeys: false })
   const prompt = buildPrompt(yamlText, pageText)

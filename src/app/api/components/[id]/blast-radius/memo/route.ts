@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server"
-import Anthropic from "@anthropic-ai/sdk"
 import { checkRateLimit } from "@/lib/rate-limit"
 import type { BlastRadiusResult, ImpactedComponent } from "@/lib/blast-radius"
 import { RELATIONSHIP_LABELS } from "@/lib/constants"
-
-const anthropic = new Anthropic()
+import {
+  getAnthropicClient,
+  isAnthropicConfigured,
+  AI_DISABLED_MESSAGE,
+} from "@/lib/anthropic-client"
 
 export async function POST(request: Request) {
   try {
+    if (!isAnthropicConfigured()) {
+      return NextResponse.json({ error: AI_DISABLED_MESSAGE }, { status: 503 })
+    }
+    const anthropic = getAnthropicClient()
     const clientIp = request.headers.get("x-forwarded-for") || "unknown"
     if (!checkRateLimit(clientIp)) {
       return NextResponse.json(
