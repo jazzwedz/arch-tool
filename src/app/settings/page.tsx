@@ -4,7 +4,15 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2, Save, Check } from "lucide-react"
+import {
+  ArrowLeft,
+  Loader2,
+  Save,
+  Check,
+  X,
+  Play,
+  HeartPulse,
+} from "lucide-react"
 import {
   BLOCK_METAS,
   type DetailTabId,
@@ -38,12 +46,41 @@ function readVisible(
   return groupCfg?.[field] !== false
 }
 
+type HealthKind = "llm" | "git" | "confluence"
+
+interface HealthResult {
+  ok: boolean
+  elapsedMs?: number
+  provider?: string
+  edition?: string
+  model?: string
+  branch?: string
+  componentsFound?: number
+  error?: string
+}
+
+interface HealthState {
+  status: "idle" | "running" | "done"
+  result?: HealthResult
+}
+
+const HEALTH_LABELS: Record<HealthKind, string> = {
+  llm: "LLM",
+  git: "Git backend",
+  confluence: "Confluence",
+}
+
 export default function SettingsPage() {
   const { blocks, loaded, refresh } = useUIConfig()
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [health, setHealth] = useState<Record<HealthKind, HealthState>>({
+    llm: { status: "idle" },
+    git: { status: "idle" },
+    confluence: { status: "idle" },
+  })
 
   // Hydrate local state from the loaded config once.
   useEffect(() => {
@@ -118,6 +155,32 @@ export default function SettingsPage() {
     }
   }
 
+  async function runHealth(kind: HealthKind) {
+    setHealth((prev) => ({ ...prev, [kind]: { status: "running" } }))
+    try {
+      const res = await fetch(`/api/healthcheck/${kind}`, { method: "POST" })
+      const data = (await res.json()) as HealthResult
+      setHealth((prev) => ({
+        ...prev,
+        [kind]: { status: "done", result: data },
+      }))
+    } catch (e) {
+      setHealth((prev) => ({
+        ...prev,
+        [kind]: {
+          status: "done",
+          result: { ok: false, error: e instanceof Error ? e.message : "Request failed" },
+        },
+      }))
+    }
+  }
+
+  function runAllHealth() {
+    void runHealth("llm")
+    void runHealth("git")
+    void runHealth("confluence")
+  }
+
   if (!loaded) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -153,6 +216,77 @@ export default function SettingsPage() {
           </p>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <HeartPulse className="h-4 w-4 text-muted-foreground" />
+              Health checks
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={runAllHealth}>
+              <Play className="h-3.5 w-3.5 mr-1" />
+              Run all
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(["llm", "git", "confluence"] as HealthKind[]).map((kind) => {
+            const s = health[kind]
+            const r = s.result
+            return (
+              <div
+                key={kind}
+                className="flex items-center gap-3 py-1.5 border-b last:border-b-0"
+              >
+                <div className="w-32 text-sm font-medium">
+                  {HEALTH_LABELS[kind]}
+                </div>
+                <div className="flex-1 text-xs text-muted-foreground">
+                  {s.status === "running" ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Probing...
+                    </span>
+                  ) : s.status === "idle" || !r ? (
+                    <span className="opacity-60">Not tested yet</span>
+                  ) : r.ok ? (
+                    <span className="inline-flex items-center gap-2 text-green-700">
+                      <Check className="h-3.5 w-3.5" />
+                      <span>
+                        OK
+                        {r.elapsedMs !== undefined ? ` · ${r.elapsedMs}ms` : ""}
+                        {r.provider ? ` · ${r.provider}` : ""}
+                        {r.edition ? ` · ${r.edition}` : ""}
+                        {r.model ? ` · ${r.model}` : ""}
+                        {r.branch ? ` · ${r.branch}` : ""}
+                        {r.componentsFound !== undefined
+                          ? ` · ${r.componentsFound} components`
+                          : ""}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-start gap-2 text-destructive">
+                      <X className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <span className="break-all">
+                        {r.error || "Failed"}
+                      </span>
+                    </span>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => runHealth(kind)}
+                  disabled={s.status === "running"}
+                >
+                  Test
+                </Button>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
 
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => setAll(true)}>
