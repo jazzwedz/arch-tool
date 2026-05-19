@@ -7,6 +7,18 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-19
+
+Multi-backend release. Every external integration the catalog touches —
+LLM, Git, Confluence — now ships with two adapters and a clean env-var
+switch between them, so the tool fits a corporate stack (Azure DevOps +
+on-prem Confluence + internal LLM gateway) as cleanly as the original
+home stack (GitHub + Atlassian Cloud + Anthropic direct). Plus a
+team-wide Settings page, in-product health checks for every provider,
+explicit rule ordering, and a Next.js 15 upgrade. No deployment on
+v0.1.0 has to change anything — every new option defaults to the v0.1.0
+behaviour.
+
 ### Added
 
 - Pluggable LLM provider — choose Anthropic Claude (default) or any OpenAI-compatible gateway via `LLM_PROVIDER`. The OpenAI-compatible adapter works with OpenAI, Azure OpenAI, OpenRouter, Together, Groq, LiteLLM, Portkey, Cloudflare AI Gateway, Ollama, LM Studio, vllm, etc.
@@ -81,5 +93,6 @@ First public release. Free software under MIT.
 - Architecture-questions checklist and 6-phase port plan for moving the app into a corporate environment.
 - Best-effort maintenance model documented in README.
 
-[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.1.0
