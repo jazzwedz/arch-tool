@@ -89,16 +89,29 @@ llm:
 
 ### Optional — Confluence integration
 
-If unset, Publish / Pull / Open in Confluence buttons are hidden.
+If unset, Publish / Pull / Open in Confluence buttons are hidden. Two editions are supported, picked via `CONFLUENCE_EDITION` (defaults to `cloud`).
+
+**Cloud (default)** — v2 REST API + Basic auth (email + API token):
 
 | Variable | Purpose |
 |---|---|
+| `CONFLUENCE_EDITION` | `cloud` (default) |
 | `CONFLUENCE_BASE_URL` | `https://<your-site>.atlassian.net` |
 | `CONFLUENCE_EMAIL` | Atlassian account email |
 | `CONFLUENCE_API_TOKEN` | API token from `id.atlassian.com/manage-profile/security/api-tokens` |
 | `CONFLUENCE_SPACE_ID` | Numeric ID of the target space |
 | `CONFLUENCE_SPACE_KEY` | Space key (used for nicer URLs) |
 | `ARCH_TOOL_PUBLIC_URL` | Public URL of your deployment (linked from Confluence pages) |
+
+**Data Center / Server** — v1 REST API + Bearer Personal Access Token:
+
+| Variable | Purpose |
+|---|---|
+| `CONFLUENCE_EDITION` | `datacenter` (also accepts `server`, `dc`) |
+| `CONFLUENCE_BASE_URL` | `https://confluence.your-company.com` |
+| `CONFLUENCE_PAT` | Personal Access Token, create at `<BASE>/plugins/personalaccesstokens/usertokens.action` |
+| `CONFLUENCE_SPACE_KEY` | Target space key (primary identifier on DC) |
+| `ARCH_TOOL_PUBLIC_URL` | Public URL of your deployment |
 
 ## Deployment
 
