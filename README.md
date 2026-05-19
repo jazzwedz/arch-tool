@@ -34,7 +34,7 @@ Architecture overview: <https://arch-tool-jaso.up.railway.app/architecture.html>
 
 ## Quickstart
 
-Prerequisites: Node.js 20+, an empty GitHub repository for your catalog data, an LLM API key (Anthropic Claude or any OpenAI-compatible gateway), optionally a Confluence Cloud account.
+Prerequisites: Node.js 20+, an empty Git repository for your catalog data (GitHub or Azure DevOps), an LLM API key (Anthropic Claude or any OpenAI-compatible gateway), optionally a Confluence Cloud account.
 
 ```bash
 git clone https://github.com/jazzwedz/arch-tool.git
@@ -56,14 +56,22 @@ All configuration via environment variables (`.env.local` for dev, your platform
 
 | Variable | Purpose |
 |---|---|
-| `GITHUB_TOKEN` | Fine-grained PAT with Contents: Read/Write on your `arch-data` repo |
-| `GITHUB_OWNER` | GitHub user/org that owns the data repo |
-| `GITHUB_REPO` | Name of the data repo (defaults to `arch-data`) |
-| `GITHUB_BRANCH` | Branch to commit into (defaults to `main`) |
+| `GIT_PROVIDER` | `github` (default) or `ado` |
+| `GITHUB_TOKEN` + `GITHUB_OWNER` | Required when `GIT_PROVIDER=github` |
+| `ADO_BASE_URL` + `ADO_PROJECT` + `ADO_REPO` + `ADO_PAT` | Required when `GIT_PROVIDER=ado` |
 | `LLM_PROVIDER` | `anthropic` (default) or `openai-compatible` |
 | `ANTHROPIC_API_KEY` | Required when `LLM_PROVIDER=anthropic` |
 | `LLM_BASE_URL` + `LLM_API_KEY` | Required when `LLM_PROVIDER=openai-compatible` |
 | `SITE_PASSWORD` | Shared password gate (basic single-user auth) |
+
+### Git storage backend
+
+Two adapters ship in the box:
+
+- **`github`** — uses Octokit. Set `GITHUB_TOKEN` (fine-grained PAT, Contents R/W), `GITHUB_OWNER`, optionally `GITHUB_REPO` (default `arch-data`) and `GITHUB_BRANCH` (default `main`).
+- **`ado`** — Azure DevOps Git, works with both Azure DevOps Service and on-prem Server/TFS. Auth: Personal Access Token via Basic auth. Set `ADO_BASE_URL` (`https://dev.azure.com/{your-org}` or `https://your-tfs/{collection}`), `ADO_PROJECT`, `ADO_REPO`, `ADO_PAT`, optionally `ADO_BRANCH` (default `main`). The PAT needs at least "Code (Read & Write)" scope.
+
+The store layer (components, diagrams, Confluence-link side-files) is identical across providers — switching backends only requires changing env vars and restarting.
 
 ### LLM provider
 

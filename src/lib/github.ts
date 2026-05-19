@@ -1,12 +1,15 @@
-import { Octokit } from "octokit"
+// Domain store: components, diagrams and Confluence link side-files.
+//
+// Stays under the historical filename `github.ts` so the 12 API route
+// imports keep working, but the implementation is now backend-agnostic —
+// it routes every read and write through the GitProvider selected via the
+// GIT_PROVIDER env var (see src/lib/git/index.ts). Today that means
+// GitHub or Azure DevOps; new backends slot in without touching this
+// layer.
+
 import yaml from "js-yaml"
+import { getGit, GitNotFoundError } from "./git"
 import type { Component, ComponentWithSha, DiagramWithSha } from "./types"
-
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN })
-
-const owner = process.env.GITHUB_OWNER!
-const repo = process.env.GITHUB_REPO || "arch-data"
-const branch = process.env.GITHUB_BRANCH || "main"
 
 // Backward compatibility for legacy YAML shapes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,117 +56,60 @@ function migrateComponent(raw: Record<string, any>): Component {
 }
 
 export async function listComponents(): Promise<Component[]> {
-  try {
-    // Use git trees API to get all files in one request, avoiding caching issues
-    const { data: refData } = await octokit.rest.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${branch}`,
+  const git = getGit()
+  const entries = await git.listTree("components/")
+  const yamlFiles = entries.filter((e) => e.path.endsWith(".yaml"))
+
+  const components = await Promise.all(
+    yamlFiles.map(async (file) => {
+      try {
+        const content = await git.getBlob(file.sha)
+        return migrateComponent(
+          yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
+        )
+      } catch (err) {
+        console.error(`Failed to fetch component ${file.path}:`, err)
+        return null
+      }
     })
+  )
 
-    const { data: commitData } = await octokit.rest.git.getCommit({
-      owner,
-      repo,
-      commit_sha: refData.object.sha,
-    })
-
-    const { data: treeData } = await octokit.rest.git.getTree({
-      owner,
-      repo,
-      tree_sha: commitData.tree.sha,
-      recursive: "true",
-    })
-
-    const yamlFiles = treeData.tree.filter(
-      (f) => f.path?.startsWith("components/") && f.path.endsWith(".yaml") && f.type === "blob"
-    )
-
-    const components = await Promise.all(
-      yamlFiles.map(async (file) => {
-        try {
-          const { data: blobData } = await octokit.rest.git.getBlob({
-            owner,
-            repo,
-            file_sha: file.sha!,
-          })
-
-          const content = Buffer.from(blobData.content, "base64").toString("utf-8")
-          return migrateComponent(yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>)
-        } catch (err) {
-          console.error(`Failed to fetch component ${file.path}:`, err)
-          return null
-        }
-      })
-    )
-
-    return components.filter(Boolean) as Component[]
-  } catch (error: unknown) {
-    if (error instanceof Error && "status" in error && (error as { status: number }).status === 404) {
-      return []
-    }
-    throw error
-  }
+  return components.filter(Boolean) as Component[]
 }
 
-export async function getComponent(
-  id: string
-): Promise<ComponentWithSha> {
-  const path = `components/${id}.yaml`
-
-  const { data } = await octokit.rest.repos.getContent({
-    owner,
-    repo,
-    path,
-    ref: branch,
-  })
-
-  if (!("content" in data)) {
-    throw new Error(`Component ${id} not found`)
-  }
-
-  const content = Buffer.from(data.content, "base64").toString("utf-8")
-  const component = migrateComponent(yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>)
-
-  return { ...component, sha: data.sha }
+export async function getComponent(id: string): Promise<ComponentWithSha> {
+  const git = getGit()
+  const file = await git.getFile(`components/${id}.yaml`)
+  const component = migrateComponent(
+    yaml.load(file.content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
+  )
+  return { ...component, sha: file.sha }
 }
 
 export async function saveComponent(
   component: Component,
   sha?: string
 ): Promise<void> {
+  const git = getGit()
   const path = `components/${component.id}.yaml`
   const content = yaml.dump(component, {
     lineWidth: -1,
     noRefs: true,
     sortKeys: false,
   })
-
   const message = sha
     ? `feat: update component ${component.id}`
     : `feat: add component ${component.id}`
-
-  await octokit.rest.repos.createOrUpdateFileContents({
-    owner,
-    repo,
-    path,
-    message,
-    content: Buffer.from(content).toString("base64"),
-    branch,
-    ...(sha ? { sha } : {}),
-  })
+  await git.putFile(path, content, message, sha)
 }
 
 export async function deleteComponent(id: string, sha: string): Promise<void> {
-  const path = `components/${id}.yaml`
-
-  await octokit.rest.repos.deleteFile({
-    owner,
-    repo,
-    path,
-    message: `feat: remove component ${id}`,
+  const git = getGit()
+  await git.deleteFile(
+    `components/${id}.yaml`,
     sha,
-    branch,
-  })
+    `feat: remove component ${id}`
+  )
 }
 
 // Component history
@@ -176,77 +122,31 @@ export interface ComponentCommit {
 }
 
 export async function getComponentHistory(id: string): Promise<ComponentCommit[]> {
-  const path = `components/${id}.yaml`
-
-  const { data } = await octokit.rest.repos.listCommits({
-    owner,
-    repo,
-    path,
-    sha: branch,
-    per_page: 50,
-  })
-
-  return data.map((commit) => ({
-    sha: commit.sha.slice(0, 7),
-    message: commit.commit.message,
-    author: commit.commit.author?.name || "unknown",
-    date: commit.commit.author?.date || "",
-  }))
+  const git = getGit()
+  return git.listFileHistory(`components/${id}.yaml`, 50)
 }
 
 // Diagrams
 
 export async function listDiagrams(): Promise<DiagramWithSha[]> {
-  try {
-    const { data: refData } = await octokit.rest.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${branch}`,
+  const git = getGit()
+  const entries = await git.listTree("diagrams/")
+  const drawioFiles = entries.filter((e) => e.path.endsWith(".drawio"))
+
+  const diagrams = await Promise.all(
+    drawioFiles.map(async (file) => {
+      try {
+        const content = await git.getBlob(file.sha)
+        const name = file.path.replace("diagrams/", "").replace(".drawio", "")
+        return { name, content, sha: file.sha } as DiagramWithSha
+      } catch (err) {
+        console.error(`Failed to fetch diagram ${file.path}:`, err)
+        return null
+      }
     })
+  )
 
-    const { data: commitData } = await octokit.rest.git.getCommit({
-      owner,
-      repo,
-      commit_sha: refData.object.sha,
-    })
-
-    const { data: treeData } = await octokit.rest.git.getTree({
-      owner,
-      repo,
-      tree_sha: commitData.tree.sha,
-      recursive: "true",
-    })
-
-    const drawioFiles = treeData.tree.filter(
-      (f) => f.path?.startsWith("diagrams/") && f.path.endsWith(".drawio") && f.type === "blob"
-    )
-
-    const diagrams = await Promise.all(
-      drawioFiles.map(async (file) => {
-        try {
-          const { data: blobData } = await octokit.rest.git.getBlob({
-            owner,
-            repo,
-            file_sha: file.sha!,
-          })
-
-          const content = Buffer.from(blobData.content, "base64").toString("utf-8")
-          const name = file.path!.replace("diagrams/", "").replace(".drawio", "")
-          return { name, content, sha: file.sha! } as DiagramWithSha
-        } catch (err) {
-          console.error(`Failed to fetch diagram ${file.path}:`, err)
-          return null
-        }
-      })
-    )
-
-    return diagrams.filter(Boolean) as DiagramWithSha[]
-  } catch (error: unknown) {
-    if (error instanceof Error && "status" in error && (error as { status: number }).status === 404) {
-      return []
-    }
-    throw error
-  }
+  return diagrams.filter(Boolean) as DiagramWithSha[]
 }
 
 export async function saveDiagram(
@@ -254,52 +154,27 @@ export async function saveDiagram(
   content: string,
   sha?: string
 ): Promise<void> {
+  const git = getGit()
   const path = `diagrams/${name}.drawio`
-
   const message = sha
     ? `feat: update diagram ${name}`
     : `feat: add diagram ${name}`
-
-  await octokit.rest.repos.createOrUpdateFileContents({
-    owner,
-    repo,
-    path,
-    message,
-    content: Buffer.from(content).toString("base64"),
-    branch,
-    ...(sha ? { sha } : {}),
-  })
+  await git.putFile(path, content, message, sha)
 }
 
 export async function getDiagram(name: string): Promise<DiagramWithSha> {
-  const path = `diagrams/${name}.drawio`
-
-  const { data } = await octokit.rest.repos.getContent({
-    owner,
-    repo,
-    path,
-    ref: branch,
-  })
-
-  if (!("content" in data)) {
-    throw new Error(`Diagram ${name} not found`)
-  }
-
-  const content = Buffer.from(data.content, "base64").toString("utf-8")
-  return { name, content, sha: data.sha }
+  const git = getGit()
+  const file = await git.getFile(`diagrams/${name}.drawio`)
+  return { name, content: file.content, sha: file.sha }
 }
 
 export async function deleteDiagram(name: string, sha: string): Promise<void> {
-  const path = `diagrams/${name}.drawio`
-
-  await octokit.rest.repos.deleteFile({
-    owner,
-    repo,
-    path,
-    message: `feat: remove diagram ${name}`,
+  const git = getGit()
+  await git.deleteFile(
+    `diagrams/${name}.drawio`,
     sha,
-    branch,
-  })
+    `feat: remove diagram ${name}`
+  )
 }
 
 // Confluence link side-file: maps a component to a Confluence page so that
@@ -320,42 +195,25 @@ interface ConfluenceLinkWithSha extends ConfluenceLink {
 export async function getConfluenceLink(
   componentId: string
 ): Promise<ConfluenceLinkWithSha | null> {
-  const path = `confluence-links/${componentId}.json`
+  const git = getGit()
   try {
-    const { data } = await octokit.rest.repos.getContent({
-      owner,
-      repo,
-      path,
-      ref: branch,
-    })
-    if (!("content" in data)) return null
-    const content = Buffer.from(data.content, "base64").toString("utf-8")
-    return { ...(JSON.parse(content) as ConfluenceLink), sha: data.sha }
+    const file = await git.getFile(`confluence-links/${componentId}.json`)
+    return { ...(JSON.parse(file.content) as ConfluenceLink), sha: file.sha }
   } catch (error: unknown) {
-    if (
-      error instanceof Error &&
-      "status" in error &&
-      (error as { status: number }).status === 404
-    ) {
-      return null
-    }
+    if (error instanceof GitNotFoundError) return null
     throw error
   }
 }
 
-export async function saveConfluenceLink(link: ConfluenceLink, sha?: string): Promise<void> {
+export async function saveConfluenceLink(
+  link: ConfluenceLink,
+  sha?: string
+): Promise<void> {
+  const git = getGit()
   const path = `confluence-links/${link.componentId}.json`
   const content = JSON.stringify(link, null, 2) + "\n"
   const message = sha
     ? `chore: update confluence link for ${link.componentId}`
     : `chore: add confluence link for ${link.componentId}`
-  await octokit.rest.repos.createOrUpdateFileContents({
-    owner,
-    repo,
-    path,
-    message,
-    content: Buffer.from(content).toString("base64"),
-    branch,
-    ...(sha ? { sha } : {}),
-  })
+  await git.putFile(path, content, message, sha)
 }
