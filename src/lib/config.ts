@@ -9,10 +9,14 @@
 
 import yaml from "js-yaml"
 import { getGit, isGitConfigured, GitNotFoundError } from "./git"
+import type { UIBlocksConfig } from "./ui-blocks"
 
 export interface RuntimeConfig {
   llm?: {
     model?: string
+  }
+  ui?: {
+    blocks?: UIBlocksConfig
   }
 }
 

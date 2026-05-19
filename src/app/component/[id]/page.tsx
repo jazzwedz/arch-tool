@@ -75,6 +75,8 @@ import { computeMaturity } from "@/lib/component-maturity"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import yaml from "js-yaml"
+import { useUIConfig } from "@/components/UIConfigProvider"
+import { isBlockVisible, isTabVisible, type DetailTabId } from "@/lib/ui-blocks"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -132,6 +134,25 @@ export default function ComponentDetailPage() {
     | "diagrams"
     | "history"
   const [tab, setTab] = useState<DetailTab>("overview")
+  const { blocks: uiBlocks } = useUIConfig()
+
+  // If the active tab has been fully hidden via config, fall back to the
+  // first visible one so the page never renders an empty body.
+  useEffect(() => {
+    if (isTabVisible(uiBlocks, tab as DetailTabId)) return
+    const order: DetailTab[] = [
+      "overview",
+      "technical",
+      "business",
+      "rules",
+      "blast-radius",
+      "documentation",
+      "diagrams",
+      "history",
+    ]
+    const fallback = order.find((t) => isTabVisible(uiBlocks, t as DetailTabId))
+    if (fallback && fallback !== tab) setTab(fallback)
+  }, [uiBlocks, tab])
   const [publishingStandalone, setPublishingStandalone] = useState(false)
   const [publishStandaloneStatus, setPublishStandaloneStatus] = useState<
     | { ok: true; pageUrl: string; action: string; capabilityParent: string; warning?: string }
@@ -633,7 +654,7 @@ export default function ComponentDetailPage() {
         </div>
       )}
 
-      {/* Tab nav */}
+      {/* Tab nav — tabs whose blocks are all hidden in config are dropped */}
       <div className="border-b">
         <nav className="-mb-px flex gap-1 flex-wrap" role="tablist">
           {(
@@ -647,7 +668,9 @@ export default function ComponentDetailPage() {
               { id: "diagrams", label: "Diagrams" },
               { id: "history", label: "History" },
             ] as { id: DetailTab; label: string }[]
-          ).map((t) => (
+          )
+            .filter((t) => isTabVisible(uiBlocks, t.id as DetailTabId))
+            .map((t) => (
             <button
               key={t.id}
               type="button"
@@ -667,7 +690,7 @@ export default function ComponentDetailPage() {
       </div>
 
       {/* OVERVIEW TAB */}
-      {tab === "overview" && (
+      {tab === "overview" && isBlockVisible(uiBlocks, "overview", "heroContext") && (
         <>
           <Card>
             <CardHeader>
@@ -707,7 +730,7 @@ export default function ComponentDetailPage() {
       )}
 
       {/* RULES & CALCULATIONS TAB */}
-      {tab === "rules" && (
+      {tab === "rules" && isBlockVisible(uiBlocks, "rules", "section") && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -840,7 +863,7 @@ export default function ComponentDetailPage() {
       )}
 
       {/* BLAST RADIUS TAB */}
-      {tab === "blast-radius" && (
+      {tab === "blast-radius" && isBlockVisible(uiBlocks, "blastRadius", "section") && (
         <Card>
           <CardContent className="pt-6">
             <BlastRadiusView componentId={component.id} active={tab === "blast-radius"} />
@@ -849,7 +872,7 @@ export default function ComponentDetailPage() {
       )}
 
       {/* DOCUMENTATION TAB */}
-      {tab === "documentation" && (
+      {tab === "documentation" && isBlockVisible(uiBlocks, "documentation", "section") && (
         <div className="space-y-6">
           {/* Generate */}
           <Card className="border-blue-200 bg-blue-50/30">
@@ -1104,7 +1127,7 @@ export default function ComponentDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Info */}
-        {tab === "overview" && (
+        {tab === "overview" && isBlockVisible(uiBlocks, "overview", "details") && (
         <Card>
           <CardHeader>
             <CardTitle>Details</CardTitle>
@@ -1145,7 +1168,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Descriptions */}
-        {tab === "overview" && (
+        {tab === "overview" && isBlockVisible(uiBlocks, "overview", "descriptions") && (
         <Card>
           <CardHeader>
             <CardTitle>Descriptions</CardTitle>
@@ -1168,7 +1191,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Interfaces */}
-        {tab === "technical" && (
+        {tab === "technical" && isBlockVisible(uiBlocks, "technical", "interfaces") && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -1242,7 +1265,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Relationships */}
-        {tab === "technical" && (
+        {tab === "technical" && isBlockVisible(uiBlocks, "technical", "relationships") && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -1325,7 +1348,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Capabilities */}
-        {tab === "business" && component.capabilities && component.capabilities.length > 0 && (
+        {tab === "business" && isBlockVisible(uiBlocks, "business", "capabilities") && component.capabilities && component.capabilities.length > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1399,7 +1422,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Inputs & Outputs */}
-        {tab === "business" && component.data &&
+        {tab === "business" && isBlockVisible(uiBlocks, "business", "data") && component.data &&
           (component.data.owns?.length ||
             component.data.inputs?.length ||
             component.data.outputs?.length) ? (
@@ -1499,7 +1522,7 @@ export default function ComponentDetailPage() {
         ) : null}
 
         {/* Processes */}
-        {tab === "business" && component.processes && component.processes.length > 0 && (
+        {tab === "business" && isBlockVisible(uiBlocks, "business", "processes") && component.processes && component.processes.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1557,7 +1580,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Non-Functional Requirements */}
-        {tab === "technical" && component.nfr && Object.values(component.nfr).some(Boolean) && (
+        {tab === "technical" && isBlockVisible(uiBlocks, "technical", "nfr") && component.nfr && Object.values(component.nfr).some(Boolean) && (
           <Card>
             <CardHeader>
               <CardTitle>Non-Functional Requirements</CardTitle>
@@ -1612,7 +1635,7 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Risks */}
-        {tab === "overview" && component.risks && component.risks.length > 0 && (
+        {tab === "overview" && isBlockVisible(uiBlocks, "overview", "risks") && component.risks && component.risks.length > 0 && (
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Risks</CardTitle>
@@ -1629,7 +1652,7 @@ export default function ComponentDetailPage() {
       </div>
 
       {/* Diagrams this component appears in */}
-      {tab === "diagrams" && (
+      {tab === "diagrams" && isBlockVisible(uiBlocks, "diagrams", "section") && (
       <Card className="mt-6">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1671,7 +1694,7 @@ export default function ComponentDetailPage() {
       )}
 
       {/* Change History */}
-      {tab === "history" && (
+      {tab === "history" && isBlockVisible(uiBlocks, "history", "section") && (
       <Card className="mt-6">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
