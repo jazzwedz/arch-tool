@@ -2,17 +2,17 @@ import { NextResponse } from "next/server"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { isValidAudience, sanitizeForPrompt } from "@/lib/validate"
 import {
-  getAnthropicClient,
-  isAnthropicConfigured,
-  AI_DISABLED_MESSAGE,
-} from "@/lib/anthropic-client"
+  getLLM,
+  isLLMConfigured,
+  LLM_DISABLED_MESSAGE,
+} from "@/lib/llm"
 
 export async function POST(request: Request) {
   try {
-    if (!isAnthropicConfigured()) {
-      return NextResponse.json({ error: AI_DISABLED_MESSAGE }, { status: 503 })
+    if (!isLLMConfigured()) {
+      return NextResponse.json({ error: LLM_DISABLED_MESSAGE }, { status: 503 })
     }
-    const anthropic = getAnthropicClient()
+    const llm = await getLLM()
     const clientIp = request.headers.get("x-forwarded-for") || "unknown"
     if (!checkRateLimit(clientIp)) {
       return NextResponse.json(
@@ -96,19 +96,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    })
-
-    const textBlock = message.content.find((block) => block.type === "text")
-    const generatedText = textBlock ? textBlock.text : ""
+    const generatedText = await llm.complete({ prompt, maxTokens: 4096 })
 
     return NextResponse.json({ generated: generatedText })
   } catch (error) {

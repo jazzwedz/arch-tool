@@ -34,7 +34,7 @@ Architecture overview: <https://arch-tool-jaso.up.railway.app/architecture.html>
 
 ## Quickstart
 
-Prerequisites: Node.js 20+, an empty GitHub repository for your catalog data, an Anthropic API key, optionally a Confluence Cloud account.
+Prerequisites: Node.js 20+, an empty GitHub repository for your catalog data, an LLM API key (Anthropic Claude or any OpenAI-compatible gateway), optionally a Confluence Cloud account.
 
 ```bash
 git clone https://github.com/jazzwedz/arch-tool.git
@@ -60,8 +60,24 @@ All configuration via environment variables (`.env.local` for dev, your platform
 | `GITHUB_OWNER` | GitHub user/org that owns the data repo |
 | `GITHUB_REPO` | Name of the data repo (defaults to `arch-data`) |
 | `GITHUB_BRANCH` | Branch to commit into (defaults to `main`) |
-| `ANTHROPIC_API_KEY` | Anthropic key for Claude (Generate, Blast Radius memo, Pull-smart) |
+| `LLM_PROVIDER` | `anthropic` (default) or `openai-compatible` |
+| `ANTHROPIC_API_KEY` | Required when `LLM_PROVIDER=anthropic` |
+| `LLM_BASE_URL` + `LLM_API_KEY` | Required when `LLM_PROVIDER=openai-compatible` |
 | `SITE_PASSWORD` | Shared password gate (basic single-user auth) |
+
+### LLM provider
+
+Two adapters ship in the box:
+
+- **`anthropic`** — calls Claude directly via the Anthropic SDK. Default. Set `ANTHROPIC_API_KEY`; optionally `ANTHROPIC_MODEL` (falls back to a built-in default).
+- **`openai-compatible`** — calls any service that exposes the OpenAI Chat Completions protocol. Set `LLM_BASE_URL` (e.g. `https://api.openai.com/v1`, your gateway, or a self-hosted endpoint) and `LLM_API_KEY`. Covers OpenAI, Azure OpenAI, OpenRouter, Together, Groq, LiteLLM, Portkey, Cloudflare AI Gateway, Ollama, LM Studio, vllm, etc. Optionally set `LLM_MODEL`.
+
+Model name can also live in `config.yaml` at the root of your data repo (overrides env):
+
+```yaml
+llm:
+  model: claude-sonnet-4-20250514   # or gpt-4o, etc.
+```
 
 ### Optional — Confluence integration
 

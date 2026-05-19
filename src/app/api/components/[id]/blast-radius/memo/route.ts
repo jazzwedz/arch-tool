@@ -3,17 +3,17 @@ import { checkRateLimit } from "@/lib/rate-limit"
 import type { BlastRadiusResult, ImpactedComponent } from "@/lib/blast-radius"
 import { RELATIONSHIP_LABELS } from "@/lib/constants"
 import {
-  getAnthropicClient,
-  isAnthropicConfigured,
-  AI_DISABLED_MESSAGE,
-} from "@/lib/anthropic-client"
+  getLLM,
+  isLLMConfigured,
+  LLM_DISABLED_MESSAGE,
+} from "@/lib/llm"
 
 export async function POST(request: Request) {
   try {
-    if (!isAnthropicConfigured()) {
-      return NextResponse.json({ error: AI_DISABLED_MESSAGE }, { status: 503 })
+    if (!isLLMConfigured()) {
+      return NextResponse.json({ error: LLM_DISABLED_MESSAGE }, { status: 503 })
     }
-    const anthropic = getAnthropicClient()
+    const llm = await getLLM()
     const clientIp = request.headers.get("x-forwarded-for") || "unknown"
     if (!checkRateLimit(clientIp)) {
       return NextResponse.json(
@@ -28,15 +28,7 @@ export async function POST(request: Request) {
     }
 
     const prompt = buildMemoPrompt(blastData)
-
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
-    })
-
-    const textBlock = message.content.find((block) => block.type === "text")
-    const memo = textBlock ? textBlock.text : ""
+    const memo = await llm.complete({ prompt, maxTokens: 2048 })
 
     return NextResponse.json({ memo })
   } catch (error) {

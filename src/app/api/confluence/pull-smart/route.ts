@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
 import yaml from "js-yaml"
 import {
-  getAnthropicClient,
-  isAnthropicConfigured,
-  AI_DISABLED_MESSAGE,
-} from "@/lib/anthropic-client"
+  getLLM,
+  isLLMConfigured,
+  LLM_DISABLED_MESSAGE,
+} from "@/lib/llm"
 import {
   getComponent,
   saveComponent,
@@ -154,9 +154,9 @@ export async function POST(request: Request) {
 
     // PROPOSE phase: AI scans the whole page text against the catalog YAML
     // and proposes precise field-level patches.
-    if (!isAnthropicConfigured()) {
+    if (!isLLMConfigured()) {
       return NextResponse.json(
-        { error: AI_DISABLED_MESSAGE },
+        { error: LLM_DISABLED_MESSAGE },
         { status: 503 }
       )
     }
@@ -191,20 +191,14 @@ async function computeAiPatches(
   storageBody: string,
   component: unknown
 ): Promise<SmartPatch[]> {
-  if (!isAnthropicConfigured()) return []
-  const anthropic = getAnthropicClient()
+  if (!isLLMConfigured()) return []
+  const llm = await getLLM()
   const pageText = storageToText(storageBody)
   const yamlText = yaml.dump(component, { lineWidth: -1, sortKeys: false })
   const prompt = buildPrompt(yamlText, pageText)
 
   try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }],
-    })
-    const textBlock = message.content.find((b) => b.type === "text")
-    const raw = textBlock ? textBlock.text : ""
+    const raw = await llm.complete({ prompt, maxTokens: 1500 })
     const parsed = extractJson(raw)
     if (!parsed || !Array.isArray(parsed.patches)) return []
     const out: SmartPatch[] = []
