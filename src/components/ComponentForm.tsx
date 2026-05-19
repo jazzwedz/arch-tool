@@ -53,7 +53,7 @@ import type {
   ComponentRule,
   RuleKind,
 } from "@/lib/types"
-import { Plus, Trash2, Save, Loader2, Info } from "lucide-react"
+import { Plus, Trash2, Save, Loader2, Info, ChevronUp, ChevronDown } from "lucide-react"
 import {
   Tooltip,
   TooltipTrigger,
@@ -303,6 +303,30 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
         if (i < index) next[i] = v
         else if (i > index) next[i - 1] = v
       })
+      return next
+    })
+  }
+
+  // Swap two rules by index. Mirrors the swap onto the per-row enforced_in
+  // input state so the constraint-input value follows the rule it belongs to.
+  const moveRule = (index: number, direction: -1 | 1) => {
+    const target = index + direction
+    setForm((prev) => {
+      const rules = [...(prev.rules || [])]
+      if (target < 0 || target >= rules.length) return prev
+      const tmp = rules[index]
+      rules[index] = rules[target]
+      rules[target] = tmp
+      return { ...prev, rules }
+    })
+    setRuleEnforcedInput((prev) => {
+      const a = prev[index]
+      const b = prev[target]
+      const next: Record<number, string> = { ...prev }
+      if (a === undefined) delete next[target]
+      else next[target] = a
+      if (b === undefined) delete next[index]
+      else next[index] = b
       return next
     })
   }
@@ -1278,12 +1302,12 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
           {(form.rules || []).length === 0 ? (
             <p className="text-sm text-muted-foreground">No rules defined.</p>
           ) : (
-            (form.rules || []).map((r, i) => (
+            (form.rules || []).map((r, i, arr) => (
               <div
                 key={i}
                 className="rounded-md border bg-muted/20 p-3 space-y-2"
               >
-                <div className="grid grid-cols-[1.4fr,auto,auto] gap-2 items-start">
+                <div className="grid grid-cols-[1.4fr,auto,auto,auto,auto] gap-2 items-start">
                   <Input
                     placeholder="Rule name (e.g. Premium calculation)"
                     value={r.name}
@@ -1310,7 +1334,33 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    onClick={() => moveRule(i, -1)}
+                    disabled={i === 0}
+                    aria-label="Move rule up"
+                    title="Move up"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => moveRule(i, 1)}
+                    disabled={i === arr.length - 1}
+                    aria-label="Move rule down"
+                    title="Move down"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
                     onClick={() => removeRule(i)}
+                    aria-label="Remove rule"
+                    title="Remove"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
