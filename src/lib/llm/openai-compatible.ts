@@ -1,4 +1,5 @@
-import type { LLMProvider, LLMCompleteOptions } from "./types"
+import type { LLMProvider, LLMCompleteOptions, LLMDescribe } from "./types"
+import { maskSecret, runHttpProbe, type ProbeTrace } from "../diagnostics"
 
 interface ChatCompletionResponse {
   choices?: Array<{ message?: { content?: string | null } }>
@@ -51,5 +52,33 @@ export class OpenAICompatibleProvider implements LLMProvider {
       )
     }
     return content
+  }
+
+  describe(): LLMDescribe {
+    return {
+      provider: "openai-compatible",
+      baseUrl: this.baseUrl,
+      model: this.model,
+      authScheme: "Bearer",
+      authHint: maskSecret(this.apiKey),
+      endpointTemplate: "/chat/completions",
+    }
+  }
+
+  async probe(): Promise<ProbeTrace> {
+    return runHttpProbe({
+      method: "POST",
+      url: `${this.baseUrl}/chat/completions`,
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.model,
+        max_tokens: 1,
+        messages: [{ role: "user", content: "Hi" }],
+      }),
+      providerLabel: "LLM gateway",
+    })
   }
 }

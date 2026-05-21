@@ -5,8 +5,10 @@ import type {
   ConfluenceProvider,
   ConfluencePageRef,
   ConfluencePageFull,
+  ConfluenceDescribe,
 } from "./types"
 import { ConfluenceHttpError } from "./types"
+import { maskSecret, runHttpProbe, type ProbeTrace } from "../diagnostics"
 
 interface CloudPageResponse {
   id: string
@@ -22,6 +24,8 @@ export class ConfluenceCloudProvider implements ConfluenceProvider {
   readonly edition = "cloud" as const
   private baseUrl: string
   private spaceId: string
+  private email: string
+  private apiToken: string
   private authHeader: string
 
   constructor(opts: {
@@ -32,6 +36,8 @@ export class ConfluenceCloudProvider implements ConfluenceProvider {
   }) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, "")
     this.spaceId = opts.spaceId
+    this.email = opts.email
+    this.apiToken = opts.apiToken
     this.authHeader =
       "Basic " +
       Buffer.from(`${opts.email}:${opts.apiToken}`).toString("base64")
@@ -136,6 +142,35 @@ export class ConfluenceCloudProvider implements ConfluenceProvider {
       cursor = decodeURIComponent(m[1])
     }
     return null
+  }
+
+  describe(): ConfluenceDescribe {
+    return {
+      edition: "cloud",
+      baseUrl: this.baseUrl,
+      space: { type: "spaceId", value: this.spaceId },
+      authScheme: "Basic (email + API token)",
+      authHint: maskSecret(this.apiToken),
+      email: this.email,
+      apiPathTemplate: "/wiki/api/v2/pages",
+    }
+  }
+
+  async probe(): Promise<ProbeTrace> {
+    const params = new URLSearchParams({
+      "space-id": this.spaceId,
+      title: "__arch-tool-healthcheck-nonexistent__",
+      limit: "1",
+    })
+    return runHttpProbe({
+      method: "GET",
+      url: `${this.baseUrl}/wiki/api/v2/pages?${params.toString()}`,
+      headers: {
+        Authorization: this.authHeader,
+        Accept: "application/json",
+      },
+      providerLabel: "Confluence Cloud",
+    })
   }
 
   private toRef(data: CloudPageResponse): ConfluencePageRef {

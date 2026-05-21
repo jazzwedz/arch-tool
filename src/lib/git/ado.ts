@@ -19,8 +19,10 @@ import type {
   GitFile,
   GitTreeEntry,
   GitCommitMeta,
+  GitDescribe,
 } from "./types"
 import { GitNotFoundError } from "./types"
+import { maskSecret, runHttpProbe, type ProbeTrace } from "../diagnostics"
 
 const API_VERSION = "7.1"
 
@@ -34,6 +36,10 @@ export class ADOProvider implements GitProvider {
   readonly name = "ado" as const
   readonly branch: string
   private repoBaseUrl: string
+  private baseUrl: string
+  private project: string
+  private repo: string
+  private pat: string
   private authHeader: string
   private branchHeadCache: { id: string; fetchedAt: number } | null = null
 
@@ -45,8 +51,12 @@ export class ADOProvider implements GitProvider {
     pat: string
   }) {
     const base = opts.baseUrl.replace(/\/$/, "")
+    this.baseUrl = base
+    this.project = opts.project
+    this.repo = opts.repo
     this.repoBaseUrl = `${base}/${encodeURIComponent(opts.project)}/_apis/git/repositories/${encodeURIComponent(opts.repo)}`
     this.branch = opts.branch
+    this.pat = opts.pat
     this.authHeader = `Basic ${Buffer.from(`:${opts.pat}`).toString("base64")}`
   }
 
@@ -193,6 +203,35 @@ export class ADOProvider implements GitProvider {
       author: c.author?.name || "unknown",
       date: c.author?.date || "",
     }))
+  }
+
+  describe(): GitDescribe {
+    return {
+      provider: "ado",
+      baseUrl: this.baseUrl,
+      branch: this.branch,
+      repoIdentifier: `${this.project}/${this.repo}`,
+      authScheme: "Basic (:PAT)",
+      authHint: maskSecret(this.pat),
+    }
+  }
+
+  async probe(): Promise<ProbeTrace> {
+    // Single ref lookup verifies auth, org/project/repo path, and branch
+    // existence — cheaper and clearer than listing items.
+    const url =
+      `${this.repoBaseUrl}/refs` +
+      `?filter=heads/${encodeURIComponent(this.branch)}` +
+      `&api-version=${API_VERSION}`
+    return runHttpProbe({
+      method: "GET",
+      url,
+      headers: {
+        Authorization: this.authHeader,
+        Accept: "application/json",
+      },
+      providerLabel: "Azure DevOps",
+    })
   }
 
   private async request(url: string, init?: RequestInit): Promise<Response> {

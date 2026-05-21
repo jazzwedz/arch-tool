@@ -48,20 +48,65 @@ function readVisible(
 
 type HealthKind = "llm" | "git" | "confluence"
 
+interface ProbeStep {
+  step: "dns" | "request" | "response" | "classify"
+  ok: boolean
+  ms?: number
+  detail?: string
+  // dns
+  address?: string
+  // request
+  method?: string
+  url?: string
+  headers?: Record<string, string>
+  // response
+  status?: number
+  statusText?: string
+  bodyExcerpt?: string
+  // classify
+  category?: string
+  hint?: string
+}
+
+interface ProbeTrace {
+  ok: boolean
+  totalMs: number
+  steps: ProbeStep[]
+}
+
+interface DescribeAny {
+  provider?: string
+  edition?: string
+  baseUrl?: string
+  model?: string
+  endpointTemplate?: string
+  apiPathTemplate?: string
+  authScheme?: string
+  authHint?: string
+  email?: string
+  space?: { type: string; value: string }
+  branch?: string
+  repoIdentifier?: string
+}
+
 interface HealthResult {
   ok: boolean
+  configured?: boolean
   elapsedMs?: number
   provider?: string
   edition?: string
   model?: string
   branch?: string
-  componentsFound?: number
+  describe?: DescribeAny
+  trace?: ProbeTrace
+  missingEnv?: string[]
   error?: string
 }
 
 interface HealthState {
   status: "idle" | "running" | "done"
   result?: HealthResult
+  expanded?: boolean
 }
 
 const HEALTH_LABELS: Record<HealthKind, string> = {
@@ -156,13 +201,22 @@ export default function SettingsPage() {
   }
 
   async function runHealth(kind: HealthKind) {
-    setHealth((prev) => ({ ...prev, [kind]: { status: "running" } }))
+    setHealth((prev) => ({
+      ...prev,
+      [kind]: { status: "running", expanded: prev[kind].expanded },
+    }))
     try {
       const res = await fetch(`/api/healthcheck/${kind}`, { method: "POST" })
       const data = (await res.json()) as HealthResult
       setHealth((prev) => ({
         ...prev,
-        [kind]: { status: "done", result: data },
+        [kind]: {
+          status: "done",
+          result: data,
+          // Auto-expand on failure so the user immediately sees the
+          // describe + trace; collapsed by default on success.
+          expanded: !data.ok || prev[kind].expanded,
+        },
       }))
     } catch (e) {
       setHealth((prev) => ({
@@ -170,6 +224,7 @@ export default function SettingsPage() {
         [kind]: {
           status: "done",
           result: { ok: false, error: e instanceof Error ? e.message : "Request failed" },
+          expanded: true,
         },
       }))
     }
@@ -179,6 +234,13 @@ export default function SettingsPage() {
     void runHealth("llm")
     void runHealth("git")
     void runHealth("confluence")
+  }
+
+  function toggleExpand(kind: HealthKind) {
+    setHealth((prev) => ({
+      ...prev,
+      [kind]: { ...prev[kind], expanded: !prev[kind].expanded },
+    }))
   }
 
   if (!loaded) {
@@ -234,54 +296,87 @@ export default function SettingsPage() {
           {(["llm", "git", "confluence"] as HealthKind[]).map((kind) => {
             const s = health[kind]
             const r = s.result
+            const failingCategory = r?.trace?.steps
+              .filter((st) => st.step === "classify")
+              .map((st) => st.category)[0]
             return (
               <div
                 key={kind}
-                className="flex items-center gap-3 py-1.5 border-b last:border-b-0"
+                className="py-2 border-b last:border-b-0"
               >
-                <div className="w-32 text-sm font-medium">
-                  {HEALTH_LABELS[kind]}
-                </div>
-                <div className="flex-1 text-xs text-muted-foreground">
-                  {s.status === "running" ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Probing...
-                    </span>
-                  ) : s.status === "idle" || !r ? (
-                    <span className="opacity-60">Not tested yet</span>
-                  ) : r.ok ? (
-                    <span className="inline-flex items-center gap-2 text-green-700">
-                      <Check className="h-3.5 w-3.5" />
-                      <span>
-                        OK
-                        {r.elapsedMs !== undefined ? ` · ${r.elapsedMs}ms` : ""}
-                        {r.provider ? ` · ${r.provider}` : ""}
-                        {r.edition ? ` · ${r.edition}` : ""}
-                        {r.model ? ` · ${r.model}` : ""}
-                        {r.branch ? ` · ${r.branch}` : ""}
-                        {r.componentsFound !== undefined
-                          ? ` · ${r.componentsFound} components`
-                          : ""}
+                <div className="flex items-center gap-3">
+                  <div className="w-32 text-sm font-medium">
+                    {HEALTH_LABELS[kind]}
+                  </div>
+                  <div className="flex-1 text-xs text-muted-foreground">
+                    {s.status === "running" ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Probing...
                       </span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-start gap-2 text-destructive">
-                      <X className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                      <span className="break-all">
-                        {r.error || "Failed"}
+                    ) : s.status === "idle" || !r ? (
+                      <span className="opacity-60">Not tested yet</span>
+                    ) : r.ok ? (
+                      <span className="inline-flex items-center gap-2 text-green-700">
+                        <Check className="h-3.5 w-3.5" />
+                        <span>
+                          OK
+                          {r.elapsedMs !== undefined ? ` · ${r.elapsedMs}ms` : ""}
+                          {r.provider ? ` · ${r.provider}` : ""}
+                          {r.edition ? ` · ${r.edition}` : ""}
+                          {r.model ? ` · ${r.model}` : ""}
+                          {r.branch ? ` · ${r.branch}` : ""}
+                        </span>
                       </span>
-                    </span>
+                    ) : (
+                      <span className="inline-flex items-start gap-2 text-destructive">
+                        <X className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span className="break-all">
+                          {failingCategory ? (
+                            <code className="font-mono bg-destructive/10 px-1 rounded mr-1">{failingCategory}</code>
+                          ) : null}
+                          {r.error || `Failed${r.elapsedMs !== undefined ? ` · ${r.elapsedMs}ms` : ""}`}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  {r && (r.describe || r.trace || r.missingEnv) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs"
+                      onClick={() => toggleExpand(kind)}
+                    >
+                      {s.expanded ? "Hide detail" : "Show detail"}
+                    </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => runHealth(kind)}
+                    disabled={s.status === "running"}
+                  >
+                    Test
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => runHealth(kind)}
-                  disabled={s.status === "running"}
-                >
-                  Test
-                </Button>
+
+                {s.expanded && r && (
+                  <div className="mt-3 ml-32 space-y-3 text-xs">
+                    {r.missingEnv && r.missingEnv.length > 0 && (
+                      <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-orange-900">
+                        <div className="font-medium mb-1">Missing environment variables</div>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {r.missingEnv.map((v) => (
+                            <li key={v}><code className="font-mono">{v}</code></li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {r.describe && <DescribeBlock describe={r.describe} />}
+                    {r.trace && <TraceBlock trace={r.trace} />}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -356,6 +451,126 @@ export default function SettingsPage() {
         )}
         {error && <span className="text-sm text-destructive">{error}</span>}
       </div>
+    </div>
+  )
+}
+
+// --- helper components for the verbose health-check detail view ---------
+
+function DescribeBlock({ describe }: { describe: DescribeAny }) {
+  const rows: Array<[string, string | undefined]> = []
+  if (describe.provider) rows.push(["Provider", describe.provider])
+  if (describe.edition) rows.push(["Edition", describe.edition])
+  if (describe.baseUrl) rows.push(["Base URL", describe.baseUrl])
+  if (describe.endpointTemplate)
+    rows.push(["Endpoint", describe.endpointTemplate])
+  if (describe.apiPathTemplate)
+    rows.push(["API path", describe.apiPathTemplate])
+  if (describe.repoIdentifier) rows.push(["Repo", describe.repoIdentifier])
+  if (describe.branch) rows.push(["Branch", describe.branch])
+  if (describe.model) rows.push(["Model", describe.model])
+  if (describe.space)
+    rows.push([`Space (${describe.space.type})`, describe.space.value])
+  if (describe.email) rows.push(["Email", describe.email])
+  if (describe.authScheme) rows.push(["Auth scheme", describe.authScheme])
+  if (describe.authHint) rows.push(["Credential", describe.authHint])
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 space-y-1">
+      <div className="font-medium text-foreground mb-1">Connection</div>
+      <table className="w-full">
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k} className="border-b border-border/50 last:border-b-0">
+              <td className="py-1 pr-3 text-muted-foreground align-top whitespace-nowrap">
+                {k}
+              </td>
+              <td className="py-1 font-mono break-all">{v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function TraceBlock({ trace }: { trace: ProbeTrace }) {
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+      <div className="font-medium text-foreground">
+        Probe trace
+        <span className="ml-2 text-muted-foreground font-normal">
+          · total {trace.totalMs}ms
+        </span>
+      </div>
+      {trace.steps.map((s, i) => (
+        <TraceStepLine key={i} step={s} />
+      ))}
+    </div>
+  )
+}
+
+function TraceStepLine({ step }: { step: ProbeStep }) {
+  const icon = step.ok ? (
+    <span className="text-green-700">✓</span>
+  ) : (
+    <span className="text-destructive">✗</span>
+  )
+  return (
+    <div className="border-l-2 border-border pl-3 space-y-0.5">
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className="font-medium capitalize">{step.step}</span>
+        {step.ms !== undefined && (
+          <span className="text-muted-foreground">{step.ms}ms</span>
+        )}
+        {step.method && step.url && (
+          <span className="text-muted-foreground">
+            · {step.method} {step.url}
+          </span>
+        )}
+        {step.status !== undefined && (
+          <span className="text-muted-foreground">
+            · {step.status} {step.statusText}
+          </span>
+        )}
+        {step.address && (
+          <span className="text-muted-foreground">· {step.address}</span>
+        )}
+        {step.category && (
+          <code className="text-xs px-1 rounded bg-destructive/10 text-destructive font-mono">
+            {step.category}
+          </code>
+        )}
+      </div>
+      {step.headers && (
+        <details className="ml-5 mt-1">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+            Headers ({Object.keys(step.headers).length})
+          </summary>
+          <pre className="font-mono text-[11px] mt-1 p-2 rounded bg-background border overflow-x-auto">
+            {Object.entries(step.headers)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join("\n")}
+          </pre>
+        </details>
+      )}
+      {step.bodyExcerpt && (
+        <details className="ml-5 mt-1" open={!step.ok}>
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+            Response body ({step.bodyExcerpt.length} chars)
+          </summary>
+          <pre className="font-mono text-[11px] mt-1 p-2 rounded bg-background border overflow-x-auto whitespace-pre-wrap break-all">
+            {step.bodyExcerpt}
+          </pre>
+        </details>
+      )}
+      {step.detail && !step.headers && !step.bodyExcerpt && (
+        <div className="ml-5 text-muted-foreground">{step.detail}</div>
+      )}
+      {step.hint && (
+        <div className="ml-5 mt-1 text-foreground/80 italic">{step.hint}</div>
+      )}
     </div>
   )
 }

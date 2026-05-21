@@ -1,37 +1,41 @@
 import { NextResponse } from "next/server"
-import { getGit, getGitProviderName, isGitConfigured } from "@/lib/git"
+import { getGit, getGitProviderName, missingGitEnvVars } from "@/lib/git"
 
-// POST — live-probe the configured Git backend by listing the components/
-// tree. An empty result is still a success (auth + network round-tripped),
-// only thrown errors mark the check as failing.
+// POST — verbose live-probe of the configured Git backend. Returns the
+// sanitized self-description, a four-step probe trace, and (when nothing
+// is configured) the list of env vars that need to be set.
 export async function POST() {
   const provider = getGitProviderName()
-  const startedAt = Date.now()
+  const missing = missingGitEnvVars()
 
-  if (!isGitConfigured()) {
+  if (missing.length > 0) {
     return NextResponse.json({
       ok: false,
+      configured: false,
       provider,
-      elapsedMs: 0,
-      error: "Git backend is not configured for this provider.",
+      missingEnv: missing,
+      error: `Not configured — set: ${missing.join(", ")}.`,
     })
   }
 
   try {
     const git = getGit()
-    const entries = await git.listTree("components/")
+    const describe = git.describe()
+    const trace = await git.probe()
     return NextResponse.json({
-      ok: true,
+      ok: trace.ok,
+      configured: true,
       provider,
       branch: git.branch,
-      componentsFound: entries.length,
-      elapsedMs: Date.now() - startedAt,
+      describe,
+      trace,
+      elapsedMs: trace.totalMs,
     })
   } catch (error: unknown) {
     return NextResponse.json({
       ok: false,
+      configured: true,
       provider,
-      elapsedMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : String(error),
     })
   }

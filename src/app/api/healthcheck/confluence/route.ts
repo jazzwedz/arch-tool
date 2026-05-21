@@ -1,38 +1,44 @@
 import { NextResponse } from "next/server"
 import {
   getConfluenceEdition,
-  isConfluenceConfigured,
-  findPageByTitleInSpace,
-} from "@/lib/confluence"
+  getConfluenceProvider,
+  missingConfluenceEnvVars,
+} from "@/lib/confluence/index"
 
-// POST — live-probe Confluence by searching for an intentionally
-// non-existent title. A `null` response is a success (auth + network
-// round-tripped without error); the probe never touches real content.
+// POST — verbose live-probe of the configured Confluence edition.
+// Returns the sanitized self-description, a four-step probe trace, and
+// (when nothing is configured) the list of env vars that need to be set.
 export async function POST() {
   const edition = getConfluenceEdition()
-  const startedAt = Date.now()
+  const missing = missingConfluenceEnvVars()
 
-  if (!isConfluenceConfigured()) {
+  if (missing.length > 0) {
     return NextResponse.json({
       ok: false,
+      configured: false,
       edition,
-      elapsedMs: 0,
-      error: "Confluence is not configured for this edition.",
+      missingEnv: missing,
+      error: `Not configured — set: ${missing.join(", ")}.`,
     })
   }
 
   try {
-    await findPageByTitleInSpace("__arch-tool-healthcheck-nonexistent__")
+    const confluence = getConfluenceProvider()
+    const describe = confluence.describe()
+    const trace = await confluence.probe()
     return NextResponse.json({
-      ok: true,
+      ok: trace.ok,
+      configured: true,
       edition,
-      elapsedMs: Date.now() - startedAt,
+      describe,
+      trace,
+      elapsedMs: trace.totalMs,
     })
   } catch (error: unknown) {
     return NextResponse.json({
       ok: false,
+      configured: true,
       edition,
-      elapsedMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : String(error),
     })
   }

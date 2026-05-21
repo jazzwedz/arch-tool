@@ -2,40 +2,47 @@ import { NextResponse } from "next/server"
 import {
   getLLM,
   getLLMProviderName,
-  isLLMConfigured,
-  LLM_DISABLED_MESSAGE,
+  missingLLMEnvVars,
 } from "@/lib/llm"
 
-// POST — live-probe the configured LLM provider with a tiny 1-token
-// completion. Returns the provider name, model in use, latency, and any
-// error message. The cost of a single 1-token call is negligible.
+// POST — verbose live-probe of the configured LLM provider. Returns:
+//   - the sanitized connection self-description (URL, model, masked
+//     credential hint)
+//   - a four-step trace (DNS → request → response → classify) so the UI
+//     can pinpoint exactly where a failing connection breaks
+//   - the env-var list when nothing is configured at all
 export async function POST() {
   const provider = getLLMProviderName()
-  const startedAt = Date.now()
+  const missing = missingLLMEnvVars()
 
-  if (!isLLMConfigured()) {
+  if (missing.length > 0) {
     return NextResponse.json({
       ok: false,
+      configured: false,
       provider,
-      elapsedMs: 0,
-      error: LLM_DISABLED_MESSAGE,
+      missingEnv: missing,
+      error: `Not configured — set: ${missing.join(", ")}.`,
     })
   }
 
   try {
     const llm = await getLLM()
-    await llm.complete({ prompt: "Hi", maxTokens: 1 })
+    const describe = llm.describe()
+    const trace = await llm.probe()
     return NextResponse.json({
-      ok: true,
+      ok: trace.ok,
+      configured: true,
       provider,
-      model: llm.model,
-      elapsedMs: Date.now() - startedAt,
+      model: describe.model,
+      describe,
+      trace,
+      elapsedMs: trace.totalMs,
     })
   } catch (error: unknown) {
     return NextResponse.json({
       ok: false,
+      configured: true,
       provider,
-      elapsedMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : String(error),
     })
   }

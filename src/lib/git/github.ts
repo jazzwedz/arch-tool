@@ -4,8 +4,12 @@ import type {
   GitFile,
   GitTreeEntry,
   GitCommitMeta,
+  GitDescribe,
 } from "./types"
 import { GitNotFoundError } from "./types"
+import { maskSecret, runHttpProbe, type ProbeTrace } from "../diagnostics"
+
+const GITHUB_BASE_URL = "https://api.github.com"
 
 export class GitHubProvider implements GitProvider {
   readonly name = "github" as const
@@ -13,6 +17,7 @@ export class GitHubProvider implements GitProvider {
   private octokit: Octokit
   private owner: string
   private repo: string
+  private token: string
 
   constructor(opts: {
     token: string
@@ -24,6 +29,7 @@ export class GitHubProvider implements GitProvider {
     this.owner = opts.owner
     this.repo = opts.repo
     this.branch = opts.branch
+    this.token = opts.token
   }
 
   async listTree(prefix: string): Promise<GitTreeEntry[]> {
@@ -136,6 +142,32 @@ export class GitHubProvider implements GitProvider {
       author: commit.commit.author?.name || "unknown",
       date: commit.commit.author?.date || "",
     }))
+  }
+
+  describe(): GitDescribe {
+    return {
+      provider: "github",
+      baseUrl: GITHUB_BASE_URL,
+      branch: this.branch,
+      repoIdentifier: `${this.owner}/${this.repo}`,
+      authScheme: "Bearer (Fine-grained PAT)",
+      authHint: maskSecret(this.token),
+    }
+  }
+
+  async probe(): Promise<ProbeTrace> {
+    // GET /repos/{owner}/{repo}/branches/{branch} — small, reliable,
+    // verifies token + repo + branch in one shot.
+    return runHttpProbe({
+      method: "GET",
+      url: `${GITHUB_BASE_URL}/repos/${encodeURIComponent(this.owner)}/${encodeURIComponent(this.repo)}/branches/${encodeURIComponent(this.branch)}`,
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      providerLabel: "GitHub",
+    })
   }
 }
 

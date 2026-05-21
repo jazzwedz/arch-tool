@@ -7,6 +7,10 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Verbose connection diagnostics in Settings.** Health checks now return a sanitized connection self-description (provider, base URL, endpoint template, repo / space / model, auth scheme, credential hint with `prefix…****suffix` masking) plus a four-step probe trace (DNS → request → response → classify). Failed probes auto-expand and surface an error category (`auth-401`, `forbidden-403`, `not-found-404`, `rate-limit-429`, `server-5xx`, `dns`, `connect`, `parse`, `http-other`) and a category-specific hint. The Response and Headers sections are inspectable in collapsible panels, so debugging an external integration no longer needs a separate curl session. Secrets are never returned in full from the server — `Authorization` and `x-api-key` headers are masked before they leave the route.
+
 ## [0.2.0] — 2026-05-19
 
 Multi-backend release. Every external integration the catalog touches —

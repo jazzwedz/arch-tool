@@ -10,6 +10,8 @@
 // is the branch HEAD commit OID at read time. Callers must not interpret
 // it — they store it and pass it back.
 
+import type { ProbeTrace } from "../diagnostics"
+
 export interface GitFile {
   path: string
   content: string
@@ -27,6 +29,16 @@ export interface GitCommitMeta {
   message: string
   author: string
   date: string
+}
+
+export interface GitDescribe {
+  provider: "github" | "ado"
+  baseUrl: string
+  branch: string
+  // For GitHub: "owner/repo". For ADO: "project/repo".
+  repoIdentifier: string
+  authScheme: string
+  authHint: string
 }
 
 export interface GitProvider {
@@ -52,6 +64,12 @@ export interface GitProvider {
 
   // List commits touching a specific path, newest first.
   listFileHistory(path: string, limit: number): Promise<GitCommitMeta[]>
+
+  // Sanitized self-description for the Settings UI. Sync, no network.
+  describe(): GitDescribe
+
+  // Verbose four-step probe (DNS / request / response / classify).
+  probe(): Promise<ProbeTrace>
 }
 
 export class GitNotFoundError extends Error {

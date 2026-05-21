@@ -11,6 +11,8 @@
 // space key on Data Center — it's informational only (stored in the
 // per-component link side-file, never used for further API calls).
 
+import type { ProbeTrace } from "../diagnostics"
+
 export interface ConfluencePageRef {
   id: string
   title: string
@@ -23,6 +25,20 @@ export interface ConfluencePageRef {
 
 export interface ConfluencePageFull extends ConfluencePageRef {
   body: string // storage format XHTML
+}
+
+export interface ConfluenceDescribe {
+  edition: "cloud" | "datacenter"
+  baseUrl: string
+  // For Cloud: { type: 'spaceId', value: '229575' }
+  // For DC:    { type: 'spaceKey', value: 'TR' }
+  space: { type: "spaceId" | "spaceKey"; value: string }
+  authScheme: string
+  authHint: string
+  // For Cloud only — the account email is not a secret and helps
+  // disambiguate which user the integration runs as.
+  email?: string
+  apiPathTemplate: string
 }
 
 export interface ConfluenceProvider {
@@ -49,6 +65,12 @@ export interface ConfluenceProvider {
 
   findPageByTitleInSpace(title: string): Promise<ConfluencePageRef | null>
   findPageByComponentId(componentId: string): Promise<ConfluencePageRef | null>
+
+  // Sanitized self-description for the Settings UI. Sync, no network.
+  describe(): ConfluenceDescribe
+
+  // Verbose four-step probe: DNS, request, response, classify.
+  probe(): Promise<ProbeTrace>
 }
 
 export class ConfluenceHttpError extends Error {

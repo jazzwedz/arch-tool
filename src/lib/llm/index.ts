@@ -18,7 +18,7 @@ import { OpenAICompatibleProvider } from "./openai-compatible"
 import type { LLMProvider } from "./types"
 import { loadConfig } from "../config"
 
-export type { LLMProvider, LLMCompleteOptions } from "./types"
+export type { LLMProvider, LLMCompleteOptions, LLMDescribe } from "./types"
 
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
 const DEFAULT_OPENAI_MODEL = "gpt-4o"
@@ -77,4 +77,19 @@ export async function getLLM(): Promise<LLMProvider> {
 // For tests / Settings page refresh after config or env change.
 export function resetLLMProvider(): void {
   _provider = null
+}
+
+// Returns the env-var names that should be set for the current provider
+// selection but are missing. Used by the healthcheck endpoint to render a
+// "not configured — set X, Y, Z" message before any network call.
+export function missingLLMEnvVars(): string[] {
+  const provider = getLLMProviderName()
+  if (provider === "anthropic") {
+    const k = process.env.ANTHROPIC_API_KEY
+    return !k || k.includes("placeholder") ? ["ANTHROPIC_API_KEY"] : []
+  }
+  const missing: string[] = []
+  if (!process.env.LLM_BASE_URL) missing.push("LLM_BASE_URL")
+  if (!process.env.LLM_API_KEY) missing.push("LLM_API_KEY")
+  return missing
 }

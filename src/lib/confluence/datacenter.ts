@@ -14,8 +14,10 @@ import type {
   ConfluenceProvider,
   ConfluencePageRef,
   ConfluencePageFull,
+  ConfluenceDescribe,
 } from "./types"
 import { ConfluenceHttpError } from "./types"
+import { maskSecret, runHttpProbe, type ProbeTrace } from "../diagnostics"
 
 interface DCPageResponse {
   id: string
@@ -27,6 +29,7 @@ interface DCPageResponse {
   _links?: { webui?: string; base?: string }
 }
 
+const API_VERSION_NOTE = ""
 const EXPAND_PAGE = "body.storage,version,ancestors,space"
 const EXPAND_REF = "version,ancestors,space"
 
@@ -144,6 +147,34 @@ export class ConfluenceDataCenterProvider implements ConfluenceProvider {
     return null
   }
 
+  describe(): ConfluenceDescribe {
+    return {
+      edition: "datacenter",
+      baseUrl: this.baseUrl,
+      space: { type: "spaceKey", value: this.spaceKey },
+      authScheme: "Bearer PAT",
+      authHint: maskSecret(this.pat),
+      apiPathTemplate: "/rest/api/content",
+    }
+  }
+
+  async probe(): Promise<ProbeTrace> {
+    const params = new URLSearchParams({
+      spaceKey: this.spaceKey,
+      title: "__arch-tool-healthcheck-nonexistent__",
+      limit: "1",
+    })
+    return runHttpProbe({
+      method: "GET",
+      url: `${this.baseUrl}/rest/api/content?${params.toString()}`,
+      headers: {
+        Authorization: `Bearer ${this.pat}`,
+        Accept: "application/json",
+      },
+      providerLabel: "Confluence Data Center",
+    })
+  }
+
   private toRef(data: DCPageResponse): ConfluencePageRef {
     const webui = data._links?.webui || ""
     const ancestors = data.ancestors || []
@@ -170,7 +201,7 @@ export class ConfluenceDataCenterProvider implements ConfluenceProvider {
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const url = `${this.baseUrl}${path}`
+    const url = `${this.baseUrl}${path}${API_VERSION_NOTE}`
     const res = await fetch(url, {
       ...init,
       headers: {

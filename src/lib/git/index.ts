@@ -10,7 +10,13 @@ import { GitHubProvider } from "./github"
 import { ADOProvider } from "./ado"
 import type { GitProvider } from "./types"
 
-export type { GitProvider, GitFile, GitTreeEntry, GitCommitMeta } from "./types"
+export type {
+  GitProvider,
+  GitFile,
+  GitTreeEntry,
+  GitCommitMeta,
+  GitDescribe,
+} from "./types"
 export { GitNotFoundError } from "./types"
 
 export type GitProviderName = "github" | "ado"
@@ -78,4 +84,22 @@ export function getGit(): GitProvider {
 
 export function resetGitProvider(): void {
   _provider = null
+}
+
+// Env-var names that should be set for the active provider but aren't.
+// Returns [] when configured.
+export function missingGitEnvVars(): string[] {
+  const name = getGitProviderName()
+  if (name === "github") {
+    const missing: string[] = []
+    if (!process.env.GITHUB_TOKEN) missing.push("GITHUB_TOKEN")
+    if (!process.env.GITHUB_OWNER) missing.push("GITHUB_OWNER")
+    return missing
+  }
+  const missing: string[] = []
+  if (!process.env.ADO_BASE_URL) missing.push("ADO_BASE_URL")
+  if (!process.env.ADO_PROJECT) missing.push("ADO_PROJECT")
+  if (!process.env.ADO_REPO) missing.push("ADO_REPO")
+  if (!process.env.ADO_PAT) missing.push("ADO_PAT")
+  return missing
 }
