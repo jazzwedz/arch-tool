@@ -77,6 +77,8 @@ import remarkGfm from "remark-gfm"
 import yaml from "js-yaml"
 import { useUIConfig } from "@/components/UIConfigProvider"
 import { isBlockVisible, isTabVisible, type DetailTabId } from "@/lib/ui-blocks"
+import { RulesImportDialog } from "@/components/RulesImportDialog"
+import type { ComponentRule } from "@/lib/types"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -134,6 +136,7 @@ export default function ComponentDetailPage() {
     | "diagrams"
     | "history"
   const [tab, setTab] = useState<DetailTab>("overview")
+  const [rulesImportOpen, setRulesImportOpen] = useState(false)
   const { blocks: uiBlocks } = useUIConfig()
 
   // If the active tab has been fully hidden via config, fall back to the
@@ -733,27 +736,40 @@ export default function ComponentDetailPage() {
       {tab === "rules" && isBlockVisible(uiBlocks, "rules", "section") && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              Rules &amp; Calculations
-              <Tooltip>
-                <TooltipTrigger className="cursor-help">
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-sm text-left">
-                  <p className="font-semibold mb-1">Business logic this component implements:</p>
-                  <ul className="text-xs space-y-0.5">
-                    <li><strong>Formula</strong> — a calculation or expression</li>
-                    <li><strong>Rule</strong> — Given / When / Then behavior</li>
-                    <li><strong>Constraint</strong> — invariant that must always hold</li>
-                  </ul>
-                </TooltipContent>
-              </Tooltip>
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Calculations, behavioral rules and invariants. Owners can capture
-              the &quot;what does this component actually do&quot; logic without
-              digging into source code.
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Rules &amp; Calculations
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-sm text-left">
+                      <p className="font-semibold mb-1">Business logic this component implements:</p>
+                      <ul className="text-xs space-y-0.5">
+                        <li><strong>Formula</strong> — a calculation or expression</li>
+                        <li><strong>Rule</strong> — Given / When / Then behavior</li>
+                        <li><strong>Constraint</strong> — invariant that must always hold</li>
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Calculations, behavioral rules and invariants. Owners can capture
+                  the &quot;what does this component actually do&quot; logic without
+                  digging into source code.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setRulesImportOpen(true)}
+                title="AI scans a PDF or Confluence page for rules relevant to this component"
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                Import from documents
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {(!component.rules || component.rules.length === 0) ? (
@@ -1999,6 +2015,31 @@ export default function ComponentDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <RulesImportDialog
+        open={rulesImportOpen}
+        onOpenChange={setRulesImportOpen}
+        componentId={component.id}
+        componentName={component.name}
+        existingRules={component.rules || []}
+        onImport={async (newRules: ComponentRule[]): Promise<string | void> => {
+          const merged: ComponentRule[] = [...(component.rules || []), ...newRules]
+          const { sha, ...rest } = component
+          const updated = { ...rest, rules: merged }
+          const res = await fetch(`/api/components/${component.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...updated, sha }),
+          })
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({ error: "Unknown error" }))
+            return body.error || `Save failed (${res.status})`
+          }
+          // Refresh component to pick up the new sha + canonical state.
+          const fresh = await fetch(`/api/components/${component.id}`).then((r) => r.json())
+          setComponent(fresh)
+        }}
+      />
     </div>
   )
 }
