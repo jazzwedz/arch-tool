@@ -7,6 +7,32 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-21
+
+Corporate-debugging release. Two themes:
+
+1. **AI rules import.** A Rules & Calculations analyst can now feed the
+   tool a PDF or a Confluence page and have the AI propose rule
+   candidates pre-shaped for the existing schema. A two-pass pipeline
+   keeps it practical on long documents — Pass 1 filters to passages
+   relevant to the active component, Pass 2 extracts structured
+   candidates. The analyst reviews, edits and selectively imports;
+   duplicates are flagged and unchecked by default.
+
+2. **Verbose connection diagnostics.** Health checks now describe what
+   they are about to do (URL, endpoint, masked credential hint, scheme)
+   and return a four-step probe trace (DNS → request → response →
+   classify). Failures classify into nine specific categories —
+   including a dedicated `tls` category that points at
+   `NODE_EXTRA_CA_CERTS` for the common corporate case where curl
+   works but Node does not trust the internal CA. The deepest
+   `err.cause` is unwrapped so the trace shows the real Node code
+   (`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `ECONNREFUSED`,
+   `ERR_TLS_CERT_ALTNAME_INVALID`, etc.) instead of the generic
+   "fetch failed".
+
+Both features are additive — no v0.2.0 deployment has to change anything.
+
 ### Added
 
 - **AI rules import from PDF or Confluence.** Rules & Calculations tab gains an "Import from documents" button that opens a wizard: choose a PDF (≤ 12 MB) or paste a Confluence page URL / page id, the server extracts text, then runs a two-pass AI analysis — Pass 1 filters the document down to passages relevant to the active component (skipped for documents under ~20K chars where it wastes more than it saves), Pass 2 emits structured rule candidates that match the existing `ComponentRule` schema (formula / Given-When-Then / constraint). Every candidate is editable (name, kind, summary, formula or G/W/T fields, description), shows a confidence badge, the source section, and a verbatim evidence quote; candidates the AI thinks duplicate an existing rule are flagged and unchecked by default. Import is append-only — selected candidates are merged onto the component and persisted through the existing PUT /api/components/[id] save flow, complete with sha optimistic concurrency. Hard cap at 320,000 input characters (~80K tokens, ~80 pages of text) — over-cap documents are rejected with a clear message before any LLM call.
@@ -99,6 +125,7 @@ First public release. Free software under MIT.
 - Architecture-questions checklist and 6-phase port plan for moving the app into a corporate environment.
 - Best-effort maintenance model documented in README.
 
-[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.1.0
