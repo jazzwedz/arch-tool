@@ -28,6 +28,10 @@ export interface ProbeStepBase {
   ok: boolean
   ms?: number
   detail?: string
+  // Optional phase label. Used by multi-phase probes (e.g. OAuth →
+  // gateway) so the UI can group the steps under a heading and the
+  // analyst can tell which phase failed.
+  phase?: string
 }
 
 export interface DnsStep extends ProbeStepBase {
@@ -69,6 +73,19 @@ export function maskSecret(value: string | undefined): string {
   if (!value) return ""
   if (value.length < 14) return "****"
   return `${value.slice(0, 6)}****${value.slice(-4)}`
+}
+
+// Mask bearer-style values inside a JSON-ish response body. Used before
+// a token endpoint response excerpt enters a diagnostic trace, so a
+// freshly-minted access_token never travels back to the browser. Best-
+// effort regex over the conventional flat token JSON; nested envelopes
+// can still slip through, so callers must also keep total excerpt
+// length short.
+export function redactBearerInJson(text: string): string {
+  return text.replace(
+    /"(access_token|id_token|refresh_token)"\s*:\s*"([^"]+)"/g,
+    (_, key, value) => `"${key}":"${maskSecret(value)}"`
+  )
 }
 
 // Sanitize request headers so we never echo a credential back to the

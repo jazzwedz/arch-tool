@@ -6,7 +6,14 @@
 //
 // The OpenAI-compatible adapter covers any gateway that speaks the Chat
 // Completions protocol: OpenAI native, Azure OpenAI, OpenRouter, Together,
-// Groq, LiteLLM, Portkey, Cloudflare AI Gateway, Ollama, LM Studio, vllm.
+// Groq, LiteLLM, Portkey, Cloudflare AI Gateway, Ollama, LM Studio, vllm,
+// and enterprise gateways that proxy one of the above behind an identity
+// provider (OAuth 2.0 client_credentials).
+//
+// Auth mode for the openai-compatible adapter is implied by which env
+// vars are set:
+//   LLM_API_KEY                    → static bearer token (default)
+//   LLM_OAUTH_TOKEN_URL + creds    → OAuth 2.0 client_credentials
 //
 // Model is read from `config.yaml` (`llm.model`) in the arch-data repo
 // when present, with an env-var fallback (ANTHROPIC_MODEL or LLM_MODEL)
@@ -33,19 +40,26 @@ export function getLLMProviderName(): LLMProviderName {
   return "anthropic"
 }
 
+// True when the active provider has enough env to attempt a connection.
+// The healthcheck route uses this to short-circuit before any network
+// call when the operator has not finished provisioning credentials.
 export function isLLMConfigured(): boolean {
   const provider = getLLMProviderName()
   if (provider === "anthropic") {
     const key = process.env.ANTHROPIC_API_KEY
     return !!key && !key.includes("placeholder")
   }
-  const baseUrl = process.env.LLM_BASE_URL
-  const apiKey = process.env.LLM_API_KEY
-  return !!baseUrl && !!apiKey
+  if (!process.env.LLM_BASE_URL) return false
+  if (process.env.LLM_OAUTH_TOKEN_URL) {
+    return !!(
+      process.env.LLM_OAUTH_CLIENT_ID && process.env.LLM_OAUTH_CLIENT_SECRET
+    )
+  }
+  return !!process.env.LLM_API_KEY
 }
 
 export const LLM_DISABLED_MESSAGE =
-  "AI features are not enabled. Set ANTHROPIC_API_KEY, or LLM_PROVIDER=openai-compatible with LLM_BASE_URL and LLM_API_KEY (see .env.local.example)."
+  "AI features are not enabled. Set ANTHROPIC_API_KEY, or LLM_PROVIDER=openai-compatible with LLM_BASE_URL and either LLM_API_KEY (static) or LLM_OAUTH_TOKEN_URL + LLM_OAUTH_CLIENT_ID + LLM_OAUTH_CLIENT_SECRET (OAuth) — see .env.local.example."
 
 export async function getLLM(): Promise<LLMProvider> {
   if (_provider) return _provider
@@ -65,12 +79,46 @@ export async function getLLM(): Promise<LLMProvider> {
   }
 
   const baseUrl = process.env.LLM_BASE_URL
-  const apiKey = process.env.LLM_API_KEY
-  if (!baseUrl || !apiKey) {
+  if (!baseUrl) {
     throw new Error(LLM_DISABLED_MESSAGE)
   }
   const model = configModel || process.env.LLM_MODEL || DEFAULT_OPENAI_MODEL
-  _provider = new OpenAICompatibleProvider({ baseUrl, apiKey, model })
+
+  const tokenUrl = process.env.LLM_OAUTH_TOKEN_URL
+  if (tokenUrl) {
+    const clientId = process.env.LLM_OAUTH_CLIENT_ID
+    const clientSecret = process.env.LLM_OAUTH_CLIENT_SECRET
+    if (!clientId || !clientSecret) {
+      throw new Error(
+        "OAuth mode requires LLM_OAUTH_CLIENT_ID and LLM_OAUTH_CLIENT_SECRET."
+      )
+    }
+    _provider = new OpenAICompatibleProvider({
+      baseUrl,
+      model,
+      auth: {
+        kind: "oauth",
+        oauth: {
+          tokenUrl,
+          clientId,
+          clientSecret,
+          scope: process.env.LLM_OAUTH_SCOPE || undefined,
+          audience: process.env.LLM_OAUTH_AUDIENCE || undefined,
+        },
+      },
+    })
+    return _provider
+  }
+
+  const apiKey = process.env.LLM_API_KEY
+  if (!apiKey) {
+    throw new Error(LLM_DISABLED_MESSAGE)
+  }
+  _provider = new OpenAICompatibleProvider({
+    baseUrl,
+    model,
+    auth: { kind: "static", apiKey },
+  })
   return _provider
 }
 
@@ -90,6 +138,13 @@ export function missingLLMEnvVars(): string[] {
   }
   const missing: string[] = []
   if (!process.env.LLM_BASE_URL) missing.push("LLM_BASE_URL")
-  if (!process.env.LLM_API_KEY) missing.push("LLM_API_KEY")
+  if (process.env.LLM_OAUTH_TOKEN_URL) {
+    if (!process.env.LLM_OAUTH_CLIENT_ID) missing.push("LLM_OAUTH_CLIENT_ID")
+    if (!process.env.LLM_OAUTH_CLIENT_SECRET) missing.push("LLM_OAUTH_CLIENT_SECRET")
+  } else if (!process.env.LLM_API_KEY) {
+    missing.push(
+      "LLM_API_KEY (or LLM_OAUTH_TOKEN_URL + LLM_OAUTH_CLIENT_ID + LLM_OAUTH_CLIENT_SECRET for OAuth)"
+    )
+  }
   return missing
 }

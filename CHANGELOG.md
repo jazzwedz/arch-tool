@@ -7,6 +7,11 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **OAuth 2.0 client_credentials authentication for the openai-compatible LLM provider.** Enterprise gateways that sit behind an identity provider can now be used as a drop-in for a static API key. Setting `LLM_OAUTH_TOKEN_URL` switches the adapter into OAuth mode; `LLM_API_KEY` is then ignored. The token URL is explicit so the adapter stays vendor-agnostic — Microsoft Entra ID, Okta, Auth0, Keycloak, AWS Cognito and self-hosted OpenID Connect IdPs all fit. Optional `LLM_OAUTH_SCOPE` and/or `LLM_OAUTH_AUDIENCE` are passed through to the token request. Tokens are cached in memory and refreshed proactively 5 minutes before expiry; concurrent callers share one in-flight refresh; 401 from the gateway invalidates the cache and retries once.
+- **Two-phase diagnostic probe for OAuth.** In OAuth mode the Settings health check runs DNS / request / response / classify against the IdP token endpoint first, then again against the gateway with the freshly-minted bearer. The trace is rendered with a "Phase: Token" / "Phase: Gateway" heading so a verbose probe pinpoints whether the failure is in the IdP, the credential, the scope/audience binding, or the gateway itself. Bearer tokens never leave the server in the trace — `access_token`, `id_token` and `refresh_token` values in the token response body are masked before they enter the response excerpt, and the request body (which carries `client_secret`) is never echoed.
+
 ## [0.3.0] — 2026-05-21
 
 Corporate-debugging release. Two themes:

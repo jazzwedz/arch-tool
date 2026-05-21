@@ -53,6 +53,9 @@ interface ProbeStep {
   ok: boolean
   ms?: number
   detail?: string
+  // Optional phase label — set by multi-phase probes (e.g. OAuth token
+  // endpoint vs gateway endpoint) so the UI can group steps.
+  phase?: string
   // dns
   address?: string
   // request
@@ -495,6 +498,7 @@ function DescribeBlock({ describe }: { describe: DescribeAny }) {
 }
 
 function TraceBlock({ trace }: { trace: ProbeTrace }) {
+  let lastPhase: string | undefined
   return (
     <div className="rounded-md border bg-muted/30 p-3 space-y-2">
       <div className="font-medium text-foreground">
@@ -503,9 +507,21 @@ function TraceBlock({ trace }: { trace: ProbeTrace }) {
           · total {trace.totalMs}ms
         </span>
       </div>
-      {trace.steps.map((s, i) => (
-        <TraceStepLine key={i} step={s} />
-      ))}
+      {trace.steps.map((s, i) => {
+        const showPhase = s.phase && s.phase !== lastPhase
+        const node = (
+          <div key={i}>
+            {showPhase && (
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mt-2 mb-1">
+                Phase: {s.phase}
+              </div>
+            )}
+            <TraceStepLine step={s} />
+          </div>
+        )
+        if (s.phase) lastPhase = s.phase
+        return node
+      })}
     </div>
   )
 }

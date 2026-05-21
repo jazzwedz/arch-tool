@@ -78,7 +78,23 @@ The store layer (components, diagrams, Confluence-link side-files) is identical 
 Two adapters ship in the box:
 
 - **`anthropic`** — calls Claude directly via the Anthropic SDK. Default. Set `ANTHROPIC_API_KEY`; optionally `ANTHROPIC_MODEL` (falls back to a built-in default).
-- **`openai-compatible`** — calls any service that exposes the OpenAI Chat Completions protocol. Set `LLM_BASE_URL` (e.g. `https://api.openai.com/v1`, your gateway, or a self-hosted endpoint) and `LLM_API_KEY`. Covers OpenAI, Azure OpenAI, OpenRouter, Together, Groq, LiteLLM, Portkey, Cloudflare AI Gateway, Ollama, LM Studio, vllm, etc. Optionally set `LLM_MODEL`.
+- **`openai-compatible`** — calls any service that exposes the OpenAI Chat Completions protocol. Set `LLM_BASE_URL` (e.g. `https://api.openai.com/v1`, your gateway, or a self-hosted endpoint). Covers OpenAI, Azure OpenAI, OpenRouter, Together, Groq, LiteLLM, Portkey, Cloudflare AI Gateway, Ollama, LM Studio, vllm, etc. Optionally set `LLM_MODEL`.
+
+  Two authentication modes:
+
+  - **Static API key (default):** set `LLM_API_KEY` to a long-lived bearer token the gateway accepts directly.
+
+  - **OAuth 2.0 client_credentials:** for enterprise gateways that sit behind an identity provider. Setting `LLM_OAUTH_TOKEN_URL` switches the adapter into OAuth mode; the static key is then ignored. The token URL is explicit so any standards-compliant IdP fits:
+
+    | IdP | `LLM_OAUTH_TOKEN_URL` | Additional |
+    |---|---|---|
+    | Microsoft Entra ID | `https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token` | `LLM_OAUTH_SCOPE=api://{your-app-uri}/.default` |
+    | Okta | `https://{your-org}.okta.com/oauth2/default/v1/token` | `LLM_OAUTH_SCOPE={your-scope}` |
+    | Auth0 | `https://{your-tenant}.auth0.com/oauth/token` | `LLM_OAUTH_AUDIENCE={your-api-identifier}` |
+    | Keycloak / OpenID Connect | `https://your-idp.example.com/realms/{realm}/protocol/openid-connect/token` | `LLM_OAUTH_SCOPE={your-scope}` |
+    | AWS Cognito | `https://{your-domain}.auth.{region}.amazoncognito.com/oauth2/token` | `LLM_OAUTH_SCOPE={resource-server}/{scope}` |
+
+    Always required: `LLM_OAUTH_CLIENT_ID` and `LLM_OAUTH_CLIENT_SECRET`. Set scope or audience (or both) depending on what your IdP expects. Tokens are cached in memory and refreshed proactively 5 minutes before expiry; a 401 from the gateway invalidates the cache and retries once.
 
 Model name can also live in `config.yaml` at the root of your data repo (overrides env):
 
