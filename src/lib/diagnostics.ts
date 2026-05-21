@@ -12,6 +12,7 @@ import { promises as dns } from "node:dns"
 
 export type ErrorCategory =
   | "dns"
+  | "tls"
   | "connect"
   | "auth-401"
   | "forbidden-403"
@@ -110,8 +111,10 @@ export function hintFor(category: ErrorCategory, providerLabel: string): string 
   switch (category) {
     case "dns":
       return `DNS resolution failed. Check the base URL hostname for typos and that DNS is reachable.`
+    case "tls":
+      return `TLS handshake rejected — Node does not trust the server's certificate chain. On a corporate network with an internal CA, export the corp root CA as PEM and set NODE_EXTRA_CA_CERTS=/path/to/ca.pem before starting the app. Curl works without this because it trusts the OS cert store.`
     case "connect":
-      return `Network connection failed (timeout, refused, TLS handshake). Check firewall, VPN, and that the host accepts HTTPS on the configured port.`
+      return `Network connection failed (timeout, refused, host unreachable). Check firewall, VPN, that the host accepts HTTPS on the configured port, and that an HTTPS_PROXY is set if the corp requires one.`
     case "auth-401":
       return `Auth rejected. Check the credential is correct, not expired, and has the required scope on ${providerLabel}.`
     case "forbidden-403":
@@ -129,6 +132,84 @@ export function hintFor(category: ErrorCategory, providerLabel: string): string 
     default:
       return ""
   }
+}
+
+// Node TLS error codes — when seen, the failure is in the cert chain
+// or hostname/SAN, not in the TCP layer. These flow up through fetch's
+// err.cause and need to be surfaced explicitly because Node wraps them
+// in a generic "fetch failed" at the outer level.
+const TLS_ERROR_CODES = new Set([
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "HOSTNAME_MISMATCH",
+  "CERT_UNTRUSTED",
+  "ERR_OSSL_PEM_NO_START_LINE",
+  "ERR_TLS_HANDSHAKE_TIMEOUT",
+  "ERR_SSL_WRONG_VERSION_NUMBER",
+])
+
+// Recursively walk an Error's `.cause` chain and pull out the deepest
+// useful message plus any `code` and `syscall` Node attached.
+interface FailureDetail {
+  message: string
+  code?: string
+  syscall?: string
+  isTls: boolean
+}
+
+function unwrapErrorCause(err: unknown): FailureDetail {
+  const codes: string[] = []
+  const messages: string[] = []
+  let syscall: string | undefined
+
+  let cur: unknown = err
+  let guard = 0
+  while (cur && guard < 8) {
+    if (cur instanceof Error) {
+      messages.push(cur.message)
+      const anyErr = cur as Error & { code?: string; syscall?: string; cause?: unknown }
+      if (anyErr.code) codes.push(anyErr.code)
+      if (anyErr.syscall && !syscall) syscall = anyErr.syscall
+      cur = anyErr.cause
+    } else if (typeof cur === "object" && cur !== null) {
+      const anyErr = cur as { message?: string; code?: string; syscall?: string; cause?: unknown }
+      if (anyErr.message) messages.push(String(anyErr.message))
+      if (anyErr.code) codes.push(String(anyErr.code))
+      if (anyErr.syscall && !syscall) syscall = String(anyErr.syscall)
+      cur = anyErr.cause
+    } else {
+      break
+    }
+    guard++
+  }
+
+  const code = codes.find((c) => c !== "UND_ERR_SOCKET" && c !== "ERR_FETCH_FAILED") || codes[0]
+  const isTls = codes.some((c) => TLS_ERROR_CODES.has(c))
+  // Prefer the deepest (most specific) message; "fetch failed" lives at
+  // the outermost layer and tells the user nothing.
+  const deepest = messages.reverse().find((m) => m && !/^fetch failed$/i.test(m)) || messages[0] || "Unknown error"
+  return { message: deepest, code, syscall, isTls }
+}
+
+export function describeFetchFailure(err: unknown): string {
+  const d = unwrapErrorCause(err)
+  const parts: string[] = []
+  if (d.code) parts.push(d.code)
+  if (d.syscall) parts.push(`syscall=${d.syscall}`)
+  const prefix = parts.length > 0 ? `[${parts.join(" ")}] ` : ""
+  return `${prefix}${d.message}`
+}
+
+// Decide whether a fetch failure is TLS-level or connect-level.
+// Walks the cause chain and looks for a known TLS error code.
+export function classifyFetchFailure(err: unknown): "tls" | "connect" {
+  return unwrapErrorCause(err).isTls ? "tls" : "connect"
 }
 
 // Resolve a hostname and return both the IP and the elapsed time. Throws
@@ -232,17 +313,23 @@ export async function runHttpProbe(opts: HttpProbeOptions): Promise<ProbeTrace> 
       body: opts.body,
     })
   } catch (err) {
+    // Node's fetch wraps the real reason (TLS code, ECONNREFUSED,
+    // ECONNRESET, ENETUNREACH, ETIMEDOUT, etc.) inside err.cause.
+    // Without unwrapping, every connect-level failure looks like the
+    // generic "fetch failed", which is useless in a corp debug.
+    const detail = describeFetchFailure(err)
+    const category = classifyFetchFailure(err)
     steps.push({
       step: "response",
       ok: false,
       ms: Date.now() - reqStart,
-      detail: err instanceof Error ? err.message : String(err),
+      detail,
     })
     steps.push({
       step: "classify",
       ok: false,
-      category: "connect",
-      hint: hintFor("connect", opts.providerLabel),
+      category,
+      hint: hintFor(category, opts.providerLabel),
     })
     return { ok: false, totalMs: Date.now() - t0, steps }
   }
