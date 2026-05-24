@@ -7,6 +7,32 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-25
+
+Shared-team release. Two themes:
+
+1. **Filesystem storage backend** — third `GIT_PROVIDER` option that
+   stores the catalog directly under a configured directory (local
+   disk, network share, NAS mount) instead of pushing through a remote
+   Git API. Same store layer as the other providers; switching is an
+   env change + restart. History is kept as JSONL sidecars so the
+   History tab still works without a Git remote.
+
+2. **Hard edit lock for multi-user filesystem deployments** — one user
+   at a time owns the edit form for a given component. The second user
+   opens the page in read-only mode with a banner naming the current
+   editor. TTL 10 minutes, heartbeat-renewed while the edit page is
+   open; explicit "Release lock" button + auto-release on save and on
+   navigate-away. Locks are filesystem-only; remote-Git providers
+   continue to rely on optimistic concurrency at save time.
+
+Plus an OAuth 2.0 client_credentials mode for the openai-compatible
+LLM provider — enterprise gateways behind any identity provider
+(Entra ID, Okta, Auth0, Keycloak, AWS Cognito, ...) now work
+out-of-the-box; the token URL is explicit so no vendor is assumed.
+
+All features are additive — no v0.3.0 deployment has to change anything.
+
 ### Added
 
 - **Filesystem storage backend.** Third `GIT_PROVIDER` option (`filesystem`, also `fs` / `file`) stores the catalog directly under a configured directory — local disk, network share, NAS mount — instead of pushing through a remote Git API. Set `FS_STORAGE_PATH` to an absolute path. The store layer (components, diagrams, Confluence-link side-files) is identical to the Git-backed providers so the rest of arch-tool is unchanged. Atomic writes via temp file + rename. Optimistic concurrency uses a SHA-256 of the current file content as the opaque revision token; mismatch on save returns 409 and the UI offers the user a Reload / Cancel choice.
@@ -136,7 +162,8 @@ First public release. Free software under MIT.
 - Architecture-questions checklist and 6-phase port plan for moving the app into a corporate environment.
 - Best-effort maintenance model documented in README.
 
-[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.4.0
 [0.3.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.1.0
