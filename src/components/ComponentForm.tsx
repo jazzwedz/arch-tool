@@ -53,7 +53,14 @@ import type {
   ComponentRule,
   RuleKind,
 } from "@/lib/types"
-import { Plus, Trash2, Save, Loader2, Info, ChevronUp, ChevronDown } from "lucide-react"
+import { Plus, Trash2, Save, Loader2, Info, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import {
   Tooltip,
   TooltipTrigger,
@@ -63,6 +70,11 @@ import {
 interface ComponentFormProps {
   initialData?: Component & { sha?: string }
   isEdit?: boolean
+  // When true, the form renders as a passive viewer — Save is hidden
+  // and the underlying <fieldset> blocks every input from accepting
+  // keystrokes. Used by the edit page when the active component is
+  // currently being edited by another user (lock denied).
+  readOnly?: boolean
 }
 
 const emptyInterface: ComponentInterface = {
@@ -104,9 +116,11 @@ const emptyRule: ComponentRule = {
   summary: "",
 }
 
-export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
+export function ComponentForm({ initialData, isEdit, readOnly = false }: ComponentFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [conflictOpen, setConflictOpen] = useState(false)
+  const [conflictMessage, setConflictMessage] = useState<string>("")
   const [existingComponents, setExistingComponents] = useState<
     { id: string; name: string }[]
   >([])
@@ -469,11 +483,29 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
           }
         } catch { /* use initialData sha as fallback */ }
 
-        await fetch(`/api/components/${component.id}`, {
+        const res = await fetch(`/api/components/${component.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...component, sha: latestSha }),
         })
+        if (res.status === 409) {
+          // Either someone else holds the edit lock or the component
+          // was modified between our load and our save. Either way the
+          // analyst's safest next action is to reload and re-apply,
+          // so we surface the modal the user signed off on.
+          const body = await res.json().catch(() => ({}))
+          setConflictMessage(
+            body.message ||
+              "This component was changed by another user since you opened it. Reload to see the new state, then re-apply your changes."
+          )
+          setConflictOpen(true)
+          return
+        }
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          alert(`Failed to save: ${body.error || res.status}`)
+          return
+        }
       } else {
         await fetch("/api/components", {
           method: "POST",
@@ -492,6 +524,15 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/*
+        <fieldset disabled> is the cleanest way to block every input,
+        select, textarea and button below — including dynamically-added
+        rule rows — without threading a `disabled` prop through every
+        component. The style override removes the default greyed-out
+        appearance so the read-only view still reads clearly; the
+        outer LockBanner already explains why saves are blocked.
+      */}
+      <fieldset disabled={readOnly} className="space-y-6 contents">
       {/* Basic Info */}
       <Card>
         <CardHeader>
@@ -1563,24 +1604,66 @@ export function ComponentForm({ initialData, isEdit }: ComponentFormProps) {
         </CardContent>
       </Card>
 
-      {/* Submit */}
-      <div className="flex gap-3 justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.back()}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
-          {isEdit ? "Update Component" : "Create Component"}
-        </Button>
-      </div>
+      </fieldset>
+
+      {/* Save-conflict modal — surfaced when the server returns 409
+          (someone else edited or holds the lock). User chooses Reload
+          (re-fetch + replace form state, losing unsaved local edits)
+          or Cancel (keep the form state and try saving again later). */}
+      <Dialog open={conflictOpen} onOpenChange={setConflictOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              Component changed by another user
+            </DialogTitle>
+            <DialogDescription className="text-sm pt-2">
+              {conflictMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setConflictOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setConflictOpen(false)
+                if (initialData?.id) {
+                  router.push(`/component/${initialData.id}`)
+                  router.refresh()
+                }
+              }}
+            >
+              Reload
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Submit — hidden entirely in read-only mode so the user is not
+          tempted to click a button that will only frustrate them. */}
+      {!readOnly && (
+        <div className="flex gap-3 justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            {isEdit ? "Update Component" : "Create Component"}
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

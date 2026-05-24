@@ -32,10 +32,11 @@ export interface GitCommitMeta {
 }
 
 export interface GitDescribe {
-  provider: "github" | "ado"
+  provider: "github" | "ado" | "filesystem"
   baseUrl: string
   branch: string
-  // For GitHub: "owner/repo". For ADO: "project/repo".
+  // For GitHub: "owner/repo". For ADO: "project/repo". For filesystem:
+  // the resolved root path.
   repoIdentifier: string
   authScheme: string
   authHint: string

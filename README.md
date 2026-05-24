@@ -66,10 +66,11 @@ All configuration via environment variables (`.env.local` for dev, your platform
 
 ### Git storage backend
 
-Two adapters ship in the box:
+Three adapters ship in the box:
 
 - **`github`** — uses Octokit. Set `GITHUB_TOKEN` (fine-grained PAT, Contents R/W), `GITHUB_OWNER`, optionally `GITHUB_REPO` (default `arch-data`) and `GITHUB_BRANCH` (default `main`).
 - **`ado`** — Azure DevOps Git, works with both Azure DevOps Service and on-prem Server/TFS. Auth: Personal Access Token via Basic auth. Set `ADO_BASE_URL` (`https://dev.azure.com/{your-org}` or `https://your-tfs/{collection}`), `ADO_PROJECT`, `ADO_REPO`, `ADO_PAT`, optionally `ADO_BRANCH` (default `main`). The PAT needs at least "Code (Read & Write)" scope.
+- **`filesystem`** — store the catalog directly under a configured directory (local SSD, network share, NAS mount). Set `FS_STORAGE_PATH` to an absolute path. The directory must already exist; sub-directories (`components/`, `diagrams/`, `confluence-links/`, `_history/`, `_locks/`) are created on demand from a one-click button in Settings. History is captured as JSONL sidecars under `_history/`. Concurrent edits are prevented by a hard per-component edit lock with a 10-minute TTL (heartbeat-renewed while the edit page is open); the user identity is read from a request header — `X-Forwarded-User` by default, configurable via `USER_HEADER` — so a reverse proxy doing Kerberos / SAML / OIDC fits in cleanly.
 
 The store layer (components, diagrams, Confluence-link side-files) is identical across providers — switching backends only requires changing env vars and restarting.
 

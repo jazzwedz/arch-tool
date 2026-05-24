@@ -32,6 +32,10 @@ export interface ProbeStepBase {
   // gateway) so the UI can group the steps under a heading and the
   // analyst can tell which phase failed.
   phase?: string
+  // Optional display override for the step's primary label. Filesystem
+  // probes use this to surface "resolve / access / contents / write" in
+  // the UI without polluting the canonical step taxonomy.
+  label?: string
 }
 
 export interface DnsStep extends ProbeStepBase {
@@ -41,9 +45,12 @@ export interface DnsStep extends ProbeStepBase {
 
 export interface RequestStep extends ProbeStepBase {
   step: "request"
-  method: string
-  url: string
-  headers: Record<string, string>
+  // HTTP-shaped probes always populate these. Non-HTTP probes (e.g.
+  // filesystem checks) may omit them and rely on `label` + `detail` to
+  // describe the operation.
+  method?: string
+  url?: string
+  headers?: Record<string, string>
 }
 
 export interface ResponseStep extends ProbeStepBase {

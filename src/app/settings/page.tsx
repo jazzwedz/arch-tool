@@ -12,6 +12,8 @@ import {
   X,
   Play,
   HeartPulse,
+  FolderPlus,
+  AlertTriangle,
 } from "lucide-react"
 import {
   BLOCK_METAS,
@@ -104,6 +106,9 @@ interface HealthResult {
   trace?: ProbeTrace
   missingEnv?: string[]
   error?: string
+  // Filesystem-specific: surfaced by /api/healthcheck/git when storage
+  // root is missing its expected sub-directories.
+  actions?: { canInitStorage?: boolean; missingSubdirs?: string[] }
 }
 
 interface HealthState {
@@ -376,6 +381,13 @@ export default function SettingsPage() {
                       </div>
                     )}
 
+                    {r.actions?.canInitStorage && (
+                      <InitStorageBlock
+                        missingSubdirs={r.actions.missingSubdirs || []}
+                        onInitialised={() => runHealth(kind)}
+                      />
+                    )}
+
                     {r.describe && <DescribeBlock describe={r.describe} />}
                     {r.trace && <TraceBlock trace={r.trace} />}
                   </div>
@@ -587,6 +599,88 @@ function TraceStepLine({ step }: { step: ProbeStep }) {
       {step.hint && (
         <div className="ml-5 mt-1 text-foreground/80 italic">{step.hint}</div>
       )}
+    </div>
+  )
+}
+
+function InitStorageBlock({
+  missingSubdirs,
+  onInitialised,
+}: {
+  missingSubdirs: string[]
+  onInitialised: () => void
+}) {
+  const [running, setRunning] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function initialise() {
+    setRunning(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/init-storage", { method: "POST" })
+      const data = (await res.json()) as {
+        ok: boolean
+        created?: string[]
+        error?: string
+        message?: string
+      }
+      if (!data.ok) {
+        setError(data.message || data.error || "Failed to initialise storage.")
+        return
+      }
+      setDone(true)
+      onInitialised()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to initialise storage.")
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-orange-900 space-y-2">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="flex-1">
+          <div className="font-medium mb-1">Storage not initialised</div>
+          <div className="text-xs">
+            The storage root is reachable but missing the required
+            sub-directories. Click below to create them in one step.
+          </div>
+          <ul className="list-disc list-inside text-xs mt-1 space-y-0.5">
+            {missingSubdirs.map((d) => (
+              <li key={d}><code className="font-mono">{d}/</code></li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={initialise}
+          disabled={running || done}
+        >
+          {running ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              Initialising...
+            </>
+          ) : done ? (
+            <>
+              <Check className="h-3.5 w-3.5 mr-1" />
+              Initialised
+            </>
+          ) : (
+            <>
+              <FolderPlus className="h-3.5 w-3.5 mr-1" />
+              Initialize storage
+            </>
+          )}
+        </Button>
+        {error && <span className="text-xs text-destructive">{error}</span>}
+      </div>
     </div>
   )
 }
