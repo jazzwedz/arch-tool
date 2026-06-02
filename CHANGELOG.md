@@ -7,6 +7,16 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-05-25
+
+Observability + code release. Two themes:
+
+1. **Structured logging + Admin console.** Every server-side log line is a JSON object; per-day per-stream files capture operational events, full LLM call traces and the admin audit trail. A new `/admin` route (gated by the existing `SITE_PASSWORD`) browses all three with filters and search. The LLM tab exports selected calls as OpenAI fine-tuning JSONL with one click — built for the corp use-case where a non-vanilla LLM behind a gateway needs prompt tuning.
+
+2. **Rules-import from source code.** Third tab in the import wizard alongside PDF and Confluence — paste source code or upload a single file (.java / .cs / .py / .js / .ts / .go / .sql / .cob / .pli / ...). The two-pass AI pipeline reuses the same Pass 1 relevance filter and Pass 2 structured extractor, with code-aware prompts that ignore plumbing and translate code into business terms.
+
+All features are additive — your existing `.env.local` keeps working unchanged. Four new optional environment variables are documented below.
+
 ### Added
 
 - **Structured JSON logging.** Every server-side log line is a JSON object with `ts`, `level`, `requestId`, `user`, `route`, `msg` and (optional) `meta`. Three streams: operational entries (`app.*.jsonl`), LLM call traces (`llm.*.jsonl`), admin audit trail (`admin-actions.*.jsonl`). Per-day rotation by filename. Configurable level (`LOG_LEVEL`) and sink (`LOG_SINK=stdout|file|both`) with file output rooted at `LOG_PATH`.
@@ -189,7 +199,8 @@ First public release. Free software under MIT.
 - Architecture-questions checklist and 6-phase port plan for moving the app into a corporate environment.
 - Best-effort maintenance model documented in README.
 
-[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.5.0
 [0.4.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.4.0
 [0.3.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.2.0
