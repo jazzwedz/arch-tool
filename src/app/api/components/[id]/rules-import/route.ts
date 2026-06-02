@@ -18,6 +18,7 @@ import {
   checkDocSize,
   extractConfluence,
   extractPdf,
+  extractCode,
   type ExtractedDoc,
 } from "@/lib/extractors"
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/lib/rules-import/identify"
 import { extractRuleCandidates } from "@/lib/rules-import/extract"
 import type { RulesImportError } from "@/lib/rules-import/types"
+import { withRouteContext } from "@/lib/route-context"
 
 // Allow up to ~12 MB body for PDF uploads.
 export const maxDuration = 60
@@ -36,6 +38,13 @@ const MAX_UPLOAD_BYTES = 12 * 1024 * 1024
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
+) {
+  return withRouteContext(request, () => doPost(request, params))
+}
+
+async function doPost(
+  request: Request,
+  params: Promise<{ id: string }>
 ) {
   try {
     const { id } = await params
@@ -98,6 +107,11 @@ export async function POST(
     }
 
     const t0 = Date.now()
+    const sourceKind: "doc" | "code" = doc.kind === "code" ? "code" : "doc"
+    const language: string | undefined =
+      doc.kind === "code"
+        ? (doc as ExtractedDoc & { language?: string }).language
+        : undefined
 
     // Pass 1 — skipped for short documents.
     let sections
@@ -107,7 +121,13 @@ export async function POST(
       pass1Skipped = true
       sections = wholeDocAsSingleSection(doc.name, doc.text)
     } else {
-      const p1 = await identifyRelevantSections(component, doc.name, doc.text)
+      const p1 = await identifyRelevantSections(
+        component,
+        doc.name,
+        doc.text,
+        sourceKind,
+        language
+      )
       pass1Ms = p1.ms
       sections = p1.sections
     }
@@ -116,12 +136,12 @@ export async function POST(
       return NextResponse.json({
         ok: false,
         error: "no-relevant-sections",
-        message: `No passages in "${doc.name}" appear to describe rules, calculations or constraints for component "${component.name}". Try a more specific document.`,
+        message: `No passages in "${doc.name}" appear to describe rules, calculations or constraints for component "${component.name}". Try a more specific ${sourceKind === "code" ? "source file" : "document"}.`,
       } as RulesImportError, { status: 200 })
     }
 
     // Pass 2 — extract structured candidates.
-    const p2 = await extractRuleCandidates(component, sections)
+    const p2 = await extractRuleCandidates(component, sections, sourceKind, language)
 
     if (p2.candidates.length === 0) {
       return NextResponse.json({
@@ -166,19 +186,39 @@ async function extractFromMultipart(request: Request): Promise<ExtractedDoc> {
       `File too large: ${(file.size / 1024 / 1024).toFixed(1)} MB (max ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB).`
     )
   }
-  const name = file.name || "upload.pdf"
+  const name = file.name || "upload"
   const lower = name.toLowerCase()
-  if (!lower.endsWith(".pdf")) {
-    throw new ExtractError(
-      `Unsupported file type: "${name}". Only PDF is supported in this version.`
-    )
+  const isPdf = lower.endsWith(".pdf")
+  const declaredKind = (form.get("kind") as string | null) || (isPdf ? "pdf" : "code")
+  if (declaredKind === "pdf") {
+    if (!isPdf) {
+      throw new ExtractError(
+        `Unsupported file type for kind=pdf: "${name}". Use a .pdf file.`
+      )
+    }
+    const buf = Buffer.from(await file.arrayBuffer())
+    return extractPdf(buf, name)
   }
-  const buf = Buffer.from(await file.arrayBuffer())
-  return extractPdf(buf, name)
+  if (declaredKind === "code") {
+    const text = await file.text()
+    const language = (form.get("language") as string | null) || undefined
+    return extractCode({ text, filename: name, language })
+  }
+  throw new ExtractError(
+    `Unsupported upload kind "${declaredKind}". Use "pdf" or "code".`
+  )
 }
 
 async function extractFromJson(request: Request): Promise<ExtractedDoc> {
-  let body: { source?: { type?: string; url?: string } }
+  let body: {
+    source?: {
+      type?: string
+      url?: string
+      text?: string
+      language?: string
+      filename?: string
+    }
+  }
   try {
     body = await request.json()
   } catch {
@@ -187,18 +227,28 @@ async function extractFromJson(request: Request): Promise<ExtractedDoc> {
   const src = body.source
   if (!src || typeof src !== "object") {
     throw new ExtractError(
-      `Body must contain { source: { type: "confluence", url: "..." } } or upload a PDF as multipart form-data.`
+      `Body must contain { source: { type: "confluence" | "code", ... } } or upload a file as multipart form-data.`
     )
   }
-  if (src.type !== "confluence") {
-    throw new ExtractError(
-      `Unsupported source type "${src.type}". Use "confluence" or upload a PDF.`
-    )
+  if (src.type === "confluence") {
+    if (typeof src.url !== "string" || !src.url.trim()) {
+      throw new ExtractError("Missing or empty Confluence url / page id.")
+    }
+    return extractConfluence(src.url.trim())
   }
-  if (typeof src.url !== "string" || !src.url.trim()) {
-    throw new ExtractError("Missing or empty Confluence url / page id.")
+  if (src.type === "code") {
+    if (typeof src.text !== "string" || !src.text.trim()) {
+      throw new ExtractError("Missing or empty 'text' for source.type=code.")
+    }
+    return extractCode({
+      text: src.text,
+      filename: src.filename,
+      language: src.language,
+    })
   }
-  return extractConfluence(src.url.trim())
+  throw new ExtractError(
+    `Unsupported source type "${src.type}". Use "confluence", "code", or upload a PDF.`
+  )
 }
 
 function jsonError(body: RulesImportError, status: number): NextResponse {

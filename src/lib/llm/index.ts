@@ -24,6 +24,7 @@ import { AnthropicProvider } from "./anthropic"
 import { OpenAICompatibleProvider } from "./openai-compatible"
 import type { LLMProvider } from "./types"
 import { loadConfig } from "../config"
+import { withLogging } from "./with-logging"
 
 export type { LLMProvider, LLMCompleteOptions, LLMDescribe } from "./types"
 
@@ -74,7 +75,7 @@ export async function getLLM(): Promise<LLMProvider> {
       throw new Error(LLM_DISABLED_MESSAGE)
     }
     const model = configModel || process.env.ANTHROPIC_MODEL || DEFAULT_ANTHROPIC_MODEL
-    _provider = new AnthropicProvider({ apiKey, model })
+    _provider = withLogging(new AnthropicProvider({ apiKey, model }))
     return _provider
   }
 
@@ -93,20 +94,22 @@ export async function getLLM(): Promise<LLMProvider> {
         "OAuth mode requires LLM_OAUTH_CLIENT_ID and LLM_OAUTH_CLIENT_SECRET."
       )
     }
-    _provider = new OpenAICompatibleProvider({
-      baseUrl,
-      model,
-      auth: {
-        kind: "oauth",
-        oauth: {
-          tokenUrl,
-          clientId,
-          clientSecret,
-          scope: process.env.LLM_OAUTH_SCOPE || undefined,
-          audience: process.env.LLM_OAUTH_AUDIENCE || undefined,
+    _provider = withLogging(
+      new OpenAICompatibleProvider({
+        baseUrl,
+        model,
+        auth: {
+          kind: "oauth",
+          oauth: {
+            tokenUrl,
+            clientId,
+            clientSecret,
+            scope: process.env.LLM_OAUTH_SCOPE || undefined,
+            audience: process.env.LLM_OAUTH_AUDIENCE || undefined,
+          },
         },
-      },
-    })
+      })
+    )
     return _provider
   }
 
@@ -114,11 +117,13 @@ export async function getLLM(): Promise<LLMProvider> {
   if (!apiKey) {
     throw new Error(LLM_DISABLED_MESSAGE)
   }
-  _provider = new OpenAICompatibleProvider({
-    baseUrl,
-    model,
-    auth: { kind: "static", apiKey },
-  })
+  _provider = withLogging(
+    new OpenAICompatibleProvider({
+      baseUrl,
+      model,
+      auth: { kind: "static", apiKey },
+    })
+  )
   return _provider
 }
 

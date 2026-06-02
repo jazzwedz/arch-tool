@@ -54,10 +54,64 @@ function buildComponentContext(c: Component): string {
   ].join("\n")
 }
 
-function buildPrompt(component: Component, docName: string, docText: string): string {
+export type IdentifySourceKind = "doc" | "code"
+
+function buildPrompt(
+  component: Component,
+  docName: string,
+  docText: string,
+  sourceKind: IdentifySourceKind = "doc",
+  language?: string
+): string {
   const safeText = docText.length > PASS_1_INPUT_CAP
-    ? docText.slice(0, PASS_1_INPUT_CAP) + "\n\n…(document truncated to fit context window)"
+    ? docText.slice(0, PASS_1_INPUT_CAP) +
+      `\n\n…(${sourceKind === "code" ? "source" : "document"} truncated to fit context window)`
     : docText
+
+  if (sourceKind === "code") {
+    const langLabel = language && language !== "auto" ? language : "unspecified"
+    return `You are an architecture analyst reading source code. A team maintains a software component:
+
+${buildComponentContext(component)}
+
+Below is source code (language: ${langLabel}, file: "${docName}") that may implement part of this component. Find every code block — class, method, function, paragraph, procedure, trigger, query — that contains BUSINESS LOGIC relevant to THIS COMPONENT.
+
+A code block is relevant when it implements:
+- a calculation or formula (numeric expressions producing a business value)
+- a conditional business rule (if/else with non-technical conditions like risk tier, status, role, age, amount thresholds)
+- a validation or invariant the component must respect (input checks, guard clauses with business meaning)
+- a state-transition decision (status changes, workflow steps)
+
+Ignore:
+- plumbing (logging, dependency injection, HTTP routing, repository CRUD, serialisation glue)
+- pure getters / setters / constructors / boilerplate
+- tests, mocks, fixtures
+- generated code, code comments without rule content
+- import / namespace declarations
+
+For each relevant block, return 5-30 source lines VERBATIM as the excerpt so an analyst can audit your selection.
+
+Return ONLY a single JSON object with this exact shape, no surrounding prose:
+{
+  "sections": [
+    {
+      "title": "<short identifier, e.g. method name or first signature line>",
+      "excerpt": "<the actual code verbatim, 5-30 lines, max 1500 chars>",
+      "why_relevant": "<one short sentence about which part of the component this implements>",
+      "confidence": "high" | "medium" | "low"
+    }
+  ]
+}
+
+If nothing in the source code is relevant, return {"sections": []}.
+
+SOURCE CODE:
+\`\`\`${langLabel === "unspecified" ? "" : langLabel}
+${safeText}
+\`\`\``
+  }
+
+  // Default: prose document
   return `You are an architecture analyst. A team maintains a software component:
 
 ${buildComponentContext(component)}
@@ -118,11 +172,13 @@ export interface IdentifyResult {
 export async function identifyRelevantSections(
   component: Component,
   docName: string,
-  docText: string
+  docText: string,
+  sourceKind: IdentifySourceKind = "doc",
+  language?: string
 ): Promise<IdentifyResult> {
   const t0 = Date.now()
   const llm = await getLLM()
-  const prompt = buildPrompt(component, docName, docText)
+  const prompt = buildPrompt(component, docName, docText, sourceKind, language)
   const raw = await llm.complete({ prompt, maxTokens: PASS_1_MAX_TOKENS })
   const parsed = extractJson(raw)
   const sections: RelevantSection[] = []

@@ -7,8 +7,13 @@ import {
   isLLMConfigured,
   LLM_DISABLED_MESSAGE,
 } from "@/lib/llm"
+import { withRouteContext } from "@/lib/route-context"
 
 export async function POST(request: Request) {
+  return withRouteContext(request, () => doPost(request))
+}
+
+async function doPost(request: Request) {
   try {
     if (!isLLMConfigured()) {
       return NextResponse.json({ error: LLM_DISABLED_MESSAGE }, { status: 503 })

@@ -31,6 +31,7 @@ import type {
 } from "@/lib/types"
 import { COMPONENT_STATUSES, RULE_KINDS } from "@/lib/constants"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { withRouteContext } from "@/lib/route-context"
 
 export const dynamic = "force-dynamic"
 
@@ -96,6 +97,10 @@ const ALLOWED_FIELDS = {
 }
 
 export async function POST(request: Request) {
+  return withRouteContext(request, () => doPost(request))
+}
+
+async function doPost(request: Request) {
   try {
     if (!isConfluenceConfigured()) {
       return NextResponse.json(

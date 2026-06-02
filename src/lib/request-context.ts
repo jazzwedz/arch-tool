@@ -1,21 +1,20 @@
-// Per-request context — user identity, anything else we need to thread
-// through code that lives below the route handler without changing every
-// signature on the way down.
+// Per-request context — user identity, request id, current route.
+// Anything we want available below the route handler (the logger, the
+// filesystem provider's history sidecar) reads it through the helpers
+// below instead of plumbing it through every signature.
 //
 // Backed by Node's AsyncLocalStorage (https://nodejs.org/api/async_context.html)
-// so the value follows the async chain naturally — no manual passing.
-//
-// API routes wrap their handler body in `withRequestContext({ user, ... }, fn)`.
-// Anything inside the chain (e.g. the filesystem provider writing to a
-// history sidecar) can call `getRequestUser()` to find out who is on the
-// other end. When called outside any context (e.g. background jobs,
-// startup paths), the helper returns "anonymous".
+// so the value follows the async chain naturally. Outside any context
+// (background jobs, startup paths, tests), the helpers return
+// reasonable defaults.
 
 import { AsyncLocalStorage } from "node:async_hooks"
 import { ANONYMOUS } from "./current-user"
 
 interface RequestContext {
   user: string
+  requestId?: string
+  route?: string
 }
 
 const store = new AsyncLocalStorage<RequestContext>()
@@ -29,4 +28,12 @@ export function withRequestContext<T>(
 
 export function getRequestUser(): string {
   return store.getStore()?.user ?? ANONYMOUS
+}
+
+export function getRequestId(): string | undefined {
+  return store.getStore()?.requestId
+}
+
+export function getRequestRoute(): string | undefined {
+  return store.getStore()?.route
 }

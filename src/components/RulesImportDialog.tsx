@@ -39,12 +39,35 @@ import {
   Check,
   Sparkles,
   X,
+  Code as CodeIcon,
 } from "lucide-react"
 import { RULE_KINDS, RULE_KIND_LABELS } from "@/lib/constants"
 import type { ComponentRule, RuleKind } from "@/lib/types"
 
 type Step = "source" | "analyzing" | "review" | "error"
-type SourceKind = "pdf" | "confluence"
+type SourceKind = "pdf" | "confluence" | "code"
+
+const LANGUAGE_OPTIONS = [
+  { value: "auto", label: "Auto-detect" },
+  { value: "java", label: "Java" },
+  { value: "kotlin", label: "Kotlin" },
+  { value: "csharp", label: "C#" },
+  { value: "python", label: "Python" },
+  { value: "javascript", label: "JavaScript" },
+  { value: "typescript", label: "TypeScript" },
+  { value: "go", label: "Go" },
+  { value: "rust", label: "Rust" },
+  { value: "ruby", label: "Ruby" },
+  { value: "php", label: "PHP" },
+  { value: "swift", label: "Swift" },
+  { value: "cpp", label: "C++" },
+  { value: "c", label: "C" },
+  { value: "sql", label: "SQL" },
+  { value: "plsql", label: "PL/SQL" },
+  { value: "cobol", label: "COBOL" },
+  { value: "scala", label: "Scala" },
+  { value: "groovy", label: "Groovy" },
+]
 
 interface Candidate {
   name: string
@@ -118,6 +141,9 @@ export function RulesImportDialog({
   const [sourceKind, setSourceKind] = useState<SourceKind>("pdf")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [confluenceUrl, setConfluenceUrl] = useState("")
+  const [codeText, setCodeText] = useState("")
+  const [codeLanguage, setCodeLanguage] = useState("auto")
+  const [codeFilename, setCodeFilename] = useState<string | undefined>(undefined)
   const [phaseIdx, setPhaseIdx] = useState(0)
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [selected, setSelected] = useState<Record<number, boolean>>({})
@@ -147,6 +173,9 @@ export function RulesImportDialog({
     setSourceKind("pdf")
     setPdfFile(null)
     setConfluenceUrl("")
+    setCodeText("")
+    setCodeLanguage("auto")
+    setCodeFilename(undefined)
     setCandidates([])
     setSelected({})
     setMeta(null)
@@ -170,16 +199,32 @@ export function RulesImportDialog({
         if (!pdfFile) throw new Error("No PDF selected.")
         const form = new FormData()
         form.append("file", pdfFile)
+        form.append("kind", "pdf")
         res = await fetch(`/api/components/${componentId}/rules-import`, {
           method: "POST",
           body: form,
         })
-      } else {
+      } else if (sourceKind === "confluence") {
         if (!confluenceUrl.trim()) throw new Error("Paste a Confluence URL or page id.")
         res = await fetch(`/api/components/${componentId}/rules-import`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ source: { type: "confluence", url: confluenceUrl.trim() } }),
+        })
+      } else {
+        // code
+        if (!codeText.trim()) throw new Error("Paste source code or upload a file.")
+        res = await fetch(`/api/components/${componentId}/rules-import`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: {
+              type: "code",
+              text: codeText,
+              language: codeLanguage !== "auto" ? codeLanguage : undefined,
+              filename: codeFilename,
+            },
+          }),
         })
       }
       const data = (await res.json()) as ApiResponse
@@ -287,6 +332,12 @@ export function RulesImportDialog({
               setPdfFile={setPdfFile}
               confluenceUrl={confluenceUrl}
               setConfluenceUrl={setConfluenceUrl}
+              codeText={codeText}
+              setCodeText={setCodeText}
+              codeLanguage={codeLanguage}
+              setCodeLanguage={setCodeLanguage}
+              codeFilename={codeFilename}
+              setCodeFilename={setCodeFilename}
             />
           )}
 
@@ -319,7 +370,13 @@ export function RulesImportDialog({
               <Button variant="ghost" onClick={() => handleOpenChange(false)}>Cancel</Button>
               <Button
                 onClick={runAnalysis}
-                disabled={sourceKind === "pdf" ? !pdfFile : !confluenceUrl.trim()}
+                disabled={
+                  sourceKind === "pdf"
+                    ? !pdfFile
+                    : sourceKind === "confluence"
+                    ? !confluenceUrl.trim()
+                    : !codeText.trim()
+                }
               >
                 <Sparkles className="h-4 w-4 mr-1" />
                 Analyze
@@ -375,6 +432,12 @@ function SourceStep({
   setPdfFile,
   confluenceUrl,
   setConfluenceUrl,
+  codeText,
+  setCodeText,
+  codeLanguage,
+  setCodeLanguage,
+  codeFilename,
+  setCodeFilename,
 }: {
   sourceKind: SourceKind
   setSourceKind: (s: SourceKind) => void
@@ -382,7 +445,36 @@ function SourceStep({
   setPdfFile: (f: File | null) => void
   confluenceUrl: string
   setConfluenceUrl: (s: string) => void
+  codeText: string
+  setCodeText: (s: string) => void
+  codeLanguage: string
+  setCodeLanguage: (s: string) => void
+  codeFilename: string | undefined
+  setCodeFilename: (s: string | undefined) => void
 }) {
+  async function handleCodeFile(file: File | undefined) {
+    if (!file) return
+    try {
+      const text = await file.text()
+      setCodeText(text)
+      setCodeFilename(file.name)
+      // Best-effort detect from extension on the client; the server
+      // re-detects to be safe.
+      const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] || ""
+      const guessed = LANGUAGE_OPTIONS.find((o) =>
+        o.value !== "auto" && file.name.toLowerCase().endsWith(`.${o.value}`)
+      )
+      if (guessed) setCodeLanguage(guessed.value)
+      else if (ext === ".py") setCodeLanguage("python")
+      else if (ext === ".cs") setCodeLanguage("csharp")
+      else if (ext === ".ts" || ext === ".tsx") setCodeLanguage("typescript")
+      else if (ext === ".js" || ext === ".jsx" || ext === ".mjs" || ext === ".cjs")
+        setCodeLanguage("javascript")
+      else if (ext === ".cob" || ext === ".cbl") setCodeLanguage("cobol")
+    } catch {
+      // ignore — user can still paste
+    }
+  }
   return (
     <div className="space-y-4 px-1">
       <div className="flex gap-2 border-b">
@@ -409,6 +501,18 @@ function SourceStep({
         >
           <Globe className="h-4 w-4 inline mr-1" />
           Confluence URL
+        </button>
+        <button
+          type="button"
+          onClick={() => setSourceKind("code")}
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
+            sourceKind === "code"
+              ? "border-blue-600 text-blue-700"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <CodeIcon className="h-4 w-4 inline mr-1" />
+          Source code
         </button>
       </div>
 
@@ -447,6 +551,59 @@ function SourceStep({
           />
           <p className="text-xs text-muted-foreground">
             Accepts <code>/pages/&#123;id&#125;/</code> (Cloud), <code>pageId=&#123;id&#125;</code> (Data Center), or just the numeric page id. <code>/display/Title</code> URLs without a pageId are not supported — open the page and copy the URL with the numeric id.
+          </p>
+        </div>
+      )}
+
+      {sourceKind === "code" && (
+        <div className="space-y-3">
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <Label htmlFor="rules-import-code-file">Upload a source file (optional)</Label>
+              <input
+                id="rules-import-code-file"
+                type="file"
+                accept=".java,.kt,.kts,.cs,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.go,.rs,.rb,.php,.swift,.cpp,.cc,.hpp,.c,.h,.sql,.cob,.cbl,.cobol,.pli,.pl1,.scala,.groovy,.lua,.r,.pl,.sh,.bash,.ps1,.dart"
+                onChange={(e) => handleCodeFile(e.target.files?.[0])}
+                className="block w-full text-sm file:mr-3 file:py-2 file:px-3 file:rounded-md file:border file:border-input file:bg-background file:text-sm file:font-medium file:cursor-pointer hover:file:bg-muted mt-1"
+              />
+            </div>
+            <div className="min-w-[180px]">
+              <Label htmlFor="rules-import-code-lang">Language</Label>
+              <Select value={codeLanguage} onValueChange={setCodeLanguage}>
+                <SelectTrigger id="rules-import-code-lang" className="h-9 mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LANGUAGE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="rules-import-code-text">Or paste the source code</Label>
+            <Textarea
+              id="rules-import-code-text"
+              value={codeText}
+              onChange={(e) => setCodeText(e.target.value)}
+              rows={14}
+              className="font-mono text-xs mt-1"
+              placeholder={`// Paste a class, function, stored procedure, COBOL paragraph, etc.\n// AI will identify business logic relevant to ${"{this component}"} and propose Formula / Given-When-Then / Constraint candidates.`}
+            />
+          </div>
+          {codeFilename && (
+            <div className="text-xs text-muted-foreground">
+              From file: <code className="font-mono">{codeFilename}</code>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            AI reads the code, ignores plumbing (logging, DI, HTTP routing,
+            tests, getters/setters, imports) and emits rule candidates with
+            verbatim source excerpts as evidence. Algebraic formulas are
+            extracted with the original variable names so you can verify
+            against the source. Max 320,000 characters per import.
           </p>
         </div>
       )}

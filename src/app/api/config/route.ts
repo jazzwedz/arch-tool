@@ -4,6 +4,8 @@ import { getGit, GitNotFoundError, isGitConfigured } from "@/lib/git"
 import { clearConfigCache } from "@/lib/config"
 import type { RuntimeConfig } from "@/lib/config"
 import type { UIBlocksConfig } from "@/lib/ui-blocks"
+import { withRouteContext } from "@/lib/route-context"
+import { getLogger } from "@/lib/log"
 
 // GET — returns the public runtime config (UI block visibility, model name).
 // Secrets and provider names live in env and are not exposed here.
@@ -39,6 +41,10 @@ export async function GET() {
 // POST — updates ui.blocks in config.yaml. Other sections (llm.*) are
 // preserved untouched. Body: { blocks: UIBlocksConfig }.
 export async function POST(request: Request) {
+  return withRouteContext(request, () => doPost(request))
+}
+
+async function doPost(request: Request) {
   if (!isGitConfigured()) {
     return NextResponse.json(
       { error: "Git backend not configured." },
@@ -109,5 +115,15 @@ export async function POST(request: Request) {
   }
 
   clearConfigCache()
+  getLogger().adminAction("config.save", {
+    blockKeys: Object.keys(body.blocks),
+    falseCount: Object.values(body.blocks).reduce<number>((acc, group) => {
+      if (!group || typeof group !== "object") return acc
+      return (
+        acc +
+        Object.values(group as Record<string, unknown>).filter((v) => v === false).length
+      )
+    }, 0),
+  })
   return NextResponse.json({ ok: true })
 }

@@ -37,9 +37,13 @@ function buildComponentContextShort(c: Component): string {
   ].join("\n")
 }
 
+export type ExtractSourceKind = "doc" | "code"
+
 function buildPrompt(
   component: Component,
-  sections: RelevantSection[]
+  sections: RelevantSection[],
+  sourceKind: ExtractSourceKind = "doc",
+  language?: string
 ): string {
   const sectionsText = sections
     .map(
@@ -51,14 +55,25 @@ function buildPrompt(
     sectionsText.length > PASS_2_INPUT_CAP
       ? sectionsText.slice(0, PASS_2_INPUT_CAP) + "\n\n…(sections truncated)"
       : sectionsText
-  return `You are an architecture analyst extracting business rules from documentation into a structured catalog.
+
+  const codeContext =
+    sourceKind === "code"
+      ? `\nThe passages below are SOURCE CODE${language && language !== "auto" ? ` (${language})` : ""}. Translate the code into business terms before emitting a candidate:
+- If you find a numeric calculation, extract the formula as a plain algebraic expression — strip language syntax, keep the variable names from the code so the analyst can verify (e.g. \`premium = baseRate * (1 + riskFactor)\`, NOT the language-specific assignment).
+- If you find an if/else with business meaning, map it to Given (precondition) / When (trigger) / Then (outcome). Skip pure technical branches (null checks, retry loops).
+- If you find a validator / guard / invariant, emit a constraint with a one-line summary describing what must always hold.
+- Preserve the original variable / method names where useful so the analyst can audit against the source.
+`
+      : ""
+
+  return `You are an architecture analyst extracting business rules from ${sourceKind === "code" ? "source code" : "documentation"} into a structured catalog.
 
 ${buildComponentContextShort(component)}
 
 The catalog already contains these rules on this component:
 ${summariseExistingRules(component.rules)}
-
-Below are passages relevant to this component. Extract every distinct rule, calculation, formula or constraint you find. Do not invent rules — only emit what the text states or directly implies.
+${codeContext}
+Below are passages relevant to this component. Extract every distinct rule, calculation, formula or constraint you find. Do not invent rules — only emit what the ${sourceKind === "code" ? "code" : "text"} states or directly implies.
 
 RULE KINDS:
 - "formula"   — a calculation. Use \`formula\` for the expression (e.g. "premium = baseRate * (1 + riskFactor)").
@@ -136,11 +151,13 @@ export interface ExtractResult {
 
 export async function extractRuleCandidates(
   component: Component,
-  sections: RelevantSection[]
+  sections: RelevantSection[],
+  sourceKind: ExtractSourceKind = "doc",
+  language?: string
 ): Promise<ExtractResult> {
   const t0 = Date.now()
   const llm = await getLLM()
-  const prompt = buildPrompt(component, sections)
+  const prompt = buildPrompt(component, sections, sourceKind, language)
   const raw = await llm.complete({ prompt, maxTokens: PASS_2_MAX_TOKENS })
   const parsed = extractJson(raw)
   const candidates: RuleCandidate[] = []

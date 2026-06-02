@@ -11,8 +11,16 @@ import { promises as fsp } from "node:fs"
 import * as path from "node:path"
 import { getGitProviderName } from "@/lib/git"
 import { REQUIRED_SUBDIRS } from "@/lib/git/filesystem"
+import { withRouteContext } from "@/lib/route-context"
+import { getLogger } from "@/lib/log"
 
-export async function POST() {
+export async function POST(request: Request) {
+  return withRouteContext(request, async () => {
+    return doInit()
+  })
+}
+
+async function doInit() {
   if (getGitProviderName() !== "filesystem") {
     return NextResponse.json(
       {
@@ -70,6 +78,7 @@ export async function POST() {
       await fsp.mkdir(full, { recursive: true })
       created.push(sub)
     }
+    getLogger().adminAction("storage.init", { rootPath, created, skipped })
     return NextResponse.json({
       ok: true,
       rootPath,
@@ -77,11 +86,13 @@ export async function POST() {
       skipped,
     })
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    getLogger().error("storage.init failed", { message })
     return NextResponse.json(
       {
         ok: false,
         error: "io-failed",
-        message: err instanceof Error ? err.message : String(err),
+        message,
         created,
       },
       { status: 500 }

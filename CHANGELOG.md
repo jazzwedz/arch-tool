@@ -7,6 +7,33 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Structured JSON logging.** Every server-side log line is a JSON object with `ts`, `level`, `requestId`, `user`, `route`, `msg` and (optional) `meta`. Three streams: operational entries (`app.*.jsonl`), LLM call traces (`llm.*.jsonl`), admin audit trail (`admin-actions.*.jsonl`). Per-day rotation by filename. Configurable level (`LOG_LEVEL`) and sink (`LOG_SINK=stdout|file|both`) with file output rooted at `LOG_PATH`.
+- **Full LLM call traces.** Every `complete()` call writes a log entry with provider, model, full prompt + response (when `LLM_LOG_FULL=true`, default), latency, and ok/err. Designed for fine-tuning analysis — the Admin console exports selected entries as OpenAI fine-tuning JSONL (`{messages: [{role:"user", content:prompt}, {role:"assistant", content:response}]}`) ready to upload as the `purpose: "fine-tune"` input.
+- **Admin console at `/admin`.** Every logged-in user (already gated by `SITE_PASSWORD`) can browse three tabs:
+  - *LLM calls* — filter by user / route / provider / OK-or-failed / full-text; click any row to expand the full prompt + response side-by-side with copy buttons; multi-select + Export as fine-tuning JSONL or raw JSONL.
+  - *Operational logs* — filter by level / user / route / search; click an entry to expand its `meta` block.
+  - *Admin audit* — every privileged action: `storage.init`, `config.save`, `lock.acquire`, `lock.denied`, `lock.release`, `llm.export`.
+- **Request correlation IDs.** Every request gets an `x-request-id` (mint a fresh UUID when the reverse proxy did not set one). All log lines from the same request share the id so a failing chain can be reconstructed end-to-end.
+- **Front-end error reporter.** `window.onerror` + `unhandledrejection` ship to `/api/client-log`; entries land in `app.*.jsonl` with `meta.source: "client"` so the Admin console shows them alongside server logs. De-duplicated within a 5-second window so a render loop cannot flood the sink.
+- **Secret redaction across the logger.** `Authorization` headers, `client_secret`, `access_token`, `id_token`, `refresh_token` and OpenAI/GitHub key patterns are masked to a short `prefix…****suffix` hint before any sink writes them. Applied to log messages, meta objects, and the body excerpts inside LLM trace entries.
+- **Rules-import from source code.** A third tab in the import wizard — paste source code or upload a single file — sends it through the same two-pass pipeline as PDF/Confluence with a code-aware prompt. Pass 1 surfaces business-logic blocks while ignoring plumbing (logging, DI, HTTP routing, tests, getters/setters, imports); Pass 2 translates them into the existing `ComponentRule` schema, with formulas extracted as plain algebraic expressions, if/else mapped to Given/When/Then, and validators as constraints. Verbatim source excerpt is kept as `evidence`.
+- **Language detection for code uploads.** Filename extension is mapped to a language slug (Java, Kotlin, C#, Python, JS/TS, Go, Rust, Ruby, PHP, Swift, C/C++, SQL, PL/SQL, COBOL, PL/I, Scala, Groovy, Lua, R, Perl, shell, PowerShell, Dart) and passed to the LLM as a hint; the user can override via a dropdown.
+
+### Environment variables
+
+**Added (all optional, drop-in safe defaults — existing `.env.local` works unchanged):**
+
+| Variable | Default | When set | Purpose |
+|---|---|---|---|
+| `LOG_LEVEL` | `info` | always | `debug` / `info` / `warn` / `error` |
+| `LOG_SINK` | `stdout` | always | `stdout` / `file` / `both` |
+| `LOG_PATH` | `./logs` | when `LOG_SINK` is `file` or `both` | Absolute path of the JSONL log directory |
+| `LLM_LOG_FULL` | `true` | always | `true` keeps full prompts+responses for fine-tuning analysis; `summary` keeps only metadata |
+
+**Changed / Removed:** none.
+
 ## [0.4.0] — 2026-05-25
 
 Shared-team release. Two themes:

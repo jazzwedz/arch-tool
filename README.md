@@ -64,6 +64,33 @@ All configuration via environment variables (`.env.local` for dev, your platform
 | `LLM_BASE_URL` + `LLM_API_KEY` | Required when `LLM_PROVIDER=openai-compatible` |
 | `SITE_PASSWORD` | Shared password gate (basic single-user auth) |
 
+### Logging and Admin console
+
+Default behaviour: JSONL log lines on stdout, `info` level, full LLM prompts + responses captured. Drop-in safe for any deployment. To enable the Admin console (`/admin`) to browse logs and inspect LLM calls, switch on the file sink:
+
+```bash
+LOG_SINK=both           # or "file" for file-only
+LOG_PATH=C:\arch-tool-logs
+LOG_LEVEL=info          # debug | info | warn | error
+LLM_LOG_FULL=true       # "summary" to drop prompt+response bodies
+```
+
+Three per-day streams when the file sink is on:
+
+| File pattern | Content |
+|---|---|
+| `app.YYYY-MM-DD.jsonl` | Operational logs (debug / info / warn / error), including front-end errors shipped via `/api/client-log` |
+| `llm.YYYY-MM-DD.jsonl` | One entry per LLM `complete()` call — provider, model, full prompt + response (when `LLM_LOG_FULL=true`), latency, ok/err |
+| `admin-actions.YYYY-MM-DD.jsonl` | Audit trail — storage init, settings save, lock acquire / deny / release, LLM exports |
+
+Secrets are redacted before they hit any sink — `Authorization` headers, `client_secret`, `access_token`, `id_token`, `refresh_token` and OpenAI / GitHub-style key patterns are masked to a short prefix+suffix hint.
+
+The Admin console (`/admin`) is available to every logged-in user (gated only by `SITE_PASSWORD`). Three tabs:
+
+- **LLM calls** — recent calls with full prompt + response side-by-side, copy buttons, "Export selected" emits OpenAI fine-tuning JSONL (`{messages: [{role:"user", content:prompt}, {role:"assistant", content:response}]}`) ready to upload as the `purpose: "fine-tune"` input.
+- **Operational logs** — filter by level / user / route / full-text search. Click an entry to expand its `meta` block.
+- **Admin audit** — every privileged action with who/when/what.
+
 ### Git storage backend
 
 Three adapters ship in the box:

@@ -3,7 +3,8 @@ import localFont from "next/font/local"
 import "./globals.css"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import { Layers, FileText, Download, FileImage, Settings } from "lucide-react"
+import { Layers, FileText, Download, FileImage, Settings, Shield } from "lucide-react"
+import { ClientErrorReporter } from "@/components/ClientErrorReporter"
 import { Providers } from "@/components/Providers"
 
 const geistSans = localFont({
@@ -71,8 +72,15 @@ export default function RootLayout({
                 Export
               </Link>
               <Link
-                href="/settings"
+                href="/admin"
                 className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 ml-auto"
+              >
+                <Shield className="h-3.5 w-3.5" />
+                Admin
+              </Link>
+              <Link
+                href="/settings"
+                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
               >
                 <Settings className="h-3.5 w-3.5" />
                 Settings
@@ -81,6 +89,7 @@ export default function RootLayout({
           </div>
         </header>
         <Providers>
+          <ClientErrorReporter />
           <main className="container mx-auto px-4 py-8">{children}</main>
         </Providers>
       </body>
