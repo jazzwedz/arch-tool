@@ -119,6 +119,25 @@ export default function ComponentDetailPage() {
 
   // "Diagrams this component appears in"
   const [diagramRefs, setDiagramRefs] = useState<{ name: string }[] | null>(null)
+  // Catalog snapshot used to render interface targets as clickable
+  // links when the target matches a component id. Loaded once on
+  // mount; fine for the detail page since the list is already shown
+  // on the catalog landing page anyway.
+  const [allComponents, setAllComponents] = useState<{ id: string; name: string; type: string }[]>([])
+  // Inbound interface backlinks — "which other components point at me
+  // via interfaces[].target". Computed by the server.
+  type InboundInterfaceRef = {
+    id: string
+    name: string
+    type: string
+    iface: {
+      direction: "provides" | "consumes"
+      type: string
+      target?: string
+      description: string
+    }
+  }
+  const [inboundInterfaces, setInboundInterfaces] = useState<InboundInterfaceRef[] | null>(null)
   // Per-section visualization toggles
   const [showInterfacesViz, setShowInterfacesViz] = useState(false)
   const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
@@ -202,6 +221,20 @@ export default function ComponentDetailPage() {
       .then(async (r) => (r.ok ? r.json() : []))
       .then((data) => setDiagramRefs(Array.isArray(data) ? data : []))
       .catch(() => setDiagramRefs([]))
+
+    // Catalog snapshot — used so interface-target strings can be
+    // rendered as clickable links when they match a component id.
+    fetch(`/api/components`)
+      .then(async (r) => (r.ok ? r.json() : []))
+      .then((data) => setAllComponents(Array.isArray(data) ? data : []))
+      .catch(() => setAllComponents([]))
+
+    // Inbound interface backlinks — populates the "Referenced by
+    // interfaces from" card below the Interfaces card.
+    fetch(`/api/components/${encodeURIComponent(id)}/inbound-interfaces`)
+      .then(async (r) => (r.ok ? r.json() : []))
+      .then((data) => setInboundInterfaces(Array.isArray(data) ? data : []))
+      .catch(() => setInboundInterfaces([]))
   }, [id, router])
 
   const generateDocs = async () => {
@@ -1284,7 +1317,14 @@ export default function ComponentDetailPage() {
               </p>
             ) : (
               <div className="space-y-3">
-                {component.interfaces.map((iface, i) => (
+                {component.interfaces.map((iface, i) => {
+                  // Resolve the target string against the catalog snapshot —
+                  // when it matches a known component id, render as a link
+                  // with the type icon so the analyst can click through.
+                  const linkedTarget = iface.target
+                    ? allComponents.find((c) => c.id === iface.target)
+                    : undefined
+                  return (
                   <div
                     key={i}
                     className="flex items-center gap-3 text-sm border-b last:border-0 pb-2"
@@ -1302,12 +1342,30 @@ export default function ComponentDetailPage() {
                     </Badge>
                     <span className="flex-1">{iface.description}</span>
                     {iface.target && (
-                      <span className="text-muted-foreground font-mono text-xs">
-                        → {iface.target}
-                      </span>
+                      linkedTarget ? (
+                        <Link
+                          href={`/component/${linkedTarget.id}`}
+                          className="inline-flex items-center gap-1 text-blue-700 hover:underline font-mono text-xs"
+                          title={`Open ${linkedTarget.name}`}
+                        >
+                          <TypeIcon
+                            type={linkedTarget.type as never}
+                            className="h-3 w-3"
+                          />
+                          → {linkedTarget.name}
+                        </Link>
+                      ) : (
+                        <span
+                          className="text-muted-foreground font-mono text-xs"
+                          title="External label — no matching component in catalog"
+                        >
+                          → {iface.target}
+                        </span>
+                      )
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
             {showInterfacesViz && component.interfaces.length > 0 && (
@@ -1318,6 +1376,68 @@ export default function ComponentDetailPage() {
           </CardContent>
         </Card>
         )}
+
+        {/* Inbound interfaces (backlinks) — "who points at me".
+            Sits in the same Technical tab as Interfaces and is gated
+            by the same visibility flag so the two halves of the
+            interface story stay together. */}
+        {tab === "technical" &&
+          isBlockVisible(uiBlocks, "technical", "interfaces") &&
+          inboundInterfaces !== null &&
+          inboundInterfaces.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  Referenced by interfaces from
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      Other components that name this one as the target of one
+                      of their interfaces. Direction is shown from the source
+                      component&apos;s perspective.
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {inboundInterfaces.map((ref, i) => (
+                    <Link
+                      key={`${ref.id}-${i}`}
+                      href={`/component/${ref.id}`}
+                      className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
+                    >
+                      <TypeIcon
+                        type={ref.type as never}
+                        className="h-4 w-4 text-muted-foreground shrink-0"
+                      />
+                      <span className="font-medium">{ref.name}</span>
+                      <Badge
+                        variant={
+                          ref.iface.direction === "provides"
+                            ? "default"
+                            : "outline"
+                        }
+                        className="text-[10px] w-20 justify-center"
+                      >
+                        {ref.iface.direction}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {ref.iface.type}
+                      </Badge>
+                      {ref.iface.description && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          {ref.iface.description}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
         {/* Relationships */}
         {tab === "technical" && isBlockVisible(uiBlocks, "technical", "relationships") && (

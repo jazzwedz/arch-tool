@@ -64,6 +64,7 @@ import {
 import { useUIConfig } from "@/components/UIConfigProvider"
 import { isBlockVisible } from "@/lib/ui-blocks"
 import { DataModelLinkCard } from "@/components/DataModelLinkCard"
+import { ComponentTargetPicker } from "@/components/ComponentTargetPicker"
 import {
   Tooltip,
   TooltipTrigger,
@@ -876,11 +877,15 @@ export function ComponentForm({
               </div>
               <div>
                 <Label className="text-xs">Target</Label>
-                <Input
-                  className="h-9"
-                  placeholder="Optional target"
+                {/* Typeahead picker: suggests existing components and
+                    accepts free text for external systems. The stored
+                    value is the component id when picked, or whatever
+                    the user typed when no suggestion was selected. */}
+                <ComponentTargetPicker
                   value={iface.target || ""}
-                  onChange={(e) => updateInterface(i, "target", e.target.value)}
+                  onChange={(v) => updateInterface(i, "target", v)}
+                  placeholder="Component or external label"
+                  excludeId={form.id}
                 />
               </div>
               <div>
