@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { TypeIcon } from "@/components/TypeIcon"
 import { TypeModelDialog } from "@/components/TypeModelDialog"
 import { ImportComponentDialog } from "@/components/ImportComponentDialog"
+import { useStoredState } from "@/lib/use-stored-state"
 import Link from "next/link"
 
 type ViewMode = "grid" | "list" | "compact"
@@ -25,13 +26,16 @@ export default function CatalogPage() {
   const [components, setComponents] = useState<Component[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [search, setSearch] = useState("")
-  const [typeFilter, setTypeFilter] = useState<string>("all")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [ownerFilter, setOwnerFilter] = useState<string>("all")
-  const [tagFilter, setTagFilter] = useState<string>("all")
-  const [view, setView] = useState<ViewMode>("grid")
-  const [isGrouped, setIsGrouped] = useState(false)
+  // Catalog view preferences are persisted per-browser via localStorage
+  // so the analyst's filters / view mode / grouping survive reloads,
+  // navigation into a component detail and back, and tab swaps.
+  const [search, setSearch] = useStoredState("catalog:search", "")
+  const [typeFilter, setTypeFilter] = useStoredState<string>("catalog:typeFilter", "all")
+  const [statusFilter, setStatusFilter] = useStoredState<string>("catalog:statusFilter", "all")
+  const [ownerFilter, setOwnerFilter] = useStoredState<string>("catalog:ownerFilter", "all")
+  const [tagFilter, setTagFilter] = useStoredState<string>("catalog:tagFilter", "all")
+  const [view, setView] = useStoredState<ViewMode>("catalog:view", "grid")
+  const [isGrouped, setIsGrouped] = useStoredState("catalog:isGrouped", false)
 
   useEffect(() => {
     fetch("/api/components")
