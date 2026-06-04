@@ -49,9 +49,11 @@ export type ComponentType =
   // fallback when the analyst has not yet decided what shape the thing
   // is. Listed first so it shows up at the top of the type picker.
   | "component"
+  | "service"
   | "microservice"
   | "frontend"
   | "database"
+  | "table"
   | "queue"
   | "gateway"
   | "external"

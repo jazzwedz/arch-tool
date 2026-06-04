@@ -16,6 +16,8 @@ import {
   AppWindow,
   Puzzle,
   Component as ComponentIcon,
+  ServerCog,
+  Table as TableIcon,
 } from "lucide-react"
 import type {
   ComponentType,
@@ -28,9 +30,11 @@ import type {
 
 export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
   component: ComponentIcon,
+  service: ServerCog,
   microservice: Cpu,
   frontend: Monitor,
   database: Database,
+  table: TableIcon,
   queue: MessageSquare,
   gateway: GitMerge,
   external: Globe,
@@ -48,9 +52,11 @@ export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
 
 export const TYPE_LABELS: Record<ComponentType, string> = {
   component: "Component",
+  service: "Service",
   microservice: "Microservice",
   frontend: "Frontend",
   database: "Database",
+  table: "Table",
   queue: "Queue",
   gateway: "Gateway",
   external: "External",
@@ -76,9 +82,11 @@ export const STATUS_COLORS: Record<ComponentStatus, string> = {
 // when the form picks `COMPONENT_TYPES[0]`.
 export const COMPONENT_TYPES: ComponentType[] = [
   "component",
+  "service",
   "microservice",
   "frontend",
   "database",
+  "table",
   "cache",
   "queue",
   "data-pipeline",
@@ -314,9 +322,11 @@ export const RULE_KIND_HINTS: Record<RuleKind, string> = {
 // Each type has: fill (very subtle bg), border (left accent), text (icon/label tint)
 export const TYPE_COLORS: Record<ComponentType, { fill: string; border: string; text: string }> = {
   component:       { fill: "#eef2ff", border: "#6366f1", text: "#4338ca" },
+  service:         { fill: "#cffafe", border: "#0891b2", text: "#0e7490" },
   microservice:    { fill: "#dae8fc", border: "#6c8ebf", text: "#4a6fa5" },
   frontend:        { fill: "#d5e8d4", border: "#82b366", text: "#5a8a42" },
   database:        { fill: "#fff2cc", border: "#d6b656", text: "#b8941e" },
+  table:           { fill: "#fef3c7", border: "#d97706", text: "#92400e" },
   queue:           { fill: "#f8cecc", border: "#b85450", text: "#a03e3a" },
   gateway:         { fill: "#e1d5e7", border: "#9673a6", text: "#7a5a8a" },
   external:        { fill: "#f5f5f5", border: "#666666", text: "#555555" },

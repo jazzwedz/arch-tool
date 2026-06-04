@@ -2,9 +2,11 @@ import type { Component, ComponentType } from "./types"
 
 const typeStyles: Record<ComponentType, string> = {
   component:       "rounded=1;fillColor=#eef2ff;strokeColor=#6366f1;fontStyle=1;fontSize=11;",
+  service:         "rounded=1;fillColor=#cffafe;strokeColor=#0891b2;fontStyle=1;fontSize=11;",
   microservice:    "rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;",
   frontend:        "rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;",
   database:        "shape=cylinder3;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;",
+  table:           "rounded=0;fillColor=#fef3c7;strokeColor=#d97706;fontStyle=1;fontSize=11;",
   queue:           "rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;",
   gateway:         "rhombus;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;",
   external:        "rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;dashed=1;",
@@ -22,10 +24,12 @@ const typeStyles: Record<ComponentType, string> = {
 
 const typeSizes: Record<ComponentType, { w: number; h: number }> = {
   component:       { w: 120, h: 60 },
+  service:         { w: 120, h: 60 },
   microservice:    { w: 120, h: 60 },
   frontend:        { w: 120, h: 60 },
   gateway:         { w: 120, h: 60 },
   database:        { w: 60,  h: 70 },
+  table:           { w: 100, h: 60 },
   queue:           { w: 60,  h: 60 },
   external:        { w: 120, h: 60 },
   platform:        { w: 120, h: 60 },
