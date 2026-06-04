@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { TypeIcon } from "@/components/TypeIcon"
 import { TypeModelDialog } from "@/components/TypeModelDialog"
 import { ImportComponentDialog } from "@/components/ImportComponentDialog"
+import { ConsistencyCheckDialog } from "@/components/ConsistencyCheckDialog"
 import { useStoredState } from "@/lib/use-stored-state"
 import Link from "next/link"
 
@@ -145,6 +146,7 @@ export default function CatalogPage() {
               Download Draw.io Library
             </Button>
           </a>
+          <ConsistencyCheckDialog />
           <ImportComponentDialog />
           <Link href="/new">
             <Button>
