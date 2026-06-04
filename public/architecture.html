@@ -402,7 +402,7 @@
         <div class="ext-title"><span>📐</span> Draw.io Export</div>
         <div class="ext-detail">
           format: mxlibrary XML<br>
-          16 component types pre-styled<br>
+          19 component types pre-styled<br>
           8 connector templates<br>
           drag-and-drop palette
         </div>
@@ -436,21 +436,22 @@
     <div>
       <div class="box-title" style="margin-bottom:14px"><span class="icon">🔷</span> Core fields</div>
       <div class="model-fields">
-        <div><span class="field-key">id</span>: <span class="field-type">string</span> <span class="field-opt">// kebab-case</span></div>
-        <div><span class="field-key">name</span>: <span class="field-type">string</span></div>
-        <div><span class="field-key">type</span>: <span class="field-type">ComponentType</span></div>
-        <div style="padding-left:20px"><span class="field-opt">16 types: microservice · frontend · database · queue · gateway · external · platform · library · data-pipeline · storage · batch-job · cache · context · boundary · application · module</span></div>
-        <div><span class="field-key">status</span>: <span class="field-type">ComponentStatus</span> <span class="field-opt">// draft · production · deprecated</span></div>
-        <div><span class="field-key">owner</span>: <span class="field-type">string</span></div>
-        <div><span class="field-key">tags</span>: <span class="field-type">string[]</span></div>
-        <div><span class="field-key">description</span>: { description } <span class="field-opt">// unified — legacy { oneliner · technical · business } auto-migrates on read</span></div>
-        <div><span class="field-key">interfaces</span>: <span class="field-type">ComponentInterface[]</span></div>
-        <div style="padding-left:20px"><span class="field-opt">direction (provides | consumes) · type · target</span></div>
-        <div><span class="field-key">relationships</span>: <span class="field-type">ComponentRelationship[]</span></div>
+        <div><span class="field-key">id</span>: <span class="field-type">string</span> <span class="field-opt">// kebab-case · auto-generated from name when omitted</span></div>
+        <div><span class="field-key">name</span>: <span class="field-type">string</span> <span class="field-opt">// the only required field</span></div>
+        <div><span class="field-key">type</span>: <span class="field-type">ComponentType</span> <span class="field-opt">? // default "component"</span></div>
+        <div style="padding-left:20px"><span class="field-opt">19 types: component · service · microservice · frontend · database · table · cache · queue · data-pipeline · batch-job · storage · gateway · external · platform · library · context · boundary · application · module</span></div>
+        <div><span class="field-key">status</span>: <span class="field-type">ComponentStatus</span> <span class="field-opt">? // draft · production · deprecated · default "draft"</span></div>
+        <div><span class="field-key">owner</span>: <span class="field-type">string</span> <span class="field-opt">?</span></div>
+        <div><span class="field-key">tags</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>
+        <div><span class="field-key">description</span>: { description } <span class="field-opt">? // unified — legacy { oneliner · technical · business } auto-migrates on read</span></div>
+        <div><span class="field-key">interfaces</span>: <span class="field-type">ComponentInterface[]</span> <span class="field-opt">?</span></div>
+        <div style="padding-left:20px"><span class="field-opt">direction (provides | consumes) · type · target · description?</span></div>
+        <div><span class="field-key">relationships</span>: <span class="field-type">ComponentRelationship[]</span> <span class="field-opt">?</span></div>
         <div style="padding-left:20px"><span class="field-opt">7 types: parent-of · child-of · depends-on · communicates-with · reads-from · writes-to · fallback</span></div>
         <div><span class="field-key">risks</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>
         <div><span class="field-key">nfr</span>: <span class="field-type">ComponentNFR</span> <span class="field-opt">?</span></div>
-        <div style="padding-left:20px"><span class="field-opt">availability · rto · rpo · max_latency · throughput · data_classification · scaling</span></div>
+        <div style="padding-left:20px"><span class="field-opt">availability · rto · rpo · max_latency · throughput · data_classification (public/internal/confidential/restricted) · scaling (horizontal/vertical/none)</span></div>
+        <div><span class="field-key">data_model</span>: { entity } <span class="field-opt">? // only on type=table — link to external data model registry</span></div>
         <div><span class="field-key">diagram</span>: <span class="field-type">ComponentDiagram</span> <span class="field-opt">? // color · shape</span></div>
       </div>
     </div>
