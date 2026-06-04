@@ -16,6 +16,7 @@ import { Search, LayoutGrid, List, Plus, Download, Grid3X3, Group } from "lucide
 import { Button } from "@/components/ui/button"
 import { TypeIcon } from "@/components/TypeIcon"
 import { TypeModelDialog } from "@/components/TypeModelDialog"
+import { ImportComponentDialog } from "@/components/ImportComponentDialog"
 import Link from "next/link"
 
 type ViewMode = "grid" | "list" | "compact"
@@ -140,6 +141,7 @@ export default function CatalogPage() {
               Download Draw.io Library
             </Button>
           </a>
+          <ImportComponentDialog />
           <Link href="/new">
             <Button>
               <Plus className="h-4 w-4 mr-2" />
