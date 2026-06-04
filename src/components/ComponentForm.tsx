@@ -54,7 +54,9 @@ import type {
   ComponentRule,
   RuleKind,
 } from "@/lib/types"
-import { Plus, Trash2, Info, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react"
+import { Plus, Trash2, Info, ChevronUp, ChevronDown, AlertTriangle, X } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { TypeIcon } from "@/components/TypeIcon"
 import {
   Dialog,
   DialogContent,
@@ -66,6 +68,7 @@ import { useUIConfig } from "@/components/UIConfigProvider"
 import { isBlockVisible } from "@/lib/ui-blocks"
 import { DataModelLinkCard } from "@/components/DataModelLinkCard"
 import { ComponentTargetPicker } from "@/components/ComponentTargetPicker"
+import { MultiComponentPicker } from "@/components/MultiComponentPicker"
 import {
   Tooltip,
   TooltipTrigger,
@@ -214,18 +217,6 @@ export function ComponentForm({
   const [risksInput, setRisksInput] = useState(
     initialData?.risks?.join("\n") || ""
   )
-  // Per-output-row "consumers" string input (UI-only state, parsed to string[] on save).
-  const [outputsConsumersInput, setOutputsConsumersInput] = useState<
-    Record<number, string>
-  >(() => {
-    const initial: Record<number, string> = {}
-    initialData?.data?.outputs?.forEach((item, i) => {
-      if (item.consumers && item.consumers.length > 0) {
-        initial[i] = item.consumers.join(", ")
-      }
-    })
-    return initial
-  })
   // Per-rule-row "enforced_in" string input for constraint kind.
   const [ruleEnforcedInput, setRuleEnforcedInput] = useState<
     Record<number, string>
@@ -311,11 +302,15 @@ export function ComponentForm({
     }))
   }
 
+  // Widened to accept string | string[] so the consumers multi-picker
+  // can replace the whole array. The narrow case (single string) still
+  // covers name / kind / source / purpose / description on a single
+  // item.
   const updateDataItem = (
     bucket: DataBucket,
     index: number,
     field: keyof DataItem,
-    value: string
+    value: string | string[]
   ) => {
     setForm((prev) => {
       const dataPrev = prev.data || {}
@@ -335,22 +330,13 @@ export function ComponentForm({
   }
 
   const removeDataItem = (bucket: DataBucket, index: number) => {
+    // No companion UI-text state to keep in sync anymore — consumers
+    // are managed directly on the item.
     setForm((prev) => {
       const dataPrev = prev.data || {}
       const list = (dataPrev[bucket] || []).filter((_, i) => i !== index)
       return { ...prev, data: { ...dataPrev, [bucket]: list } }
     })
-    if (bucket === "outputs") {
-      setOutputsConsumersInput((prev) => {
-        const next: Record<number, string> = {}
-        Object.entries(prev).forEach(([k, v]) => {
-          const i = Number(k)
-          if (i < index) next[i] = v
-          else if (i > index) next[i - 1] = v
-        })
-        return next
-      })
-    }
   }
 
   const updateProcess = (
@@ -457,15 +443,14 @@ export function ComponentForm({
             out.description = item.description.trim()
           if (bucket === "inputs" && item.source && item.source.trim())
             out.source = item.source.trim()
-          if (bucket === "outputs") {
-            const raw = outputsConsumersInput[i]
-            if (raw && raw.trim()) {
-              const consumers = raw
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean)
-              if (consumers.length > 0) out.consumers = consumers
-            }
+          if (bucket === "outputs" && item.consumers && item.consumers.length > 0) {
+            // Consumers come straight from the multi-picker as a clean
+            // string[] — no more comma-separated text intermediary to
+            // parse. Drop empty / whitespace-only entries defensively.
+            const cleaned = item.consumers
+              .map((c) => (typeof c === "string" ? c.trim() : ""))
+              .filter(Boolean)
+            if (cleaned.length > 0) out.consumers = cleaned
           }
           return out
         })
@@ -1334,26 +1319,33 @@ export function ComponentForm({
                           className="h-9"
                         />
                         {bucket === "inputs" && (
-                          <Input
-                            placeholder="Source component id (optional)"
+                          // Source: which component supplies this input.
+                          // Picker matches the interface target picker —
+                          // pick an existing component or type a free
+                          // external label.
+                          <ComponentTargetPicker
                             value={item.source || ""}
-                            onChange={(e) =>
-                              updateDataItem(bucket, i, "source", e.target.value)
+                            onChange={(v) =>
+                              updateDataItem(bucket, i, "source", v)
                             }
-                            className="h-9"
+                            placeholder="Source (component or external, optional)"
+                            excludeId={form.id}
+                            components={existingComponents}
                           />
                         )}
                         {bucket === "outputs" && (
-                          <Input
-                            placeholder="Consumers, comma-separated (optional)"
-                            value={outputsConsumersInput[i] || ""}
-                            onChange={(e) =>
-                              setOutputsConsumersInput((prev) => ({
-                                ...prev,
-                                [i]: e.target.value,
-                              }))
+                          // Consumers: who reads this output. Multi-pick
+                          // with chip badges so the analyst can build the
+                          // list one at a time and visually confirm each
+                          // entry resolved to a known component.
+                          <MultiComponentPicker
+                            values={item.consumers || []}
+                            onChange={(next) =>
+                              updateDataItem(bucket, i, "consumers", next)
                             }
-                            className="h-9"
+                            components={existingComponents}
+                            excludeId={form.id}
+                            placeholder="Add a consumer (pick or type)"
                           />
                         )}
                       </div>

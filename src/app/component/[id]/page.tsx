@@ -160,6 +160,24 @@ export default function ComponentDetailPage() {
     }
   }
   const [inboundRelationships, setInboundRelationships] = useState<InboundRelationshipRef[] | null>(null)
+  // Inbound data backlinks — "other components that point at me via
+  // their inputs[].source or outputs[].consumers". Two `via` values
+  // distinguish the two directions in the response.
+  type InboundDataRef = {
+    id: string
+    name: string
+    type: string
+    via: "input-source" | "output-consumer"
+    dataItem: {
+      name: string
+      kind: string
+      source?: string
+      consumers?: string[]
+      purpose?: string
+      description?: string
+    }
+  }
+  const [inboundData, setInboundData] = useState<InboundDataRef[] | null>(null)
   // Per-section visualization toggles
   const [showInterfacesViz, setShowInterfacesViz] = useState(false)
   const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
@@ -264,6 +282,13 @@ export default function ComponentDetailPage() {
       .then(async (r) => (r.ok ? r.json() : []))
       .then((data) => setInboundRelationships(Array.isArray(data) ? data : []))
       .catch(() => setInboundRelationships([]))
+
+    // Inbound data backlinks — components that reference this one as
+    // an input source or output consumer, surfaced in the Business tab.
+    fetch(`/api/components/${encodeURIComponent(id)}/inbound-data`)
+      .then(async (r) => (r.ok ? r.json() : []))
+      .then((data) => setInboundData(Array.isArray(data) ? data : []))
+      .catch(() => setInboundData([]))
   }, [id, router])
 
   const generateDocs = async () => {
@@ -1820,17 +1845,80 @@ export default function ComponentDetailPage() {
                               {item.purpose}
                             </span>
                           )}
-                          {bucket === "inputs" && item.source && (
-                            <Link
-                              href={`/component/${item.source}`}
-                              className="text-xs text-blue-700 hover:underline ml-auto"
-                            >
-                              source: {item.source}
-                            </Link>
-                          )}
+                          {bucket === "inputs" && item.source && (() => {
+                            // Resolve source against the live catalog.
+                            // Matched → show TypeIcon + name + working
+                            // link. Unmatched (deleted, typo, or
+                            // external label) → flag with a red
+                            // "missing" badge so the analyst sees the
+                            // stale ref inline.
+                            const sourceComp = allComponents.find(
+                              (c) => c.id === item.source
+                            )
+                            return sourceComp ? (
+                              <Link
+                                href={`/component/${item.source}`}
+                                className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline ml-auto"
+                                title={`Open ${sourceComp.name}`}
+                              >
+                                <TypeIcon
+                                  type={sourceComp.type as never}
+                                  className="h-3 w-3"
+                                />
+                                source: {sourceComp.name}
+                              </Link>
+                            ) : (
+                              <span
+                                className="inline-flex items-center gap-1 text-xs ml-auto"
+                                title="Source not in catalog"
+                              >
+                                <span className="text-muted-foreground">source:</span>
+                                <span className="font-mono">{item.source}</span>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] uppercase border-red-300 bg-red-50 text-red-700"
+                                >
+                                  missing
+                                </Badge>
+                              </span>
+                            )
+                          })()}
                           {bucket === "outputs" && item.consumers && item.consumers.length > 0 && (
-                            <span className="text-xs text-muted-foreground ml-auto">
-                              consumers: {item.consumers.join(", ")}
+                            <span className="inline-flex flex-wrap items-center gap-1 text-xs ml-auto">
+                              <span className="text-muted-foreground">consumers:</span>
+                              {item.consumers.map((cId, ci) => {
+                                const linked = allComponents.find(
+                                  (c) => c.id === cId
+                                )
+                                return linked ? (
+                                  <Link
+                                    key={`${cId}-${ci}`}
+                                    href={`/component/${cId}`}
+                                    className="inline-flex items-center gap-0.5 text-blue-700 hover:underline"
+                                    title={`Open ${linked.name}`}
+                                  >
+                                    <TypeIcon
+                                      type={linked.type as never}
+                                      className="h-3 w-3"
+                                    />
+                                    {linked.name}
+                                  </Link>
+                                ) : (
+                                  <span
+                                    key={`${cId}-${ci}`}
+                                    className="inline-flex items-center gap-1"
+                                    title="Consumer not in catalog"
+                                  >
+                                    <span className="font-mono">{cId}</span>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] uppercase border-red-300 bg-red-50 text-red-700"
+                                    >
+                                      missing
+                                    </Badge>
+                                  </span>
+                                )
+                              })}
                             </span>
                           )}
                         </div>
@@ -1847,6 +1935,90 @@ export default function ComponentDetailPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* Inbound data backlinks. Two groups shown together (each
+            with its own subheader): downstream consumers (they put me
+            in inputs[].source) and upstream emitters (they put me in
+            outputs[].consumers). Gated by the same Inputs & Outputs
+            visibility flag — when an admin hides the IO card, the
+            backlinks hide with it. */}
+        {tab === "business" &&
+          isBlockVisible(uiBlocks, "business", "data") &&
+          inboundData !== null &&
+          inboundData.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  Data referenced by other components
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-sm text-left">
+                      <p className="font-semibold mb-1">Two directions of data flow:</p>
+                      <ul className="text-xs space-y-0.5">
+                        <li>
+                          <strong>Downstream consumers</strong> — they list this
+                          component as the <code>source</code> of one of their inputs
+                        </li>
+                        <li>
+                          <strong>Upstream emitters</strong> — they list this
+                          component in the <code>consumers</code> of one of their outputs
+                        </li>
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(["input-source", "output-consumer"] as const).map((via) => {
+                  const rows = inboundData.filter((r) => r.via === via)
+                  if (rows.length === 0) return null
+                  const heading =
+                    via === "input-source"
+                      ? "Downstream consumers (they read this as a source)"
+                      : "Upstream emitters (they list this as a consumer of their output)"
+                  return (
+                    <div key={via}>
+                      <h4 className="text-sm font-semibold mb-2">{heading}</h4>
+                      <div className="space-y-1.5">
+                        {rows.map((ref, i) => (
+                          <Link
+                            key={`${ref.id}-${via}-${i}`}
+                            href={`/component/${ref.id}`}
+                            className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
+                          >
+                            <TypeIcon
+                              type={ref.type as never}
+                              className="h-4 w-4 text-muted-foreground shrink-0"
+                            />
+                            <span className="font-medium">{ref.name}</span>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {ref.dataItem.name}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${
+                                DATA_KIND_COLORS[ref.dataItem.kind as never] || ""
+                              }`}
+                            >
+                              {DATA_KIND_LABELS[ref.dataItem.kind as never] ||
+                                ref.dataItem.kind}
+                            </Badge>
+                            {ref.dataItem.purpose && (
+                              <span className="text-xs text-muted-foreground truncate">
+                                {ref.dataItem.purpose}
+                              </span>
+                            )}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          )}
 
         {/* Processes */}
         {tab === "business" && isBlockVisible(uiBlocks, "business", "processes") && component.processes && component.processes.length > 0 && (
