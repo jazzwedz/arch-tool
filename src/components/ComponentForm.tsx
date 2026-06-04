@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/dialog"
 import { useUIConfig } from "@/components/UIConfigProvider"
 import { isBlockVisible } from "@/lib/ui-blocks"
+import { DataModelLinkCard } from "@/components/DataModelLinkCard"
 import {
   Tooltip,
   TooltipTrigger,
@@ -781,6 +782,19 @@ export function ComponentForm({
           </div>
         </CardContent>
       </Card>
+      )}
+
+      {/* Data model registry link — only meaningful on table-type
+          components. The card itself silently hides when the
+          deployment does not have the registry configured, so an
+          OSS install without the integration sees nothing. */}
+      {form.type === "table" && (
+        <DataModelLinkCard
+          entity={form.data_model?.entity}
+          onChange={(entity) =>
+            updateField("data_model", entity ? { entity } : undefined)
+          }
+        />
       )}
 
       {/* Interfaces */}

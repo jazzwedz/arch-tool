@@ -9,6 +9,31 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Data Model Registry integration (read-only).** Components of type `table` can be linked to an entity in an external REST metadata service via a new `data_model.entity` field. The edit form gains a "Data model registry link" card and the detail page renders attributes + relationships fetched live from the registry — the catalog never copies the registry data into YAML so the registry stays the single source of truth. One-way pull only: arch-tool never writes back. Generic across vendors — the base URL, API path prefix, entity endpoint and relationships endpoint are all configurable so any standards-compliant REST metadata service fits.
+- **Two auth modes for the registry, mirroring the LLM gateway adapter.** Static bearer token (`DATA_MODEL_REGISTRY_TOKEN`) for the quick-start path; OAuth 2.0 client_credentials (`DATA_MODEL_REGISTRY_OAUTH_*`) for production deployments behind an identity provider. The OAuth provider class is shared with the LLM adapter — token caching, proactive refresh and 401-driven invalidate-and-retry already work.
+- **Data Model Registry healthcheck row in Settings.** Four-step probe (DNS → request → response → classify) identical to the LLM / Git / Confluence rows. When OAuth mode is on, the trace splits into "Phase: Token" + "Phase: Registry" so an operator can pinpoint whether the IdP, the credentials, the scope/audience binding, or the registry endpoint itself is at fault.
+
+### Environment variables
+
+**Added (all optional, drop-in safe defaults — existing `.env.local` works unchanged):**
+
+| Variable | Default | When set | Purpose |
+|---|---|---|---|
+| `DATA_MODEL_REGISTRY_BASE_URL` | (unset) | always | Enables the integration. Leave empty to disable. |
+| `DATA_MODEL_REGISTRY_API_PATH` | `""` | optional | Path prefix between base URL and the endpoint paths. |
+| `DATA_MODEL_REGISTRY_ENTITY_PATH` | `/dataModel/version` | optional | Endpoint that returns `{ entity, attributes, version, zone }`. |
+| `DATA_MODEL_REGISTRY_RELATIONSHIPS_PATH` | `/relationships` | optional | Endpoint that returns `{ relationships: [{parent, child, type}] }`. |
+| `DATA_MODEL_REGISTRY_ZONE` | `PRD` | optional | Value passed as the `zone` query parameter on entity lookups. |
+| `DATA_MODEL_REGISTRY_AUTH` | `bearer` | optional | `bearer` (static token) or `oauth` (client_credentials). |
+| `DATA_MODEL_REGISTRY_TOKEN` | (unset) | when `AUTH=bearer` | Static bearer token. |
+| `DATA_MODEL_REGISTRY_OAUTH_TOKEN_URL` | (unset) | when `AUTH=oauth` | OAuth token endpoint. |
+| `DATA_MODEL_REGISTRY_OAUTH_CLIENT_ID` | (unset) | when `AUTH=oauth` | OAuth client id. |
+| `DATA_MODEL_REGISTRY_OAUTH_CLIENT_SECRET` | (unset) | when `AUTH=oauth` | OAuth client secret. |
+| `DATA_MODEL_REGISTRY_OAUTH_SCOPE` | (unset) | when IdP needs scope | Pass-through to the token request. |
+| `DATA_MODEL_REGISTRY_OAUTH_AUDIENCE` | (unset) | when IdP needs audience | Pass-through to the token request. |
+
+**Changed / Removed:** none.
+
 - **Two extra component types: `service` and `table`.** `service` sits next to `microservice` for cases where the team distinguishes "a service" from "a microservice" (or where the analyst has not committed to either pattern yet). `table` sits next to `database` for catalogs that model individual database tables / collections / entities as first-class components instead of folding them into the parent database. Both ship with icons (`ServerCog`, `Table`), distinct colours (cyan-600 for service, amber-600 for table), and drawio styles + sizes so they render cleanly on the diagram builder and the catalog cards.
 - **Generic `component` type as the new default.** New components default to type `Component` (a neutral catch-all) instead of `microservice` so an analyst who has not yet decided what shape the thing is can still create it without picking a specific architecture archetype. Existing components keep their type unchanged. Listed first in the type picker, paired with a neutral indigo style on diagrams.
 - **Component id auto-generated from the name.** Only the **Name** field is required on the new-component form. The id is slugified from the name on save (lowercase, dashes for spaces, alphanumerics + dash / underscore only). An "Advanced — customize component id" expander lets the analyst override the slug. Edit mode shows the id as read-only because renaming the YAML file would invalidate every link to the component.

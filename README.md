@@ -64,6 +64,23 @@ All configuration via environment variables (`.env.local` for dev, your platform
 | `LLM_BASE_URL` + `LLM_API_KEY` | Required when `LLM_PROVIDER=openai-compatible` |
 | `SITE_PASSWORD` | Shared password gate (basic single-user auth) |
 
+### Optional — Data Model Registry integration
+
+Read-only, one-way pull from an external REST metadata service that exposes entity definitions + entity-to-entity relationships. When configured, components of type **table** get a "Data model registry link" card on the edit form (enter the entity name) and a "Data model registry" card on the detail page that fetches attributes and relationships live from the registry. The catalog stores only the entity name; the registry remains the source of truth.
+
+| Variable | Purpose |
+|---|---|
+| `DATA_MODEL_REGISTRY_BASE_URL` | Base URL of the registry. Leave empty to disable the integration. |
+| `DATA_MODEL_REGISTRY_API_PATH` | API path prefix appended after the base URL (optional). |
+| `DATA_MODEL_REGISTRY_ENTITY_PATH` | Endpoint path for entity lookup. Default `/dataModel/version`. |
+| `DATA_MODEL_REGISTRY_RELATIONSHIPS_PATH` | Endpoint path for relationships lookup. Default `/relationships`. |
+| `DATA_MODEL_REGISTRY_ZONE` | Active zone passed as the `zone` query parameter. Default `PRD`. |
+| `DATA_MODEL_REGISTRY_AUTH` | `bearer` (default) or `oauth`. |
+| `DATA_MODEL_REGISTRY_TOKEN` | Static bearer token (when `AUTH=bearer`). |
+| `DATA_MODEL_REGISTRY_OAUTH_TOKEN_URL` + `_CLIENT_ID` + `_CLIENT_SECRET` + optional `_SCOPE` / `_AUDIENCE` | OAuth 2.0 client_credentials (when `AUTH=oauth`). Same shape as the LLM gateway adapter. |
+
+Diagnostics: the Settings page health-check panel gains a "Data model registry" row that probes DNS → request → response → classify, plus a second phase against the IdP token endpoint when running in OAuth mode.
+
 ### Logging and Admin console
 
 Default behaviour: JSONL log lines on stdout, `info` level, full LLM prompts + responses captured. Drop-in safe for any deployment. To enable the Admin console (`/admin`) to browse logs and inspect LLM calls, switch on the file sink:

@@ -161,10 +161,19 @@ export interface ComponentRule {
   enforced_in?: string[]
 }
 
+// Optional link to an entity in an external data model registry. Only
+// meaningful on components of type `table`. The catalog stores just
+// the entity name; the registry remains the source of truth for the
+// attributes and relationships, which are fetched live for display.
+export interface ComponentDataModelLink {
+  entity: string
+}
+
 export interface Component {
   id: string
   name: string
   type: ComponentType
+  data_model?: ComponentDataModelLink
   status: ComponentStatus
   owner: string
   tags: string[]

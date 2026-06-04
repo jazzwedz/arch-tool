@@ -79,6 +79,7 @@ import { useUIConfig } from "@/components/UIConfigProvider"
 import { isBlockVisible, isTabVisible, type DetailTabId } from "@/lib/ui-blocks"
 import { RulesImportDialog } from "@/components/RulesImportDialog"
 import type { ComponentRule } from "@/lib/types"
+import { DataModelEntityCard } from "@/components/DataModelEntityCard"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -731,6 +732,15 @@ export default function ComponentDetailPage() {
           </Card>
         </>
       )}
+
+      {/* Data model registry — only rendered when the component is a
+          table and the YAML carries a registry link. The card hides
+          itself when the registry integration is not configured. */}
+      {tab === "overview" &&
+        component.type === "table" &&
+        component.data_model?.entity && (
+          <DataModelEntityCard entityName={component.data_model.entity} />
+        )}
 
       {/* RULES & CALCULATIONS TAB */}
       {tab === "rules" && isBlockVisible(uiBlocks, "rules", "section") && (

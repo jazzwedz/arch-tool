@@ -48,7 +48,7 @@ function readVisible(
   return groupCfg?.[field] !== false
 }
 
-type HealthKind = "llm" | "git" | "confluence"
+type HealthKind = "llm" | "git" | "confluence" | "data-model"
 
 interface ProbeStep {
   step: "dns" | "request" | "response" | "classify"
@@ -121,6 +121,7 @@ const HEALTH_LABELS: Record<HealthKind, string> = {
   llm: "LLM",
   git: "Git backend",
   confluence: "Confluence",
+  "data-model": "Data model registry",
 }
 
 export default function SettingsPage() {
@@ -133,6 +134,7 @@ export default function SettingsPage() {
     llm: { status: "idle" },
     git: { status: "idle" },
     confluence: { status: "idle" },
+    "data-model": { status: "idle" },
   })
 
   // Hydrate local state from the loaded config once.
@@ -242,6 +244,7 @@ export default function SettingsPage() {
     void runHealth("llm")
     void runHealth("git")
     void runHealth("confluence")
+    void runHealth("data-model")
   }
 
   function toggleExpand(kind: HealthKind) {
@@ -301,7 +304,7 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {(["llm", "git", "confluence"] as HealthKind[]).map((kind) => {
+          {(["llm", "git", "confluence", "data-model"] as HealthKind[]).map((kind) => {
             const s = health[kind]
             const r = s.result
             const failingCategory = r?.trace?.steps
