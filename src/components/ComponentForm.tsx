@@ -75,6 +75,15 @@ interface ComponentFormProps {
   // keystrokes. Used by the edit page when the active component is
   // currently being edited by another user (lock denied).
   readOnly?: boolean
+  // Lets the parent page render Cancel + Save buttons in the page
+  // header instead of at the bottom of the (very long) form. The form
+  // tags its <form> element with `id={formId}` so the parent can
+  // submit via a `<button type="submit" form={formId}>` placed
+  // anywhere in the React tree.
+  formId?: string
+  // Callback mirror of the internal saving flag — parent uses this to
+  // disable the header Save button while a save is in flight.
+  onSavingChange?: (saving: boolean) => void
 }
 
 const emptyInterface: ComponentInterface = {
@@ -132,9 +141,21 @@ export function slugifyForId(name: string): string {
     .replace(/^[-_]+|[-_]+$/g, "")
 }
 
-export function ComponentForm({ initialData, isEdit, readOnly = false }: ComponentFormProps) {
+export function ComponentForm({
+  initialData,
+  isEdit,
+  readOnly = false,
+  formId,
+  onSavingChange,
+}: ComponentFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  // Mirror the internal saving flag back up to the parent so a header
+  // Save button (rendered outside this form) can disable itself while
+  // a save is in flight.
+  useEffect(() => {
+    onSavingChange?.(saving)
+  }, [saving, onSavingChange])
   const [conflictOpen, setConflictOpen] = useState(false)
   const [conflictMessage, setConflictMessage] = useState<string>("")
   const [existingComponents, setExistingComponents] = useState<
@@ -477,13 +498,12 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
       finalId = slug || `component-${Date.now().toString(36)}`
     }
 
-    // Clean description: drop the legacy technical / business fields on
-    // save so the YAML migrates to the unified shape. oneliner and the
-    // unified `description` survive when non-empty.
-    const cleanDescription: { oneliner?: string; description?: string } = {}
-    if (form.description?.oneliner && form.description.oneliner.trim()) {
-      cleanDescription.oneliner = form.description.oneliner.trim()
-    }
+    // Clean description: drop every legacy field on save so the YAML
+    // migrates to the unified shape. Only the unified `description`
+    // survives when non-empty; oneliner / technical / business that
+    // existed on the in-memory record (from migrateComponent) are not
+    // re-written.
+    const cleanDescription: { description?: string } = {}
     if (form.description?.description && form.description.description.trim()) {
       cleanDescription.description = form.description.description.trim()
     }
@@ -564,7 +584,7 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form id={formId} onSubmit={handleSubmit} className="space-y-6">
       {/*
         <fieldset disabled> is the cleanest way to block every input,
         select, textarea and button below — including dynamically-added
@@ -684,10 +704,9 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
               <Label htmlFor="owner">Owner</Label>
               <Input
                 id="owner"
-                placeholder="e.g. platform-team"
+                placeholder="e.g. platform-team (optional)"
                 value={form.owner}
                 onChange={(e) => updateField("owner", e.target.value)}
-                required
               />
             </div>
             <div className="space-y-2">
@@ -703,34 +722,20 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
         </CardContent>
       </Card>
 
-      {/* Description — unified field. Legacy YAML with separate
-          technical + business sections is merged into this on load
-          (see migrateComponent); the next save persists only this
-          field and drops the legacy ones. */}
+      {/* Description — single unified field. Legacy YAML with separate
+          technical + business sections (and / or oneliner) is merged
+          into this on load via migrateComponent; the next save persists
+          only the unified field and drops the legacy ones. */}
       <Card>
         <CardHeader>
           <CardTitle>Description</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="oneliner">One-liner</Label>
-            <Input
-              id="oneliner"
-              placeholder="Short summary shown on cards and previews..."
-              value={form.description.oneliner || ""}
-              onChange={(e) =>
-                updateField("description", {
-                  ...form.description,
-                  oneliner: e.target.value,
-                })
-              }
-            />
-          </div>
+        <CardContent>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="What does this component do? Capture purpose, behaviour, audience-relevant context — in one block, not split by technical / business."
+              placeholder="What does this component do? Capture purpose, behaviour, audience-relevant context."
               value={form.description.description || ""}
               onChange={(e) =>
                 updateField("description", {
@@ -1707,27 +1712,11 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
         </DialogContent>
       </Dialog>
 
-      {/* Submit — hidden entirely in read-only mode so the user is not
-          tempted to click a button that will only frustrate them. */}
-      {!readOnly && (
-        <div className="flex gap-3 justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.back()}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            {isEdit ? "Update Component" : "Create Component"}
-          </Button>
-        </div>
-      )}
+      {/* Submit lives in the page header — see edit/[id]/page.tsx and
+          new/page.tsx, which render Cancel + Save buttons that target
+          this form via `<button type="submit" form={formId}>`. The
+          old bottom-of-form buttons were too easy to miss on a long
+          form. */}
     </form>
   )
 }

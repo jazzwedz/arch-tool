@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ComponentForm } from "@/components/ComponentForm"
-import { ArrowLeft, Lock, AlertTriangle, RefreshCw } from "lucide-react"
+import { ArrowLeft, Lock, AlertTriangle, RefreshCw, Save, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import type { ComponentWithSha } from "@/lib/types"
@@ -32,6 +32,7 @@ export default function EditComponentPage() {
   const [component, setComponent] = useState<ComponentWithSha | null>(null)
   const [loading, setLoading] = useState(true)
   const [lockState, setLockState] = useState<LockState>({ kind: "checking" })
+  const [formSaving, setFormSaving] = useState(false)
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const ownedRef = useRef(false)
 
@@ -186,7 +187,7 @@ export default function EditComponentPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 flex-wrap">
         <Link href={`/component/${id}`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
@@ -204,11 +205,36 @@ export default function EditComponentPage() {
             Release lock
           </Button>
         )}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.push(`/component/${id}`)}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          form="component-form"
+          disabled={readOnly || formSaving}
+        >
+          {formSaving ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
+          Update Component
+        </Button>
       </div>
 
       <LockBanner state={lockState} onRetry={retryAcquire} />
 
-      <ComponentForm initialData={component} isEdit readOnly={readOnly} />
+      <ComponentForm
+        initialData={component}
+        isEdit
+        readOnly={readOnly}
+        formId="component-form"
+        onSavingChange={setFormSaving}
+      />
     </div>
   )
 }
