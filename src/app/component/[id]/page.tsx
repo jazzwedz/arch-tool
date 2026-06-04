@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/StatusBadge"
 import {
   TYPE_LABELS,
   RELATIONSHIP_LABELS,
+  INVERSE_RELATIONSHIP_LABELS,
   DATA_CLASSIFICATION_LABELS,
   CAPABILITY_ROLE_LABELS,
   CAPABILITY_ROLE_COLORS,
@@ -131,6 +132,7 @@ export default function ComponentDetailPage() {
     () => new Map(allComponents.map((c) => [c.id, c.name])),
     [allComponents]
   )
+
   // Inbound interface backlinks — "which other components point at me
   // via interfaces[].target". Computed by the server.
   type InboundInterfaceRef = {
@@ -178,6 +180,58 @@ export default function ComponentDetailPage() {
     }
   }
   const [inboundData, setInboundData] = useState<InboundDataRef[] | null>(null)
+
+  // Unified relationships list — outbound (declared on this component)
+  // PLUS inbound inverted (declared on other components, presented from
+  // this side using INVERSE_RELATIONSHIP_LABELS). The user-facing
+  // Relationships section renders ONE merged list so the analyst sees
+  // "Parent of X" on the parent's page regardless of whether the
+  // parent declared `parent-of: X` or X declared `child-of: parent`.
+  //
+  // Dedupe key: `displayLabel + target`. Both sides legitimately
+  // declaring the same logical edge (e.g. A:parent-of:B + B:child-of:A)
+  // collapses to a single row, with the outbound side winning so the
+  // editable connector/description from THIS component's YAML stays.
+  type UnifiedRelationship = {
+    target: string
+    displayLabel: string
+    connector?: string
+    description?: string
+    isInverse: boolean
+    /** When inverse, the name of the component that declared it. */
+    declaredOn?: string
+  }
+  const combinedRelationships = useMemo<UnifiedRelationship[]>(() => {
+    const outbound: UnifiedRelationship[] = (component?.relationships || []).map(
+      (rel) => ({
+        target: rel.target,
+        displayLabel: RELATIONSHIP_LABELS[rel.type] || rel.type,
+        connector: rel.connector,
+        description: rel.description,
+        isInverse: false,
+      })
+    )
+    const outboundKeys = new Set(
+      outbound.map((r) => `${r.displayLabel}::${r.target}`)
+    )
+    const inverted: UnifiedRelationship[] = (inboundRelationships || []).map(
+      (ref) => ({
+        target: ref.id,
+        displayLabel:
+          INVERSE_RELATIONSHIP_LABELS[ref.relationship.type] ||
+          ref.relationship.type,
+        connector: ref.relationship.connector,
+        description: ref.relationship.description,
+        isInverse: true,
+        declaredOn: ref.name,
+      })
+    )
+    // Drop inverse rows that duplicate an explicit outbound row.
+    const filteredInverse = inverted.filter(
+      (r) => !outboundKeys.has(`${r.displayLabel}::${r.target}`)
+    )
+    return [...outbound, ...filteredInverse]
+  }, [component, inboundRelationships])
   // Per-section visualization toggles
   const [showInterfacesViz, setShowInterfacesViz] = useState(false)
   const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
@@ -813,7 +867,13 @@ export default function ComponentDetailPage() {
             </CardHeader>
             {showHeroDiagram && (
               <CardContent>
-                <MermaidPreview chart={buildHeroContextMermaid(component, nameLookup)} />
+                <MermaidPreview
+                  chart={buildHeroContextMermaid(
+                    component,
+                    nameLookup,
+                    combinedRelationships
+                  )}
+                />
               </CardContent>
             )}
           </Card>
@@ -1254,9 +1314,13 @@ export default function ComponentDetailPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">Status</span>
-                <p>
+                {/* StatusBadge renders a Badge which is a <div>; was
+                    previously wrapped in <p>, which is illegal HTML and
+                    threw a hydration mismatch in dev. Use a block div
+                    with a top margin to keep the visual rhythm. */}
+                <div className="mt-1">
                   <StatusBadge status={component.status} />
-                </p>
+                </div>
               </div>
             </div>
             <div>
@@ -1540,7 +1604,7 @@ export default function ComponentDetailPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowRelationshipsViz((v) => !v)}
-                disabled={!component.relationships || component.relationships.length === 0}
+                disabled={combinedRelationships.length === 0}
                 title="Visualize relationships as a graph"
               >
                 {showRelationshipsViz ? (
@@ -1553,25 +1617,24 @@ export default function ComponentDetailPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {(!component.relationships || component.relationships.length === 0) ? (
+            {combinedRelationships.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No relationships defined.
               </p>
             ) : (
               <div className="space-y-2">
-                {component.relationships.map((rel, i) => {
+                {combinedRelationships.map((rel, i) => {
                   // Resolve target against the catalog snapshot. When
                   // the target exists, render the name + type icon and
                   // make the row a working link. When the target has
                   // been deleted (or was a typo), drop the link, show
-                  // a "missing" warning badge, and surface the raw id
-                  // so the analyst can fix it on the next edit.
+                  // a "missing" warning badge, and surface the raw id.
                   const targetComp = allComponents.find((c) => c.id === rel.target)
                   const body = (
                     <>
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       <Badge variant="outline" className="text-xs shrink-0">
-                        {RELATIONSHIP_LABELS[rel.type] || rel.type}
+                        {rel.displayLabel}
                       </Badge>
                       {targetComp ? (
                         <span className="inline-flex items-center gap-1.5">
@@ -1602,13 +1665,23 @@ export default function ComponentDetailPage() {
                           {rel.description}
                         </span>
                       )}
+                      {/* Inverse rows are derived from the other
+                          component's YAML — surface that on hover so
+                          the analyst knows where to go if they need to
+                          edit the underlying declaration. No badge in
+                          the row body — keep visual parity with
+                          outbound rows per request. */}
                     </>
                   )
+                  const titleAttr = rel.isInverse
+                    ? `Declared on ${rel.declaredOn ?? "the other component"} — edit it there to change this row.`
+                    : undefined
                   return targetComp ? (
                     <Link
                       key={`${rel.target}-${i}`}
                       href={`/component/${rel.target}`}
                       className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
+                      title={titleAttr}
                     >
                       {body}
                     </Link>
@@ -1616,7 +1689,7 @@ export default function ComponentDetailPage() {
                     <div
                       key={`${rel.target}-${i}`}
                       className="flex items-center gap-3 text-sm p-2 rounded-md bg-red-50/30"
-                      title="Target component is not in the catalog"
+                      title={titleAttr ?? "Target component is not in the catalog"}
                     >
                       {body}
                     </div>
@@ -1624,80 +1697,27 @@ export default function ComponentDetailPage() {
                 })}
               </div>
             )}
-            {showRelationshipsViz &&
-              component.relationships &&
-              component.relationships.length > 0 && (
-                <div className="mt-4 border-t pt-3">
-                  <MermaidPreview chart={buildRelationshipsMermaid(component, nameLookup)} />
-                </div>
-              )}
+            {showRelationshipsViz && combinedRelationships.length > 0 && (
+              <div className="mt-4 border-t pt-3">
+                <MermaidPreview
+                  chart={buildRelationshipsMermaid(
+                    component,
+                    nameLookup,
+                    combinedRelationships
+                  )}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
         )}
 
-        {/* Inbound relationships (backlinks). Mirrors the inbound
-            interfaces card — gated by the same Relationships visibility
-            flag so admins who hide Relationships in Settings hide both
-            halves of the story. Direction shown is from the source
-            component's perspective (e.g. "Order Gateway · depends-on"
-            on /component/payment-service means Order Gateway depends
-            on Payment Service). */}
-        {tab === "technical" &&
-          isBlockVisible(uiBlocks, "technical", "relationships") &&
-          inboundRelationships !== null &&
-          inboundRelationships.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Referenced by relationships from
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help">
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-xs">
-                      Other components whose relationships target this one. The
-                      relationship label is shown from the source component&apos;s
-                      perspective.
-                    </TooltipContent>
-                  </Tooltip>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {inboundRelationships.map((ref, i) => (
-                    <Link
-                      key={`${ref.id}-${i}`}
-                      href={`/component/${ref.id}`}
-                      className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
-                    >
-                      <TypeIcon
-                        type={ref.type as never}
-                        className="h-4 w-4 text-muted-foreground shrink-0"
-                      />
-                      <span className="font-medium">{ref.name}</span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] shrink-0"
-                      >
-                        {RELATIONSHIP_LABELS[ref.relationship.type] ||
-                          ref.relationship.type}
-                      </Badge>
-                      {ref.relationship.connector && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {ref.relationship.connector}
-                        </Badge>
-                      )}
-                      {ref.relationship.description && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {ref.relationship.description}
-                        </span>
-                      )}
-                    </Link>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        {/* Inbound relationships are no longer a separate card — they
+            are merged into the Relationships card above with their
+            inverse labels (see INVERSE_RELATIONSHIP_LABELS), so
+            "Parent of X" shows up on the parent's page whether the
+            parent declared `parent-of: X` or X declared `child-of:
+            parent`. */}
 
         {/* Capabilities */}
         {tab === "business" && isBlockVisible(uiBlocks, "business", "capabilities") && component.capabilities && component.capabilities.length > 0 && (

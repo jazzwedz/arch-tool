@@ -18,6 +18,18 @@ import {
 
 export type NameLookup = Map<string, string>
 
+// Caller-supplied relationship row, used by the hero context and the
+// per-section Relationships visualizer. Lets the detail page pre-merge
+// outbound (declared here) and inbound (declared on the other side,
+// inverted via INVERSE_RELATIONSHIP_LABELS) into one list before
+// handing it to the builders. The builders are then ignorant of the
+// outbound/inbound distinction — they just draw an edge labelled
+// `displayLabel` from the component to `target`.
+export interface RelationshipForViz {
+  target: string
+  displayLabel: string
+}
+
 function safeId(s: string): string {
   return s.replace(/[^a-zA-Z0-9_]/g, "_")
 }
@@ -189,7 +201,15 @@ export function buildIOMermaid(component: Component): string {
  */
 export function buildHeroContextMermaid(
   component: Component,
-  nameLookup?: NameLookup
+  nameLookup?: NameLookup,
+  /**
+   * Optional merged relationships list (outbound + inverted inbound).
+   * When provided the hero diagram draws THIS list instead of the
+   * component's own `relationships` field, so inverse edges declared
+   * on other components surface here too. Falls back to outbound only
+   * when omitted.
+   */
+  relationshipsOverride?: RelationshipForViz[]
 ): string {
   const lines: string[] = ["flowchart LR"]
   const me = safeId(component.id)
@@ -198,7 +218,13 @@ export function buildHeroContextMermaid(
   const inputs = (component.data?.inputs || []).slice(0, 8)
   const outputs = (component.data?.outputs || []).slice(0, 8)
   const owns = (component.data?.owns || []).slice(0, 6)
-  const rels = (component.relationships || []).slice(0, 6)
+  const relsSource =
+    relationshipsOverride ??
+    (component.relationships || []).map((r) => ({
+      target: r.target,
+      displayLabel: RELATIONSHIP_LABELS[r.type] || r.type,
+    }))
+  const rels = relsSource.slice(0, 6)
 
   const total =
     interfaces.length + inputs.length + outputs.length + owns.length + rels.length
@@ -264,13 +290,14 @@ export function buildHeroContextMermaid(
   }
 
   // Relationships (peers, dotted gray). Target id resolved to name
-  // when possible — was raw id in earlier versions.
+  // when possible. The label comes straight from rel.displayLabel —
+  // already inverted when the row originated from an inbound edge
+  // declared on the other side.
   rels.forEach((rel, i) => {
     const nid = `rel_${i}_${safeId(rel.target).slice(0, 18)}`
     const otherLabel = displayTarget(rel.target, nameLookup)
     lines.push(`  ${nid}["${escLabel(otherLabel)}"]:::peer`)
-    const label = RELATIONSHIP_LABELS[rel.type] || rel.type
-    lines.push(`  ${me} -.${escLabel(label)}.- ${nid}`)
+    lines.push(`  ${me} -.${escLabel(rel.displayLabel)}.- ${nid}`)
   })
 
   // Owned data (cylinders, dotted).
@@ -299,13 +326,24 @@ export function buildHeroContextMermaid(
  */
 export function buildRelationshipsMermaid(
   component: Component,
-  nameLookup?: NameLookup
+  nameLookup?: NameLookup,
+  /**
+   * Same override semantics as buildHeroContextMermaid — allows the
+   * detail page to pass the merged outbound + inverted inbound list.
+   * Falls back to outbound only when omitted.
+   */
+  relationshipsOverride?: RelationshipForViz[]
 ): string {
   const lines: string[] = ["flowchart LR"]
   const me = safeId(component.id)
   lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
 
-  const rels = component.relationships || []
+  const rels =
+    relationshipsOverride ??
+    (component.relationships || []).map((r) => ({
+      target: r.target,
+      displayLabel: RELATIONSHIP_LABELS[r.type] || r.type,
+    }))
   if (rels.length === 0) {
     lines.push(`  noop["No relationships defined"]:::muted`)
     lines.push(`  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px`)
@@ -317,8 +355,7 @@ export function buildRelationshipsMermaid(
     const otherId = safeId(rel.target)
     const otherLabel = displayTarget(rel.target, nameLookup)
     lines.push(`  ${otherId}["${escLabel(otherLabel)}"]:::peer`)
-    const label = RELATIONSHIP_LABELS[rel.type] || rel.type
-    lines.push(`  ${me} -->|${escLabel(label)}| ${otherId}`)
+    lines.push(`  ${me} -->|${escLabel(rel.displayLabel)}| ${otherId}`)
   }
 
   lines.push(`  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px`)

@@ -185,6 +185,30 @@ export const RELATIONSHIP_LABELS: Record<string, string> = {
   "fallback": "Fallback for",
 }
 
+// Display labels for inverse relationships — used when another
+// component declares a relationship targeting THIS component, and we
+// surface that as a regular row in THIS component's Relationships
+// section. The original side stays the source of truth on disk; this
+// mapping is presentation-only, so the analyst sees "Parent of X" on
+// the parent's page when X has declared "child-of: parent". Pairs:
+//
+//   parent-of (X parent of me)       → me: "Child of"
+//   child-of  (X child of me)        → me: "Parent of"
+//   depends-on (X depends on me)     → me: "Required by"
+//   communicates-with (X comm me)    → me: "Communicates with" (symmetric)
+//   reads-from (X reads from me)     → me: "Read by"
+//   writes-to (X writes to me)       → me: "Written to by"
+//   fallback (X fallback for me)     → me: "Has fallback"
+export const INVERSE_RELATIONSHIP_LABELS: Record<string, string> = {
+  "parent-of": "Child of",
+  "child-of": "Parent of",
+  "depends-on": "Required by",
+  "communicates-with": "Communicates with",
+  "reads-from": "Read by",
+  "writes-to": "Written to by",
+  "fallback": "Has fallback",
+}
+
 export const CAPABILITY_ROLES: CapabilityRole[] = [
   "owner",
   "contributor",
