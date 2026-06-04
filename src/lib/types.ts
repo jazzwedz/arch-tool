@@ -27,12 +27,28 @@ export interface ComponentDiagram {
 }
 
 export interface ComponentDescription {
-  oneliner: string
-  technical: string
-  business: string
+  /** Short one-line summary. Used as a card subtitle / hover tooltip. */
+  oneliner?: string
+  /**
+   * Unified long-form description. This is what new components write
+   * and what the UI shows. Legacy components that stored split
+   * technical / business fields keep them — migrateComponent backfills
+   * `description` from them at read time so the form sees one merged
+   * value; on the next save the legacy fields drop and only this one
+   * stays.
+   */
+  description?: string
+  /** @deprecated use `description` instead. Read at load time only. */
+  technical?: string
+  /** @deprecated use `description` instead. Read at load time only. */
+  business?: string
 }
 
 export type ComponentType =
+  // Generic "component" — the default for new entries and a safe
+  // fallback when the analyst has not yet decided what shape the thing
+  // is. Listed first so it shows up at the top of the type picker.
+  | "component"
   | "microservice"
   | "frontend"
   | "database"

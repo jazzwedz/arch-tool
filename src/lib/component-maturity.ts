@@ -27,14 +27,17 @@ export function computeMaturity(component: Component): MaturityResult {
       filled: !!component.description?.oneliner?.trim(),
     },
     {
-      key: "technical",
-      label: "Technical description",
-      filled: !!component.description?.technical?.trim(),
-    },
-    {
-      key: "business",
-      label: "Business description",
-      filled: !!component.description?.business?.trim(),
+      // Unified description (v0.6+). For legacy components that still
+      // hold only technical / business we count the field as filled when
+      // either of them has content, so existing maturity scores do not
+      // regress on the migration boundary.
+      key: "description",
+      label: "Description",
+      filled: !!(
+        component.description?.description?.trim() ||
+        component.description?.technical?.trim() ||
+        component.description?.business?.trim()
+      ),
     },
     {
       key: "owner",

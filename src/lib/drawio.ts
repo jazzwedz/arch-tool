@@ -1,6 +1,7 @@
 import type { Component, ComponentType } from "./types"
 
 const typeStyles: Record<ComponentType, string> = {
+  component:       "rounded=1;fillColor=#eef2ff;strokeColor=#6366f1;fontStyle=1;fontSize=11;",
   microservice:    "rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;",
   frontend:        "rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;",
   database:        "shape=cylinder3;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;",
@@ -20,6 +21,7 @@ const typeStyles: Record<ComponentType, string> = {
 }
 
 const typeSizes: Record<ComponentType, { w: number; h: number }> = {
+  component:       { w: 120, h: 60 },
   microservice:    { w: 120, h: 60 },
   frontend:        { w: 120, h: 60 },
   gateway:         { w: 120, h: 60 },

@@ -15,6 +15,7 @@ import {
   Shield,
   AppWindow,
   Puzzle,
+  Component as ComponentIcon,
 } from "lucide-react"
 import type {
   ComponentType,
@@ -26,6 +27,7 @@ import type {
 } from "./types"
 
 export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
+  component: ComponentIcon,
   microservice: Cpu,
   frontend: Monitor,
   database: Database,
@@ -45,6 +47,7 @@ export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
 }
 
 export const TYPE_LABELS: Record<ComponentType, string> = {
+  component: "Component",
   microservice: "Microservice",
   frontend: "Frontend",
   database: "Database",
@@ -69,7 +72,10 @@ export const STATUS_COLORS: Record<ComponentStatus, string> = {
   deprecated: "bg-gray-100 text-gray-500 border-gray-300",
 }
 
+// Order matters — "component" sits at the top so it is the default
+// when the form picks `COMPONENT_TYPES[0]`.
 export const COMPONENT_TYPES: ComponentType[] = [
+  "component",
   "microservice",
   "frontend",
   "database",
@@ -307,6 +313,7 @@ export const RULE_KIND_HINTS: Record<RuleKind, string> = {
 // Colors matching Draw.io library export (drawio.ts typeStyles)
 // Each type has: fill (very subtle bg), border (left accent), text (icon/label tint)
 export const TYPE_COLORS: Record<ComponentType, { fill: string; border: string; text: string }> = {
+  component:       { fill: "#eef2ff", border: "#6366f1", text: "#4338ca" },
   microservice:    { fill: "#dae8fc", border: "#6c8ebf", text: "#4a6fa5" },
   frontend:        { fill: "#d5e8d4", border: "#82b366", text: "#5a8a42" },
   database:        { fill: "#fff2cc", border: "#d6b656", text: "#b8941e" },

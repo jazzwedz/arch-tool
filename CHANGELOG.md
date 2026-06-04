@@ -7,6 +7,13 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Generic `component` type as the new default.** New components default to type `Component` (a neutral catch-all) instead of `microservice` so an analyst who has not yet decided what shape the thing is can still create it without picking a specific architecture archetype. Existing components keep their type unchanged. Listed first in the type picker, paired with a neutral indigo style on diagrams.
+- **Component id auto-generated from the name.** Only the **Name** field is required on the new-component form. The id is slugified from the name on save (lowercase, dashes for spaces, alphanumerics + dash / underscore only). An "Advanced — customize component id" expander lets the analyst override the slug. Edit mode shows the id as read-only because renaming the YAML file would invalidate every link to the component.
+- **Unified `description.description` field.** The Description card on the form and the detail page now uses one textarea instead of two (Technical + Business). Existing components that store split `description.technical` / `description.business` are merged into the unified field at read time via `migrateComponent`, so old YAML keeps loading unchanged on disk. The next save persists only the unified field and drops the legacy ones; components that have never been re-saved still render correctly by falling back to the legacy fields in the detail view and in the catalog search.
+- **Pull-smart now patches `description.description`.** The Confluence pull-smart flow recognises the unified field as a primary patch target. Legacy `description.technical` / `description.business` patches still work for Confluence pages whose structure has not been re-published.
+
 ### Fixed
 
 - **Operational logs now actually populate `app.YYYY-MM-DD.jsonl`.** v0.5.0 shipped the file sink and the Admin console's Operational logs tab, but most API routes were still emitting their errors through `console.error`/`console.warn` (which only lands on stdout) instead of `getLogger()`. As a result, the file sink was being written for LLM calls and admin actions only, and the Operational tab stayed empty on file-sink deployments. This release replaces every server-side `console.*` in `src/lib/*` and every API route with `getLogger()` equivalents, and wraps every route handler in `withRouteContext` so an `info` entry per mutating request and a `debug` entry per `GET` are emitted automatically. The `app` stream now reflects real traffic.

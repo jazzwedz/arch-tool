@@ -336,9 +336,14 @@ export default function GeneratePage() {
   }, [result, selectedComponentId, outputMode, audience, documentType])
 
   const getDescription = (component: Component): string => {
-    if (audience === "Business") return component.description.business
-    if (audience === "Executive") return component.description.oneliner
-    return component.description.technical
+    const d = component.description || {}
+    // Unified description (preferred). Falls back to the legacy
+    // technical / business split for components that have not been
+    // re-saved since the v0.6 migration.
+    const unified = d.description || ""
+    if (audience === "Executive") return d.oneliner || unified || d.business || d.technical || ""
+    if (audience === "Business") return d.business || unified || d.technical || ""
+    return d.technical || unified || d.business || ""
   }
 
   const hasSelection =

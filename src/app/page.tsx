@@ -66,7 +66,8 @@ export default function CatalogPage() {
         !search ||
         c.id.toLowerCase().includes(search.toLowerCase()) ||
         c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.description.oneliner.toLowerCase().includes(search.toLowerCase())
+        (c.description?.oneliner || "").toLowerCase().includes(search.toLowerCase()) ||
+        (c.description?.description || "").toLowerCase().includes(search.toLowerCase())
 
       const matchesType = typeFilter === "all" || c.type === typeFilter
       const matchesStatus = statusFilter === "all" || c.status === statusFilter

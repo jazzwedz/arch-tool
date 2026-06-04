@@ -53,6 +53,27 @@ function migrateComponent(raw: Record<string, any>): Component {
       delete raw.data.produces
     }
   }
+  // Description: legacy YAML kept `technical` + `business` as two
+  // separate sections. New code uses a single `description` field. To
+  // keep old files loading unchanged, backfill `description` from
+  // technical + business at read time. The form sees one merged
+  // textarea; the next save persists only the unified field, dropping
+  // the legacy ones. Components that only set `technical` keep its
+  // content; ones that set both get them joined.
+  if (raw.description && typeof raw.description === "object") {
+    const d = raw.description as Record<string, unknown>
+    if (typeof d.description !== "string" || !d.description) {
+      const tech = typeof d.technical === "string" ? d.technical : ""
+      const biz = typeof d.business === "string" ? d.business : ""
+      if (tech && biz && tech.trim() !== biz.trim()) {
+        d.description = `${tech.trim()}\n\n${biz.trim()}`
+      } else if (tech) {
+        d.description = tech
+      } else if (biz) {
+        d.description = biz
+      }
+    }
+  }
   return raw as Component
 }
 

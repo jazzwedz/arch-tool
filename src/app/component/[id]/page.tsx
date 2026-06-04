@@ -1112,20 +1112,27 @@ export default function ComponentDetailPage() {
                 <Button
                   variant="outline"
                   onClick={() =>
-                    copyToClipboard(component.description.technical, "technical")
+                    copyToClipboard(
+                      component.description?.description ||
+                        component.description?.technical ||
+                        component.description?.business ||
+                        "",
+                      "description"
+                    )
                   }
                 >
-                  {copiedField === "technical" ? (
+                  {copiedField === "description" ? (
                     <Check className="h-4 w-4 mr-2" />
                   ) : (
                     <Copy className="h-4 w-4 mr-2" />
                   )}
-                  Copy Technical Description
+                  Copy Description
                 </Button>
                 <Button
                   variant="outline"
+                  className="hidden"
                   onClick={() =>
-                    copyToClipboard(component.description.business, "business")
+                    copyToClipboard(component.description?.business || "", "business")
                   }
                 >
                   {copiedField === "business" ? (
@@ -1183,25 +1190,61 @@ export default function ComponentDetailPage() {
         </Card>
         )}
 
-        {/* Descriptions */}
+        {/* Description — unified field with backward-compat fallback to
+            the legacy technical / business pair so components that have
+            not been re-saved since the v0.6 migration still render. */}
         {tab === "overview" && isBlockVisible(uiBlocks, "overview", "descriptions") && (
         <Card>
           <CardHeader>
-            <CardTitle>Descriptions</CardTitle>
+            <CardTitle>Description</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <span className="text-sm text-muted-foreground font-medium">
-                Technical
-              </span>
-              <p className="text-sm mt-1">{component.description.technical}</p>
-            </div>
-            <div>
-              <span className="text-sm text-muted-foreground font-medium">
-                Business
-              </span>
-              <p className="text-sm mt-1">{component.description.business}</p>
-            </div>
+            {component.description?.oneliner && (
+              <div>
+                <span className="text-sm text-muted-foreground font-medium">
+                  One-liner
+                </span>
+                <p className="text-sm mt-1">{component.description.oneliner}</p>
+              </div>
+            )}
+            {component.description?.description ? (
+              <div>
+                <p className="text-sm whitespace-pre-wrap">
+                  {component.description.description}
+                </p>
+              </div>
+            ) : (
+              <>
+                {component.description?.technical && (
+                  <div>
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Technical
+                    </span>
+                    <p className="text-sm mt-1 whitespace-pre-wrap">
+                      {component.description.technical}
+                    </p>
+                  </div>
+                )}
+                {component.description?.business && (
+                  <div>
+                    <span className="text-sm text-muted-foreground font-medium">
+                      Business
+                    </span>
+                    <p className="text-sm mt-1 whitespace-pre-wrap">
+                      {component.description.business}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+            {!component.description?.oneliner &&
+              !component.description?.description &&
+              !component.description?.technical &&
+              !component.description?.business && (
+                <p className="text-sm text-muted-foreground italic">
+                  No description yet.
+                </p>
+              )}
           </CardContent>
         </Card>
         )}

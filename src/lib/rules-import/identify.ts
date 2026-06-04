@@ -45,8 +45,14 @@ function buildComponentContext(c: Component): string {
     `Type: ${c.type}`,
     `Owner: ${c.owner || "(unassigned)"}`,
     `One-liner: ${c.description?.oneliner || "(none)"}`,
-    `Technical: ${(c.description?.technical || "").slice(0, 600) || "(none)"}`,
-    `Business: ${(c.description?.business || "").slice(0, 600) || "(none)"}`,
+    `Description: ${(
+      c.description?.description ||
+      [c.description?.technical, c.description?.business]
+        .filter((s): s is string => !!s)
+        .join("\n\n") ||
+      ""
+    )
+      .slice(0, 1200) || "(none)"}`,
     `Capabilities: ${caps}`,
     `Interfaces: ${interfaces}`,
     `Data in: ${dataIn}`,

@@ -59,6 +59,10 @@ const SCALAR_ALLOWED_FIELDS = new Set<string>([
   "owner",
   "tags",
   "description.oneliner",
+  "description.description",
+  // Legacy fields — still accepted from older Confluence pages whose
+  // structure has not been re-published since the v0.6 migration. New
+  // pages should patch description.description directly.
   "description.technical",
   "description.business",
   "nfr.availability",
@@ -368,8 +372,9 @@ EDITABLE FIELDS (only propose changes to these — use these exact dot-paths):
 - owner (string)
 - tags (array of strings — return as a comma-separated string in newValue)
 - description.oneliner (string, short summary)
-- description.technical (string, may be longer prose)
-- description.business (string, may be longer prose)
+- description.description (string, the unified long-form description — use this for any new description content)
+- description.technical (string, legacy — only patch when the Confluence page still has a "Technical" section; new pages should patch description.description instead)
+- description.business (string, legacy — only patch when the Confluence page still has a "Business" section; new pages should patch description.description instead)
 - nfr.availability (string, e.g. "99.9%")
 - nfr.rto (string, e.g. "1h")
 - nfr.rpo (string)
@@ -549,6 +554,9 @@ async function applyPatches(args: ApplyArgs): Promise<NextResponse> {
         break
       case "description.oneliner":
         ;(updated.description as Record<string, string>).oneliner = v
+        break
+      case "description.description":
+        ;(updated.description as Record<string, string>).description = v
         break
       case "description.technical":
         ;(updated.description as Record<string, string>).technical = v

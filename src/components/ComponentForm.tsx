@@ -116,6 +116,22 @@ const emptyRule: ComponentRule = {
   summary: "",
 }
 
+// Convert a free-form name into a YAML-safe component id.
+// Lowercases, replaces whitespace with dashes, strips anything that is
+// not a letter / digit / dash / underscore, and collapses runs of
+// dashes. Returns "" when the input has no usable characters; the
+// caller falls back to a timestamp-based id in that case.
+export function slugifyForId(name: string): string {
+  return (name || "")
+    .normalize("NFKD")
+    .toLowerCase()
+    .trim()
+    .replace(/[\s/\\]+/g, "-")
+    .replace(/[^a-z0-9_\-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
+}
+
 export function ComponentForm({ initialData, isEdit, readOnly = false }: ComponentFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -128,11 +144,11 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
   const [form, setForm] = useState<Component>({
     id: "",
     name: "",
-    type: "microservice",
+    type: "component",
     status: "draft",
     owner: "",
     tags: [],
-    description: { oneliner: "", technical: "", business: "" },
+    description: { oneliner: "", description: "" },
     interfaces: [],
     relationships: [],
     risks: [],
@@ -452,8 +468,29 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
       })
       .filter((x): x is ComponentRule => x !== null)
 
+    // Auto-generate id from name on create when the analyst did not
+    // type one. Edit mode keeps the existing id (the input is disabled
+    // and the YAML filename cannot change without a rename flow).
+    let finalId = form.id.trim()
+    if (!isEdit && !finalId) {
+      const slug = slugifyForId(form.name)
+      finalId = slug || `component-${Date.now().toString(36)}`
+    }
+
+    // Clean description: drop the legacy technical / business fields on
+    // save so the YAML migrates to the unified shape. oneliner and the
+    // unified `description` survive when non-empty.
+    const cleanDescription: { oneliner?: string; description?: string } = {}
+    if (form.description?.oneliner && form.description.oneliner.trim()) {
+      cleanDescription.oneliner = form.description.oneliner.trim()
+    }
+    if (form.description?.description && form.description.description.trim()) {
+      cleanDescription.description = form.description.description.trim()
+    }
+
     const component: Component = {
       ...form,
+      id: finalId,
       tags: tagsInput
         .split(",")
         .map((t) => t.trim())
@@ -462,6 +499,10 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
         .split("\n")
         .map((r) => r.trim())
         .filter(Boolean),
+      // Unified description — legacy technical / business are dropped
+      // on save; migrateComponent backfills `description` from them at
+      // read time for any YAML that still has the old shape.
+      description: cleanDescription,
       capabilities: cleanCapabilities.length > 0 ? cleanCapabilities : undefined,
       // Drop any legacy field on save so the YAML is upgraded.
       business_capabilities: undefined,
@@ -539,28 +580,66 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
           <CardTitle>Basic Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Name is the only required field for a new component.
+              The id is auto-generated from the name on save unless the
+              analyst opens the "Advanced" panel and types one. Edit
+              mode locks the id because changing it would rename the
+              backing YAML file. */}
+          <div className="space-y-2">
+            <Label htmlFor="name">Name <span className="text-destructive">*</span></Label>
+            <Input
+              id="name"
+              placeholder="e.g. Authentication Service"
+              value={form.name}
+              onChange={(e) => updateField("name", e.target.value)}
+              required
+            />
+            {!isEdit && (
+              <div className="text-xs text-muted-foreground">
+                ID:{" "}
+                <code className="font-mono">
+                  {form.id || slugifyForId(form.name) || "(type a name first)"}
+                </code>
+              </div>
+            )}
+          </div>
+          {isEdit && (
             <div className="space-y-2">
               <Label htmlFor="id">Component ID</Label>
               <Input
                 id="id"
-                placeholder="e.g. auth-service"
                 value={form.id}
-                onChange={(e) => updateField("id", e.target.value)}
-                disabled={isEdit}
-                required
+                disabled
+                className="font-mono"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                placeholder="e.g. Authentication Service"
-                value={form.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                required
-              />
-            </div>
+          )}
+          {!isEdit && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground py-1">
+                Advanced — customize component id
+              </summary>
+              <div className="mt-2 space-y-2">
+                <Label htmlFor="id">Component ID (optional)</Label>
+                <Input
+                  id="id"
+                  placeholder={
+                    slugifyForId(form.name) || "auto-generated from name"
+                  }
+                  value={form.id}
+                  onChange={(e) => updateField("id", e.target.value)}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to use the auto-generated slug. Only
+                  letters, digits, dashes and underscores; this becomes
+                  the YAML filename and the URL slug for the component.
+                </p>
+              </div>
+            </details>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
             <div className="space-y-2">
               <Label>Type</Label>
               <Select
@@ -624,57 +703,42 @@ export function ComponentForm({ initialData, isEdit, readOnly = false }: Compone
         </CardContent>
       </Card>
 
-      {/* Descriptions */}
+      {/* Description — unified field. Legacy YAML with separate
+          technical + business sections is merged into this on load
+          (see migrateComponent); the next save persists only this
+          field and drops the legacy ones. */}
       <Card>
         <CardHeader>
-          <CardTitle>Descriptions</CardTitle>
+          <CardTitle>Description</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="oneliner">One-liner</Label>
             <Input
               id="oneliner"
-              placeholder="Short description..."
-              value={form.description.oneliner}
+              placeholder="Short summary shown on cards and previews..."
+              value={form.description.oneliner || ""}
               onChange={(e) =>
                 updateField("description", {
                   ...form.description,
                   oneliner: e.target.value,
                 })
               }
-              required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="technical">Technical Description</Label>
+            <Label htmlFor="description">Description</Label>
             <Textarea
-              id="technical"
-              placeholder="Detailed technical description..."
-              value={form.description.technical}
+              id="description"
+              placeholder="What does this component do? Capture purpose, behaviour, audience-relevant context — in one block, not split by technical / business."
+              value={form.description.description || ""}
               onChange={(e) =>
                 updateField("description", {
                   ...form.description,
-                  technical: e.target.value,
+                  description: e.target.value,
                 })
               }
-              rows={3}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="business">Business Description</Label>
-            <Textarea
-              id="business"
-              placeholder="Business-friendly description..."
-              value={form.description.business}
-              onChange={(e) =>
-                updateField("description", {
-                  ...form.description,
-                  business: e.target.value,
-                })
-              }
-              rows={3}
-              required
+              rows={8}
             />
           </div>
         </CardContent>
