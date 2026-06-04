@@ -61,6 +61,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { useUIConfig } from "@/components/UIConfigProvider"
+import { isBlockVisible } from "@/lib/ui-blocks"
 import {
   Tooltip,
   TooltipTrigger,
@@ -158,6 +160,22 @@ export function ComponentForm({
   }, [saving, onSavingChange])
   const [conflictOpen, setConflictOpen] = useState(false)
   const [conflictMessage, setConflictMessage] = useState<string>("")
+
+  // Hide form sections whose detail-page block is hidden by the
+  // team-wide config in Settings. The mapping mirrors BLOCK_METAS so
+  // the analyst is not asked to edit fields they have chosen not to
+  // display anywhere. Basic Information is always visible — the Name
+  // input is the only required field on the form.
+  const { blocks: uiBlocks } = useUIConfig()
+  const showDescription = isBlockVisible(uiBlocks, "overview", "descriptions")
+  const showRisks = isBlockVisible(uiBlocks, "overview", "risks")
+  const showInterfaces = isBlockVisible(uiBlocks, "technical", "interfaces")
+  const showRelationships = isBlockVisible(uiBlocks, "technical", "relationships")
+  const showNfr = isBlockVisible(uiBlocks, "technical", "nfr")
+  const showCapabilities = isBlockVisible(uiBlocks, "business", "capabilities")
+  const showData = isBlockVisible(uiBlocks, "business", "data")
+  const showProcesses = isBlockVisible(uiBlocks, "business", "processes")
+  const showRules = isBlockVisible(uiBlocks, "rules", "section")
   const [existingComponents, setExistingComponents] = useState<
     { id: string; name: string }[]
   >([])
@@ -732,6 +750,7 @@ export function ComponentForm({
           technical + business sections (and / or oneliner) is merged
           into this on load via migrateComponent; the next save persists
           only the unified field and drops the legacy ones. */}
+      {showDescription && (
       <Card>
         <CardHeader>
           <CardTitle>Description</CardTitle>
@@ -762,8 +781,10 @@ export function ComponentForm({
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Interfaces */}
+      {showInterfaces && (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -879,7 +900,10 @@ export function ComponentForm({
         </CardContent>
       </Card>
 
+      )}
+
       {/* Relationships */}
+      {showRelationships && (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -1030,7 +1054,10 @@ export function ComponentForm({
         </CardContent>
       </Card>
 
+      )}
+
       {/* Capabilities */}
+      {showCapabilities && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1133,7 +1160,10 @@ export function ComponentForm({
         </CardContent>
       </Card>
 
+      )}
+
       {/* Inputs & Outputs (data) */}
+      {showData && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1299,7 +1329,10 @@ export function ComponentForm({
         </CardContent>
       </Card>
 
+      )}
+
       {/* Processes */}
+      {showProcesses && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1402,7 +1435,10 @@ export function ComponentForm({
         </CardContent>
       </Card>
 
+      )}
+
       {/* Rules & Calculations */}
+      {showRules && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1564,7 +1600,10 @@ export function ComponentForm({
         </CardContent>
       </Card>
 
+      )}
+
       {/* Non-Functional Requirements */}
+      {showNfr && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1672,7 +1711,10 @@ export function ComponentForm({
         </CardContent>
       </Card>
 
+      )}
+
       {/* Risks */}
+      {showRisks && (
       <Card>
         <CardHeader>
           <CardTitle>Risks</CardTitle>
@@ -1686,6 +1728,7 @@ export function ComponentForm({
           />
         </CardContent>
       </Card>
+      )}
 
       </fieldset>
 
