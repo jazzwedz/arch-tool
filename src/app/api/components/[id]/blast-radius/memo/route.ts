@@ -8,6 +8,7 @@ import {
   LLM_DISABLED_MESSAGE,
 } from "@/lib/llm"
 import { withRouteContext } from "@/lib/route-context"
+import { getLogger } from "@/lib/log"
 
 export async function POST(request: Request) {
   return withRouteContext(request, () => doPost(request))
@@ -37,10 +38,9 @@ async function doPost(request: Request) {
 
     return NextResponse.json({ memo })
   } catch (error) {
-    console.error(
-      "Failed to generate impact memo:",
-      error instanceof Error ? error.message : "Unknown error"
-    )
+    getLogger().error("Failed to generate impact memo", {
+      err: error instanceof Error ? error.message : "Unknown error",
+    })
     return NextResponse.json(
       { error: "Failed to generate impact memo" },
       { status: 500 }

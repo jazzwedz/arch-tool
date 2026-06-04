@@ -32,6 +32,7 @@ import type {
 import { COMPONENT_STATUSES, RULE_KINDS } from "@/lib/constants"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { withRouteContext } from "@/lib/route-context"
+import { getLogger } from "@/lib/log"
 
 export const dynamic = "force-dynamic"
 
@@ -187,7 +188,7 @@ async function doPost(request: Request) {
         : error && typeof error === "object" && "message" in error
         ? String((error as { message: string }).message)
         : "Unknown error"
-    console.error("Failed pull-smart:", message)
+    getLogger().error("Failed pull-smart", { err: message })
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
@@ -237,7 +238,7 @@ async function computeAiPatches(
     }
     return out
   } catch (err) {
-    console.warn("AI scan failed:", err instanceof Error ? err.message : err)
+    getLogger().warn("AI scan failed", { err: err instanceof Error ? err.message : String(err) })
     return []
   }
 }
@@ -613,10 +614,9 @@ async function applyPatches(args: ApplyArgs): Promise<NextResponse> {
       args.linkSha
     )
   } catch (err) {
-    console.warn(
-      `saveConfluenceLink failed for ${args.componentId} (apply still succeeded):`,
-      err instanceof Error ? err.message : err
-    )
+    getLogger().warn(`saveConfluenceLink failed for ${args.componentId} (apply still succeeded)`, {
+      err: err instanceof Error ? err.message : String(err),
+    })
   }
 
   return NextResponse.json({

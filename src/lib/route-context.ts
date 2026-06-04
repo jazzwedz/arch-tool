@@ -16,6 +16,7 @@
 import { randomUUID } from "node:crypto"
 import { withRequestContext } from "./request-context"
 import { getCurrentUser } from "./current-user"
+import { getLogger } from "./log"
 
 export function withRouteContext<T>(
   request: Request,
@@ -30,5 +31,18 @@ export function withRouteContext<T>(
   } catch {
     // ignore
   }
-  return withRequestContext({ user, requestId, route }, fn)
+  return withRequestContext({ user, requestId, route }, async () => {
+    // Auto-log one operational entry per request so the Admin console's
+    // Operational tab actually shows traffic. Mutating methods are
+    // logged at info, read-only at debug — default LOG_LEVEL=info hides
+    // GET flooding from a catalog page reload but still surfaces every
+    // save/delete/import. Set LOG_LEVEL=debug to see GETs too.
+    const method = (request.method || "GET").toUpperCase()
+    const level: "debug" | "info" =
+      method === "GET" || method === "HEAD" ? "debug" : "info"
+    const log = getLogger()
+    if (level === "info") log.info(`${method} ${route || ""}`)
+    else log.debug(`${method} ${route || ""}`)
+    return fn()
+  })
 }

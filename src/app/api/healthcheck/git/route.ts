@@ -3,14 +3,21 @@ import { promises as fsp } from "node:fs"
 import * as path from "node:path"
 import { getGit, getGitProviderName, missingGitEnvVars } from "@/lib/git"
 import { REQUIRED_SUBDIRS } from "@/lib/git/filesystem"
+import { withRouteContext } from "@/lib/route-context"
+import { getLogger } from "@/lib/log"
 
 // POST — verbose live-probe of the configured Git backend. Returns the
 // sanitized self-description, a four-step probe trace, and (when the
 // active backend is filesystem) an `actions` block the Settings UI uses
 // to decide whether to render the "Initialize storage" button.
-export async function POST() {
+export async function POST(request: Request) {
+  return withRouteContext(request, doPost)
+}
+
+async function doPost() {
   const provider = getGitProviderName()
   const missing = missingGitEnvVars()
+  getLogger().adminAction("healthcheck.git", { provider })
 
   if (missing.length > 0) {
     return NextResponse.json({

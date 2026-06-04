@@ -10,6 +10,7 @@
 import yaml from "js-yaml"
 import { getGit, isGitConfigured, GitNotFoundError } from "./git"
 import type { UIBlocksConfig } from "./ui-blocks"
+import { getLogger } from "./log"
 
 export interface RuntimeConfig {
   llm?: {
@@ -46,10 +47,9 @@ export async function loadConfig(): Promise<RuntimeConfig> {
     }
     // Other errors (auth, network) — log once and return empty so AI
     // routes still work with env-default model.
-    console.warn(
-      "Failed to load config.yaml:",
-      error instanceof Error ? error.message : error
-    )
+    getLogger().warn("Failed to load config.yaml", {
+      err: error instanceof Error ? error.message : String(error),
+    })
     _cached = { value: {}, loadedAt: now }
     return {}
   }

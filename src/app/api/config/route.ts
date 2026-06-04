@@ -27,10 +27,7 @@ export async function GET() {
     if (error instanceof GitNotFoundError) {
       return NextResponse.json({ ui: { blocks: {} }, llm: {} })
     }
-    console.error(
-      "Failed to load config.yaml:",
-      error instanceof Error ? error.message : error
-    )
+    getLogger().error("Failed to load config.yaml", { err: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: "Failed to load config" },
       { status: 500 }
@@ -79,10 +76,7 @@ async function doPost(request: Request) {
     }
   } catch (error: unknown) {
     if (!(error instanceof GitNotFoundError)) {
-      console.error(
-        "Failed to read config.yaml before update:",
-        error instanceof Error ? error.message : error
-      )
+      getLogger().error("Failed to read config.yaml before update", { err: error instanceof Error ? error.message : String(error) })
       return NextResponse.json(
         { error: "Failed to read existing config" },
         { status: 500 }
@@ -104,10 +98,7 @@ async function doPost(request: Request) {
       sha
     )
   } catch (error: unknown) {
-    console.error(
-      "Failed to write config.yaml:",
-      error instanceof Error ? error.message : error
-    )
+    getLogger().error("Failed to write config.yaml", { err: error instanceof Error ? error.message : String(error) })
     return NextResponse.json(
       { error: "Failed to write config" },
       { status: 500 }

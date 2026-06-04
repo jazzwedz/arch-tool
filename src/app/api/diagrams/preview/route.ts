@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
 import { getDiagram } from "@/lib/github"
 import { isValidName } from "@/lib/validate"
+import { getLogger } from "@/lib/log"
+import { withRouteContext } from "@/lib/route-context"
 
 export async function GET(request: Request) {
+  return withRouteContext(request, () => doGet(request))
+}
+
+async function doGet(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const name = searchParams.get("name")
@@ -51,7 +57,7 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.error("Diagram preview failed:", error instanceof Error ? error.message : "Unknown error")
+    getLogger().error("Diagram preview failed", { err: error instanceof Error ? error.message : "Unknown error" })
     return new NextResponse("Failed to load diagram", { status: 500 })
   }
 }

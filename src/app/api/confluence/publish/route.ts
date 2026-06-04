@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { getComponent, getConfluenceLink, saveConfluenceLink } from "@/lib/github"
 import { isValidName } from "@/lib/validate"
+import { withRouteContext } from "@/lib/route-context"
+import { getLogger } from "@/lib/log"
 import {
   isConfluenceConfigured,
   createPage,
@@ -24,6 +26,10 @@ interface PublishBody {
 }
 
 export async function POST(request: Request) {
+  return withRouteContext(request, () => doPost(request))
+}
+
+async function doPost(request: Request) {
   try {
     if (!isConfluenceConfigured()) {
       return NextResponse.json(
@@ -76,10 +82,9 @@ export async function POST(request: Request) {
         existingLinkSha = linked.sha
       }
     } catch (err) {
-      console.warn(
-        `getConfluenceLink failed for ${componentId} (continuing with title fallback):`,
-        err instanceof Error ? err.message : err
-      )
+      getLogger().warn(`getConfluenceLink failed for ${componentId} (continuing with title fallback)`, {
+        err: err instanceof Error ? err.message : String(err),
+      })
     }
     if (!existingPageId) {
       const found = await findPageByComponentId(componentId)
@@ -103,10 +108,9 @@ export async function POST(request: Request) {
         action = "updated"
       } catch (err) {
         // Page might have been deleted in Confluence; fall through to create.
-        console.warn(
-          `Confluence page ${existingPageId} no longer accessible, recreating:`,
-          err instanceof Error ? err.message : err
-        )
+        getLogger().warn(`Confluence page ${existingPageId} no longer accessible, recreating`, {
+          err: err instanceof Error ? err.message : String(err),
+        })
         pageRef = await createPage({
           title,
           storageBody,
@@ -143,10 +147,9 @@ export async function POST(request: Request) {
       linkPersisted = false
       linkWarning =
         "Confluence page is live, but the link side-file in arch-data could not be written (GitHub PAT permission). Pull will use title-based lookup."
-      console.warn(
-        `saveConfluenceLink failed for ${componentId}:`,
-        err instanceof Error ? err.message : err
-      )
+      getLogger().warn(`saveConfluenceLink failed for ${componentId}`, {
+        err: err instanceof Error ? err.message : String(err),
+      })
     }
 
     return NextResponse.json({
@@ -169,7 +172,7 @@ export async function POST(request: Request) {
         : error && typeof error === "object" && "message" in error
         ? String((error as { message: string }).message)
         : "Unknown error"
-    console.error("Failed to publish to Confluence:", message)
+    getLogger().error("Failed to publish to Confluence", { err: message })
     return NextResponse.json(
       { error: `Failed to publish: ${message}` },
       { status: status >= 400 && status < 600 ? status : 500 }

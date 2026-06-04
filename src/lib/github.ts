@@ -10,6 +10,7 @@
 import yaml from "js-yaml"
 import { getGit, GitNotFoundError } from "./git"
 import type { Component, ComponentWithSha, DiagramWithSha } from "./types"
+import { getLogger } from "./log"
 
 // Backward compatibility for legacy YAML shapes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,7 +69,9 @@ export async function listComponents(): Promise<Component[]> {
           yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
         )
       } catch (err) {
-        console.error(`Failed to fetch component ${file.path}:`, err)
+        getLogger().error(`Failed to fetch component ${file.path}`, {
+          err: err instanceof Error ? err.message : String(err),
+        })
         return null
       }
     })
@@ -140,7 +143,9 @@ export async function listDiagrams(): Promise<DiagramWithSha[]> {
         const name = file.path.replace("diagrams/", "").replace(".drawio", "")
         return { name, content, sha: file.sha } as DiagramWithSha
       } catch (err) {
-        console.error(`Failed to fetch diagram ${file.path}:`, err)
+        getLogger().error(`Failed to fetch diagram ${file.path}`, {
+          err: err instanceof Error ? err.message : String(err),
+        })
         return null
       }
     })

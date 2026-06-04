@@ -7,6 +7,10 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Operational logs now actually populate `app.YYYY-MM-DD.jsonl`.** v0.5.0 shipped the file sink and the Admin console's Operational logs tab, but most API routes were still emitting their errors through `console.error`/`console.warn` (which only lands on stdout) instead of `getLogger()`. As a result, the file sink was being written for LLM calls and admin actions only, and the Operational tab stayed empty on file-sink deployments. This release replaces every server-side `console.*` in `src/lib/*` and every API route with `getLogger()` equivalents, and wraps every route handler in `withRouteContext` so an `info` entry per mutating request and a `debug` entry per `GET` are emitted automatically. The `app` stream now reflects real traffic.
+
 ## [0.5.0] — 2026-05-25
 
 Observability + code release. Two themes:

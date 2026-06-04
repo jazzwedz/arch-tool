@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { isConfluenceConfigured, findPageByComponentId } from "@/lib/confluence"
 import { getConfluenceLink } from "@/lib/github"
 import { isValidName } from "@/lib/validate"
+import { getLogger } from "@/lib/log"
+import { withRouteContext } from "@/lib/route-context"
 
 export const dynamic = "force-dynamic"
 
@@ -9,6 +11,10 @@ export const dynamic = "force-dynamic"
 // Reports whether Confluence is configured and whether this component
 // already has a published page (side-file first, title-based fallback).
 export async function GET(request: Request) {
+  return withRouteContext(request, () => doGet(request))
+}
+
+async function doGet(request: Request) {
   try {
     const url = new URL(request.url)
     const componentId = url.searchParams.get("componentId") || ""
@@ -58,10 +64,7 @@ export async function GET(request: Request) {
       pageUrl,
     })
   } catch (error) {
-    console.error(
-      "Failed to get confluence status:",
-      error instanceof Error ? error.message : "Unknown error"
-    )
+    getLogger().error("Failed to get confluence status", { err: error instanceof Error ? error.message : "Unknown error" })
     return NextResponse.json({ error: "Failed to get status" }, { status: 500 })
   }
 }

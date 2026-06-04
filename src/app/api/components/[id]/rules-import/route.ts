@@ -29,6 +29,7 @@ import {
 import { extractRuleCandidates } from "@/lib/rules-import/extract"
 import type { RulesImportError } from "@/lib/rules-import/types"
 import { withRouteContext } from "@/lib/route-context"
+import { getLogger } from "@/lib/log"
 
 // Allow up to ~12 MB body for PDF uploads.
 export const maxDuration = 60
@@ -167,7 +168,7 @@ async function doPost(
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error("rules-import failed:", message)
+    getLogger().error("rules-import failed", { err: message })
     return NextResponse.json(
       { ok: false, error: "ai-failed", message: `Failed to run rules-import: ${message}` },
       { status: 500 }
