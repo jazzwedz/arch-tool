@@ -138,6 +138,20 @@ export default function ComponentDetailPage() {
     }
   }
   const [inboundInterfaces, setInboundInterfaces] = useState<InboundInterfaceRef[] | null>(null)
+  // Inbound relationship backlinks — "which other components point at
+  // me via relationships[].target".
+  type InboundRelationshipRef = {
+    id: string
+    name: string
+    type: string
+    relationship: {
+      target: string
+      type: string
+      connector?: string
+      description?: string
+    }
+  }
+  const [inboundRelationships, setInboundRelationships] = useState<InboundRelationshipRef[] | null>(null)
   // Per-section visualization toggles
   const [showInterfacesViz, setShowInterfacesViz] = useState(false)
   const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
@@ -235,6 +249,13 @@ export default function ComponentDetailPage() {
       .then(async (r) => (r.ok ? r.json() : []))
       .then((data) => setInboundInterfaces(Array.isArray(data) ? data : []))
       .catch(() => setInboundInterfaces([]))
+
+    // Inbound relationship backlinks — mirrors the interfaces sub-route
+    // but scans relationships[].target instead.
+    fetch(`/api/components/${encodeURIComponent(id)}/inbound-relationships`)
+      .then(async (r) => (r.ok ? r.json() : []))
+      .then((data) => setInboundRelationships(Array.isArray(data) ? data : []))
+      .catch(() => setInboundRelationships([]))
   }, [id, router])
 
   const generateDocs = async () => {
@@ -1486,29 +1507,69 @@ export default function ComponentDetailPage() {
               </p>
             ) : (
               <div className="space-y-2">
-                {component.relationships.map((rel, i) => (
-                  <Link
-                    key={`${rel.target}-${i}`}
-                    href={`/component/${rel.target}`}
-                    className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
-                  >
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {RELATIONSHIP_LABELS[rel.type] || rel.type}
-                    </Badge>
-                    <span className="font-mono">{rel.target}</span>
-                    {rel.connector && (
-                      <Badge variant="secondary" className="text-xs">
-                        {rel.connector}
+                {component.relationships.map((rel, i) => {
+                  // Resolve target against the catalog snapshot. When
+                  // the target exists, render the name + type icon and
+                  // make the row a working link. When the target has
+                  // been deleted (or was a typo), drop the link, show
+                  // a "missing" warning badge, and surface the raw id
+                  // so the analyst can fix it on the next edit.
+                  const targetComp = allComponents.find((c) => c.id === rel.target)
+                  const body = (
+                    <>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {RELATIONSHIP_LABELS[rel.type] || rel.type}
                       </Badge>
-                    )}
-                    {rel.description && (
-                      <span className="text-muted-foreground text-xs truncate">
-                        {rel.description}
-                      </span>
-                    )}
-                  </Link>
-                ))}
+                      {targetComp ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <TypeIcon
+                            type={targetComp.type as never}
+                            className="h-3.5 w-3.5 text-muted-foreground"
+                          />
+                          <span className="font-medium">{targetComp.name}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-mono">{rel.target || "(unset)"}</span>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] uppercase border-red-300 bg-red-50 text-red-700"
+                          >
+                            missing
+                          </Badge>
+                        </span>
+                      )}
+                      {rel.connector && (
+                        <Badge variant="secondary" className="text-xs">
+                          {rel.connector}
+                        </Badge>
+                      )}
+                      {rel.description && (
+                        <span className="text-muted-foreground text-xs truncate">
+                          {rel.description}
+                        </span>
+                      )}
+                    </>
+                  )
+                  return targetComp ? (
+                    <Link
+                      key={`${rel.target}-${i}`}
+                      href={`/component/${rel.target}`}
+                      className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
+                    >
+                      {body}
+                    </Link>
+                  ) : (
+                    <div
+                      key={`${rel.target}-${i}`}
+                      className="flex items-center gap-3 text-sm p-2 rounded-md bg-red-50/30"
+                      title="Target component is not in the catalog"
+                    >
+                      {body}
+                    </div>
+                  )
+                })}
               </div>
             )}
             {showRelationshipsViz &&
@@ -1521,6 +1582,70 @@ export default function ComponentDetailPage() {
           </CardContent>
         </Card>
         )}
+
+        {/* Inbound relationships (backlinks). Mirrors the inbound
+            interfaces card — gated by the same Relationships visibility
+            flag so admins who hide Relationships in Settings hide both
+            halves of the story. Direction shown is from the source
+            component's perspective (e.g. "Order Gateway · depends-on"
+            on /component/payment-service means Order Gateway depends
+            on Payment Service). */}
+        {tab === "technical" &&
+          isBlockVisible(uiBlocks, "technical", "relationships") &&
+          inboundRelationships !== null &&
+          inboundRelationships.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  Referenced by relationships from
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      Other components whose relationships target this one. The
+                      relationship label is shown from the source component&apos;s
+                      perspective.
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {inboundRelationships.map((ref, i) => (
+                    <Link
+                      key={`${ref.id}-${i}`}
+                      href={`/component/${ref.id}`}
+                      className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
+                    >
+                      <TypeIcon
+                        type={ref.type as never}
+                        className="h-4 w-4 text-muted-foreground shrink-0"
+                      />
+                      <span className="font-medium">{ref.name}</span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] shrink-0"
+                      >
+                        {RELATIONSHIP_LABELS[ref.relationship.type] ||
+                          ref.relationship.type}
+                      </Badge>
+                      {ref.relationship.connector && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {ref.relationship.connector}
+                        </Badge>
+                      )}
+                      {ref.relationship.description && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          {ref.relationship.description}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
         {/* Capabilities */}
         {tab === "business" && isBlockVisible(uiBlocks, "business", "capabilities") && component.capabilities && component.capabilities.length > 0 && (

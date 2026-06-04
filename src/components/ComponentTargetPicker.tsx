@@ -1,6 +1,6 @@
 "use client"
 
-// Typeahead picker for an interface target.
+// Typeahead picker for an interface / relationship target.
 //
 // Two modes share one input field:
 //   - Pick an existing component from the catalog — suggestions filter
@@ -16,38 +16,29 @@
 // existing component id, so the analyst can tell at a glance whether
 // the value will resolve to a clickable link on the detail page.
 //
-// Component list is fetched once and cached at module scope — multiple
-// pickers in the same form share the request. Cache invalidation is
-// page-scoped (a fresh page load re-fetches).
+// Component list source:
+//   - When the parent passes `components`, those are used verbatim
+//     (recommended — keeps every picker in a form in sync with one
+//     authoritative fetch made by the parent).
+//   - When `components` is omitted, the picker fetches `/api/components`
+//     itself on mount. No module-level cache: each mount fetches fresh,
+//     so a component deleted in another tab cannot continue to appear
+//     in the dropdown after a page navigation.
 
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { TypeIcon } from "@/components/TypeIcon"
 import { Link as LinkIcon } from "lucide-react"
-import type { Component } from "@/lib/types"
+import type { Component, ComponentType } from "@/lib/types"
 
-// Module-level cache. Reset on page navigation, intentionally.
-let cache: Component[] | null = null
-let inflight: Promise<Component[]> | null = null
-
-async function loadComponents(): Promise<Component[]> {
-  if (cache) return cache
-  if (inflight) return inflight
-  inflight = fetch("/api/components")
-    .then((r) => (r.ok ? r.json() : []))
-    .then((data: unknown) => {
-      cache = Array.isArray(data) ? (data as Component[]) : []
-      return cache
-    })
-    .catch(() => {
-      cache = []
-      return cache
-    })
-    .finally(() => {
-      inflight = null
-    })
-  return inflight
+// Minimum shape the picker needs out of a component. Accepting a
+// narrowed shape lets ComponentForm pass its `existingComponents`
+// state straight through without re-mapping.
+export interface PickableComponent {
+  id: string
+  name: string
+  type: ComponentType
 }
 
 interface Props {
@@ -56,6 +47,11 @@ interface Props {
   placeholder?: string
   /** Optional id to hide from suggestions (typically the current component, to prevent self-reference). */
   excludeId?: string
+  /**
+   * Component list. When provided, used directly — no fetch happens.
+   * When omitted, the picker fetches /api/components on mount.
+   */
+  components?: PickableComponent[]
   className?: string
 }
 
@@ -66,22 +62,40 @@ export function ComponentTargetPicker({
   onChange,
   placeholder,
   excludeId,
+  components: componentsProp,
   className,
 }: Props) {
-  const [components, setComponents] = useState<Component[]>([])
+  const [fetched, setFetched] = useState<PickableComponent[]>([])
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Only fetch when the parent did not supply a list. Aborted on unmount
+  // so an in-flight request from a stale form does not overwrite state.
   useEffect(() => {
-    let alive = true
-    loadComponents().then((list) => {
-      if (alive) setComponents(list)
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
+    if (componentsProp !== undefined) return
+    const controller = new AbortController()
+    fetch("/api/components", { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: unknown) => {
+        if (controller.signal.aborted) return
+        const list = Array.isArray(data)
+          ? (data as Component[]).map((c) => ({
+              id: c.id,
+              name: c.name,
+              type: c.type,
+            }))
+          : []
+        setFetched(list)
+      })
+      .catch(() => {
+        // Network error or abort — leave list empty; the input still
+        // accepts free text, so the user is never blocked.
+      })
+    return () => controller.abort()
+  }, [componentsProp])
+
+  const components = componentsProp ?? fetched
 
   // Close on click outside.
   useEffect(() => {
@@ -114,7 +128,7 @@ export function ComponentTargetPicker({
   // drives the "linked" badge.
   const linkedComponent = components.find((c) => c.id === value)
 
-  const pickComponent = (c: Component) => {
+  const pickComponent = (c: PickableComponent) => {
     onChange(c.id)
     setOpen(false)
   }

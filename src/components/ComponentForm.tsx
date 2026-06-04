@@ -45,6 +45,7 @@ import type {
   ComponentNFR,
   ComponentCapability,
   CapabilityRole,
+  ComponentType,
   DataItem,
   DataKind,
   ComponentData,
@@ -178,8 +179,13 @@ export function ComponentForm({
   const showData = isBlockVisible(uiBlocks, "business", "data")
   const showProcesses = isBlockVisible(uiBlocks, "business", "processes")
   const showRules = isBlockVisible(uiBlocks, "rules", "section")
+  // Fresh catalog snapshot, fetched once per form mount. Used by both
+  // the relationship Target Component picker and the interface target
+  // typeahead — passed down as a prop so a single fetch feeds every
+  // picker in the form, and so the list cannot go stale across
+  // navigations (no module-level cache).
   const [existingComponents, setExistingComponents] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; type: ComponentType }[]
   >([])
 
   const [form, setForm] = useState<Component>({
@@ -233,12 +239,22 @@ export function ComponentForm({
   })
 
   useEffect(() => {
-    fetch("/api/components")
+    // Always-fresh fetch per form mount. AbortController prevents a
+    // late response from a previous mount writing back into a new one.
+    const controller = new AbortController()
+    fetch("/api/components", { signal: controller.signal })
       .then((r) => r.json())
-      .then((data: Component[]) =>
-        setExistingComponents(data.map((c) => ({ id: c.id, name: c.name })))
-      )
-      .catch(console.error)
+      .then((data: Component[]) => {
+        if (controller.signal.aborted) return
+        setExistingComponents(
+          data.map((c) => ({ id: c.id, name: c.name, type: c.type }))
+        )
+      })
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+        console.error(err)
+      })
+    return () => controller.abort()
   }, [])
 
   const updateField = <K extends keyof Component>(
@@ -886,6 +902,7 @@ export function ComponentForm({
                   onChange={(v) => updateInterface(i, "target", v)}
                   placeholder="Component or external label"
                   excludeId={form.id}
+                  components={existingComponents}
                 />
               </div>
               <div>
@@ -999,23 +1016,21 @@ export function ComponentForm({
               </div>
               <div>
                 <Label className="text-xs">Target Component</Label>
-                <Select
+                {/* Typeahead picker — same component the interface row
+                    uses. Relationships still expect an existing
+                    component id, so the analyst will normally pick from
+                    the dropdown; the input still accepts free text for
+                    forward references to components not in the catalog
+                    yet (e.g. while modelling a future system in
+                    parallel). Catalog data flows in from the form's
+                    one fetch — no module cache, no stale entries. */}
+                <ComponentTargetPicker
                   value={rel.target}
-                  onValueChange={(v) => updateRelationship(i, "target", v)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select component..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {existingComponents
-                      .filter((c) => c.id !== form.id)
-                      .map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name} ({c.id})
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => updateRelationship(i, "target", v)}
+                  placeholder="Pick or type a component id"
+                  excludeId={form.id}
+                  components={existingComponents}
+                />
               </div>
               {hideConnector ? (
                 <div />
