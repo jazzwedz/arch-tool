@@ -23,7 +23,7 @@ Architecture overview: <https://arch-tool-jaso.up.railway.app/architecture.html>
 
 ## Features
 
-- **Component catalog** — 16 component types, status, owner, tags, three audience descriptions.
+- **Component catalog** — 19 component types (generic Component / Service / Microservice / Frontend / Database / Table / Cache / Queue / ...), status, owner, tags, free-form description. New components need only a name — the id is auto-generated from it.
 - **Rich modelling** — `capabilities` (with role: Owner / Contributor / Consumer / Indirect), `data` (inputs / outputs / owned, 16 kinds across Format / Business / Technical), `processes`, `rules` (formula / Given-When-Then / constraint), NFR, interfaces, relationships.
 - **AI documentation generation** — Claude Sonnet 4. Audience-tailored or doctype (Audit / Security / Detailed Solution). Optional PDF / ERD / BPMN attachments enrich the prompt.
 - **Bidirectional Confluence sync** — publish renders structured tables and coloured panel macros; pull-smart compares page edits against the YAML and proposes per-field patches with confidence + evidence.

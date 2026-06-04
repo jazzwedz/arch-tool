@@ -1128,20 +1128,6 @@ export default function ComponentDetailPage() {
                   )}
                   Copy Description
                 </Button>
-                <Button
-                  variant="outline"
-                  className="hidden"
-                  onClick={() =>
-                    copyToClipboard(component.description?.business || "", "business")
-                  }
-                >
-                  {copiedField === "business" ? (
-                    <Check className="h-4 w-4 mr-2" />
-                  ) : (
-                    <Copy className="h-4 w-4 mr-2" />
-                  )}
-                  Copy Business Description
-                </Button>
               </div>
             </CardContent>
           </Card>

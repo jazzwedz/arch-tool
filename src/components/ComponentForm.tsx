@@ -53,7 +53,7 @@ import type {
   ComponentRule,
   RuleKind,
 } from "@/lib/types"
-import { Plus, Trash2, Save, Loader2, Info, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react"
+import { Plus, Trash2, Info, ChevronUp, ChevronDown, AlertTriangle } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -598,6 +598,12 @@ export function ComponentForm({
       <Card>
         <CardHeader>
           <CardTitle>Basic Information</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Only <strong>Name</strong> is required. Everything else —
+            type, status, owner, tags, description — is optional. The
+            component id is auto-generated from the name; open
+            &ldquo;Advanced&rdquo; to customise it.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Name is the only required field for a new component.
@@ -729,13 +735,21 @@ export function ComponentForm({
       <Card>
         <CardHeader>
           <CardTitle>Description</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            One free-form description. Capture purpose, behaviour and
+            any context an analyst would want to know — for any
+            audience. Existing components that still carry separate
+            technical / business / one-liner content are merged into
+            this single field on load; the next save persists only the
+            unified text.
+          </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="What does this component do? Capture purpose, behaviour, audience-relevant context."
+              placeholder="What does this component do? Why does it exist? Who depends on it? Anything an architect or analyst should know at a glance."
               value={form.description.description || ""}
               onChange={(e) =>
                 updateField("description", {

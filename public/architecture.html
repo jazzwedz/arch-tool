@@ -443,7 +443,7 @@
         <div><span class="field-key">status</span>: <span class="field-type">ComponentStatus</span> <span class="field-opt">// draft · production · deprecated</span></div>
         <div><span class="field-key">owner</span>: <span class="field-type">string</span></div>
         <div><span class="field-key">tags</span>: <span class="field-type">string[]</span></div>
-        <div><span class="field-key">description</span>: { oneliner · technical · business }</div>
+        <div><span class="field-key">description</span>: { description } <span class="field-opt">// unified — legacy { oneliner · technical · business } auto-migrates on read</span></div>
         <div><span class="field-key">interfaces</span>: <span class="field-type">ComponentInterface[]</span></div>
         <div style="padding-left:20px"><span class="field-opt">direction (provides | consumes) · type · target</span></div>
         <div><span class="field-key">relationships</span>: <span class="field-type">ComponentRelationship[]</span></div>
@@ -477,7 +477,7 @@
       </div>
 
       <div style="margin-top:20px;padding:12px;background:#0c2340;border:1px solid #1d4ed8;border-radius:8px;font-size:11px;color:#93c5fd;line-height:1.6">
-        <strong>Storage:</strong> each component is one <code>{id}.yaml</code> file. Git history = audit log. Backward-compat: legacy <code>business_capabilities: string[]</code> auto-migrates to <code>capabilities: [{name, role: indirect}]</code> on read; legacy <code>data.consumes / produces</code> → <code>data.inputs / outputs</code>.
+        <strong>Storage:</strong> each component is one <code>{id}.yaml</code> file. Git history = audit log. Backward-compat: legacy <code>business_capabilities: string[]</code> auto-migrates to <code>capabilities: [{name, role: indirect}]</code> on read; legacy <code>data.consumes / produces</code> → <code>data.inputs / outputs</code>; legacy <code>description.{oneliner, technical, business}</code> → unified <code>description.description</code>.
       </div>
     </div>
 

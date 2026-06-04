@@ -68,8 +68,9 @@ export const BLOCK_METAS: BlockMeta[] = [
     tab: "overview",
     group: "overview",
     field: "descriptions",
-    label: "Descriptions",
-    description: "One-liner, technical and business prose.",
+    label: "Description",
+    description:
+      "Long-form description of what the component does. Legacy one-liner / technical / business fields render here too on components that have not been re-saved since v0.6.",
   },
   {
     tab: "overview",
