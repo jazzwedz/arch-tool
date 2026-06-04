@@ -9,17 +9,36 @@
 // hitting Back.
 //
 // Lifecycle:
-//   1. On mount the state initialises with the caller-supplied
-//      default — same value on server and client, so the initial
-//      HTML hydrates without a mismatch.
-//   2. A post-mount effect reads localStorage and, if a value is
-//      present, calls setState to swap to it. The visible flash is
-//      one frame in practice.
-//   3. A second effect persists every subsequent state change. It is
-//      gated by a `hydrated` flag so the first render's default
-//      cannot clobber a stored value before step 2 finishes.
-//   4. Errors (private-mode browsers, disabled storage, malformed
-//      JSON) fall back to the default silently.
+//
+//   On the server (Next.js SSR pass for the "use client" component):
+//     window is undefined, so the useState initialiser falls back to
+//     the caller-supplied `initial`. Server-rendered HTML uses that.
+//
+//   On the client (hydration + every subsequent render):
+//     the useState initialiser reads localStorage SYNCHRONOUSLY and
+//     returns the stored value when one exists. The very first
+//     client-side render therefore reflects the persisted value —
+//     no second-pass effect, no flash of defaults that previously
+//     looked like "the page forgot my filters".
+//
+//   On every state change after mount:
+//     the persistence effect writes the new value back. No hydration
+//     gate is needed any more — the initial state IS the persisted
+//     value, so writing it on first run is at worst a no-op identity
+//     write.
+//
+//   On errors (private-mode browsers, disabled storage, quota,
+//     malformed JSON): silently fall back to the default. The in-
+//     memory state still works — only the persistence is lost.
+//
+// Hydration-mismatch caveat: for keys whose stored value differs
+// from `initial`, the server-rendered HTML uses `initial` but the
+// client's first render uses the stored value. React 18+ tolerates
+// this for input.value / aria attributes by re-rendering to client
+// values; the visible result is the user's persisted choice from
+// the first paint, with at most a console warning in dev. Worth
+// it — the alternative (two-pass render via useEffect) was visibly
+// flashing defaults on every navigation, which reads as "broken".
 
 import {
   useState,
@@ -30,40 +49,41 @@ import {
 
 const STORAGE_PREFIX = "arch-tool:"
 
+function readStorage<T>(fullKey: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback
+  try {
+    const raw = window.localStorage.getItem(fullKey)
+    if (raw === null) return fallback
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+
 export function useStoredState<T>(
   key: string,
   initial: T
 ): [T, Dispatch<SetStateAction<T>>] {
   const fullKey = STORAGE_PREFIX + key
-  const [state, setState] = useState<T>(initial)
-  const [hydrated, setHydrated] = useState(false)
 
-  // Hydrate from localStorage once. setHydrated flips after — its
-  // delayed render is what unblocks the persistence effect below.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(fullKey)
-      if (raw !== null) {
-        setState(JSON.parse(raw) as T)
-      }
-    } catch {
-      // Storage unavailable or value malformed — keep the default.
-    }
-    setHydrated(true)
-  }, [fullKey])
+  // Synchronous initialiser — reads localStorage on first client
+  // render, returns `initial` on the server. No two-phase load.
+  const [state, setState] = useState<T>(() => readStorage(fullKey, initial))
 
-  // Persist on each subsequent change. Skipped on the very first
-  // mount render so the default never overwrites a stored value
-  // before the hydration effect has had a chance to load it.
+  // Persist on every change. Guarded against SSR; otherwise
+  // unconditional, since the initial render already has either the
+  // stored value or the default (writing the default first is fine
+  // — it just records "this key exists with the default" and gets
+  // overwritten the moment the user changes anything).
   useEffect(() => {
-    if (!hydrated) return
+    if (typeof window === "undefined") return
     try {
-      localStorage.setItem(fullKey, JSON.stringify(state))
+      window.localStorage.setItem(fullKey, JSON.stringify(state))
     } catch {
-      // Storage may be unavailable or quota-exceeded; swallow it —
-      // the in-memory state still works, just won't survive a reload.
+      // Quota / private mode / disabled storage — swallow. The in-
+      // memory state still works, just won't survive a reload.
     }
-  }, [fullKey, state, hydrated])
+  }, [fullKey, state])
 
   return [state, setState]
 }
