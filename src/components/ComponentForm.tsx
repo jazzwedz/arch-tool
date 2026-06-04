@@ -92,6 +92,7 @@ interface ComponentFormProps {
 }
 
 const emptyInterface: ComponentInterface = {
+  name: "",
   direction: "provides",
   type: "rest",
   target: "",
@@ -853,8 +854,18 @@ export function ComponentForm({
           {form.interfaces.map((iface, i) => (
             <div
               key={i}
-              className="grid grid-cols-[120px_100px_1fr_1fr_40px] gap-2 items-end"
+              className="space-y-2 border-l-2 border-muted pl-3 py-2"
             >
+              <div>
+                <Label className="text-xs">Name</Label>
+                <Input
+                  className="h-9"
+                  placeholder="Interface name (e.g. Orders API, Stock checker)"
+                  value={iface.name || ""}
+                  onChange={(e) => updateInterface(i, "name", e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-[120px_100px_1fr_1fr_40px] gap-2 items-end">
               <div>
                 <Label className="text-xs">Direction</Label>
                 <Select
@@ -931,6 +942,7 @@ export function ComponentForm({
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
+              </div>
             </div>
           ))}
         </CardContent>

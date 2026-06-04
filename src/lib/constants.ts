@@ -18,6 +18,7 @@ import {
   Component as ComponentIcon,
   ServerCog,
   Table as TableIcon,
+  Braces,
 } from "lucide-react"
 import type {
   ComponentType,
@@ -35,6 +36,7 @@ export const TYPE_ICONS: Record<ComponentType, typeof Cpu> = {
   frontend: Monitor,
   database: Database,
   table: TableIcon,
+  schema: Braces,
   queue: MessageSquare,
   gateway: GitMerge,
   external: Globe,
@@ -57,6 +59,7 @@ export const TYPE_LABELS: Record<ComponentType, string> = {
   frontend: "Frontend",
   database: "Database",
   table: "Table",
+  schema: "Schema",
   queue: "Queue",
   gateway: "Gateway",
   external: "External",
@@ -87,6 +90,7 @@ export const COMPONENT_TYPES: ComponentType[] = [
   "frontend",
   "database",
   "table",
+  "schema",
   "cache",
   "queue",
   "data-pipeline",
@@ -117,6 +121,7 @@ export const CONNECTOR_TYPES = [
   "human",
   "info",
   "link",
+  "data",
 ] as const
 
 export const INTERFACE_DIRECTIONS = ["provides", "consumes"] as const
@@ -327,6 +332,7 @@ export const TYPE_COLORS: Record<ComponentType, { fill: string; border: string; 
   frontend:        { fill: "#d5e8d4", border: "#82b366", text: "#5a8a42" },
   database:        { fill: "#fff2cc", border: "#d6b656", text: "#b8941e" },
   table:           { fill: "#fef3c7", border: "#d97706", text: "#92400e" },
+  schema:          { fill: "#fce7f3", border: "#db2777", text: "#9d174d" },
   queue:           { fill: "#f8cecc", border: "#b85450", text: "#a03e3a" },
   gateway:         { fill: "#e1d5e7", border: "#9673a6", text: "#7a5a8a" },
   external:        { fill: "#f5f5f5", border: "#666666", text: "#555555" },

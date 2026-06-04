@@ -1,5 +1,13 @@
 // Build small mermaid diagrams scoped to a single component's perspective.
 // Used by per-section "Visualize" buttons on the detail page.
+//
+// All builders accept an optional `nameLookup` map: component id →
+// component name. When provided, target ids in relationships and
+// interfaces are rendered as the human-readable component name; when
+// omitted (or the id is absent from the map), the raw id is used as
+// fallback. Detail pages pass the catalog snapshot they already have,
+// so the analyst never sees `acme_order_db_prod` in a label when the
+// component is actually called "Acme Order DB (prod)".
 
 import type { Component } from "./types"
 import {
@@ -7,6 +15,8 @@ import {
   CAPABILITY_ROLE_LABELS,
   DATA_KIND_LABELS,
 } from "./constants"
+
+export type NameLookup = Map<string, string>
 
 function safeId(s: string): string {
   return s.replace(/[^a-zA-Z0-9_]/g, "_")
@@ -16,6 +26,14 @@ function escLabel(s: string): string {
   return s.replace(/"/g, "&quot;").replace(/\n/g, " ")
 }
 
+// Resolve a component id to a display label. Falls back to the raw id
+// when no lookup is provided or the id is not in the map (e.g. broken
+// reference or external label typed into a target field).
+function displayTarget(id: string, lookup?: NameLookup): string {
+  if (!id) return ""
+  return lookup?.get(id) || id
+}
+
 /**
  * Visualise the component's interfaces.
  *
@@ -23,7 +41,10 @@ function escLabel(s: string): string {
  * to "External callers" (or named target if present); `consumes` interfaces
  * point inward from "External providers" (or named target).
  */
-export function buildInterfacesMermaid(component: Component): string {
+export function buildInterfacesMermaid(
+  component: Component,
+  nameLookup?: NameLookup
+): string {
   const lines: string[] = ["flowchart LR"]
   const me = safeId(component.id)
   lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
@@ -40,9 +61,17 @@ export function buildInterfacesMermaid(component: Component): string {
   for (const iface of interfaces) {
     counter++
     const otherId = iface.target ? safeId(iface.target) : `caller_${counter}`
-    const otherLabel = iface.target || (iface.direction === "provides" ? "External caller" : "External source")
+    const otherLabel = iface.target
+      ? displayTarget(iface.target, nameLookup)
+      : iface.direction === "provides"
+      ? "External caller"
+      : "External source"
     lines.push(`  ${otherId}["${escLabel(otherLabel)}"]:::peer`)
-    const protoLabel = `${iface.type}${iface.description ? `: ${iface.description.slice(0, 40)}` : ""}`
+    // Edge label: prefer the interface name when set, fall back to
+    // the connector type. Description goes after the name for context.
+    const head = iface.name || iface.type
+    const tail = iface.description ? `: ${iface.description.slice(0, 40)}` : ""
+    const protoLabel = `${head}${tail}`
     if (iface.direction === "provides") {
       lines.push(`  ${otherId} -->|${escLabel(protoLabel)}| ${me}`)
     } else {
@@ -149,21 +178,30 @@ export function buildIOMermaid(component: Component): string {
 }
 
 /**
- * Hero "Component context" diagram — combines relationships, inputs,
- * outputs and owned data into a single flowchart so the user sees the
- * component in its environment at a glance. Used at the top of the
+ * Hero "Component context" diagram — combines interfaces, relationships,
+ * inputs, outputs and owned data into a single flowchart so the user sees
+ * the component in its environment at a glance. Used at the top of the
  * Overview tab on the detail page.
+ *
+ * The diagram is intentionally capped: at most 6 each of interfaces /
+ * relationships and 8 inputs / outputs / owns. Beyond those counts the
+ * picture stops telling a story.
  */
-export function buildHeroContextMermaid(component: Component): string {
+export function buildHeroContextMermaid(
+  component: Component,
+  nameLookup?: NameLookup
+): string {
   const lines: string[] = ["flowchart LR"]
   const me = safeId(component.id)
 
+  const interfaces = (component.interfaces || []).slice(0, 6)
   const inputs = (component.data?.inputs || []).slice(0, 8)
   const outputs = (component.data?.outputs || []).slice(0, 8)
   const owns = (component.data?.owns || []).slice(0, 6)
-  const rels = (component.relationships || []).slice(0, 8)
+  const rels = (component.relationships || []).slice(0, 6)
 
-  const total = inputs.length + outputs.length + owns.length + rels.length
+  const total =
+    interfaces.length + inputs.length + outputs.length + owns.length + rels.length
   if (total === 0) {
     lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
     lines.push(
@@ -201,10 +239,36 @@ export function buildHeroContextMermaid(component: Component): string {
     lines.push(`  ${me} -->|${escLabel(edge)}| ${nid}`)
   })
 
-  // Relationships (peers, gray).
+  // Interfaces — direction-aware. provides: external caller → me;
+  // consumes: me → external target. Edge label prefers the interface
+  // name and falls back to the connector type.
+  let ifCounter = 0
+  for (const iface of interfaces) {
+    ifCounter++
+    const otherId = iface.target
+      ? `iface_t_${safeId(iface.target).slice(0, 18)}`
+      : `iface_anon_${ifCounter}`
+    const otherLabel = iface.target
+      ? displayTarget(iface.target, nameLookup)
+      : iface.direction === "provides"
+      ? "External caller"
+      : "External source"
+    lines.push(`  ${otherId}["${escLabel(otherLabel)}"]:::peer`)
+    const head = iface.name || iface.type
+    const edgeLabel = head.slice(0, 32)
+    if (iface.direction === "provides") {
+      lines.push(`  ${otherId} -->|${escLabel(edgeLabel)}| ${me}`)
+    } else {
+      lines.push(`  ${me} -->|${escLabel(edgeLabel)}| ${otherId}`)
+    }
+  }
+
+  // Relationships (peers, dotted gray). Target id resolved to name
+  // when possible — was raw id in earlier versions.
   rels.forEach((rel, i) => {
     const nid = `rel_${i}_${safeId(rel.target).slice(0, 18)}`
-    lines.push(`  ${nid}["${escLabel(rel.target)}"]:::peer`)
+    const otherLabel = displayTarget(rel.target, nameLookup)
+    lines.push(`  ${nid}["${escLabel(otherLabel)}"]:::peer`)
     const label = RELATIONSHIP_LABELS[rel.type] || rel.type
     lines.push(`  ${me} -.${escLabel(label)}.- ${nid}`)
   })
@@ -233,7 +297,10 @@ export function buildHeroContextMermaid(component: Component): string {
  * Visualise the component's relationships to other components in the catalog.
  * Edges are labelled with the relationship type.
  */
-export function buildRelationshipsMermaid(component: Component): string {
+export function buildRelationshipsMermaid(
+  component: Component,
+  nameLookup?: NameLookup
+): string {
   const lines: string[] = ["flowchart LR"]
   const me = safeId(component.id)
   lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
@@ -248,7 +315,8 @@ export function buildRelationshipsMermaid(component: Component): string {
 
   for (const rel of rels) {
     const otherId = safeId(rel.target)
-    lines.push(`  ${otherId}["${escLabel(rel.target)}"]:::peer`)
+    const otherLabel = displayTarget(rel.target, nameLookup)
+    lines.push(`  ${otherId}["${escLabel(otherLabel)}"]:::peer`)
     const label = RELATIONSHIP_LABELS[rel.type] || rel.type
     lines.push(`  ${me} -->|${escLabel(label)}| ${otherId}`)
   }

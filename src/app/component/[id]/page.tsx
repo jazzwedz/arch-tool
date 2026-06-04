@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -124,6 +124,13 @@ export default function ComponentDetailPage() {
   // mount; fine for the detail page since the list is already shown
   // on the catalog landing page anyway.
   const [allComponents, setAllComponents] = useState<{ id: string; name: string; type: string }[]>([])
+  // Derived id → name lookup, handed to every mermaid builder so node
+  // labels show the human-readable component name instead of the raw
+  // YAML id. Recomputed when allComponents changes.
+  const nameLookup = useMemo(
+    () => new Map(allComponents.map((c) => [c.id, c.name])),
+    [allComponents]
+  )
   // Inbound interface backlinks — "which other components point at me
   // via interfaces[].target". Computed by the server.
   type InboundInterfaceRef = {
@@ -131,6 +138,7 @@ export default function ComponentDetailPage() {
     name: string
     type: string
     iface: {
+      name?: string
       direction: "provides" | "consumes"
       type: string
       target?: string
@@ -780,7 +788,7 @@ export default function ComponentDetailPage() {
             </CardHeader>
             {showHeroDiagram && (
               <CardContent>
-                <MermaidPreview chart={buildHeroContextMermaid(component)} />
+                <MermaidPreview chart={buildHeroContextMermaid(component, nameLookup)} />
               </CardContent>
             )}
           </Card>
@@ -1361,7 +1369,21 @@ export default function ComponentDetailPage() {
                     <Badge variant="secondary" className="text-xs">
                       {iface.type}
                     </Badge>
-                    <span className="flex-1">{iface.description}</span>
+                    {/* Name primary when set; description shown next to it
+                        as muted context. Older entries (no name) keep
+                        the description as the primary label. */}
+                    {iface.name ? (
+                      <span className="flex-1 flex items-baseline gap-2 min-w-0">
+                        <span className="font-medium truncate">{iface.name}</span>
+                        {iface.description && (
+                          <span className="text-muted-foreground text-xs truncate">
+                            — {iface.description}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="flex-1">{iface.description}</span>
+                    )}
                     {iface.target && (
                       linkedTarget ? (
                         <Link
@@ -1391,7 +1413,7 @@ export default function ComponentDetailPage() {
             )}
             {showInterfacesViz && component.interfaces.length > 0 && (
               <div className="mt-4 border-t pt-3">
-                <MermaidPreview chart={buildInterfacesMermaid(component)} />
+                <MermaidPreview chart={buildInterfacesMermaid(component, nameLookup)} />
               </div>
             )}
           </CardContent>
@@ -1448,6 +1470,11 @@ export default function ComponentDetailPage() {
                       <Badge variant="secondary" className="text-[10px]">
                         {ref.iface.type}
                       </Badge>
+                      {ref.iface.name && (
+                        <span className="text-xs font-medium truncate">
+                          {ref.iface.name}
+                        </span>
+                      )}
                       {ref.iface.description && (
                         <span className="text-xs text-muted-foreground truncate">
                           {ref.iface.description}
@@ -1576,7 +1603,7 @@ export default function ComponentDetailPage() {
               component.relationships &&
               component.relationships.length > 0 && (
                 <div className="mt-4 border-t pt-3">
-                  <MermaidPreview chart={buildRelationshipsMermaid(component)} />
+                  <MermaidPreview chart={buildRelationshipsMermaid(component, nameLookup)} />
                 </div>
               )}
           </CardContent>

@@ -1,6 +1,22 @@
 export interface ComponentInterface {
+  /**
+   * Short human-readable name for the interface — e.g. "Orders API",
+   * "Stock checker", "Inventory snapshot". Optional and unrestricted;
+   * legacy components that have only `description` keep rendering the
+   * description as the primary label so nothing on disk needs editing.
+   */
+  name?: string
   direction: "provides" | "consumes"
-  type: "rest" | "grpc" | "async" | "db" | "file" | "human" | "info" | "link"
+  type:
+    | "rest"
+    | "grpc"
+    | "async"
+    | "db"
+    | "file"
+    | "human"
+    | "info"
+    | "link"
+    | "data"
   target?: string
   description: string
 }
@@ -17,7 +33,16 @@ export type RelationshipType =
 export interface ComponentRelationship {
   target: string
   type: RelationshipType
-  connector?: "rest" | "grpc" | "async" | "db" | "file" | "human" | "info" | "link"
+  connector?:
+    | "rest"
+    | "grpc"
+    | "async"
+    | "db"
+    | "file"
+    | "human"
+    | "info"
+    | "link"
+    | "data"
   description?: string
 }
 
@@ -54,6 +79,7 @@ export type ComponentType =
   | "frontend"
   | "database"
   | "table"
+  | "schema"
   | "queue"
   | "gateway"
   | "external"

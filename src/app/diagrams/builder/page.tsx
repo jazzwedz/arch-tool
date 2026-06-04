@@ -82,6 +82,7 @@ const CONNECTOR_COLORS: Record<ConnectorType, string> = {
   human: "#d79b00",
   info: "#2196f3",
   link: "#607d8b",
+  data: "#db2777",
 }
 
 const CONNECTOR_LABELS: Record<ConnectorType, string> = {
@@ -93,6 +94,7 @@ const CONNECTOR_LABELS: Record<ConnectorType, string> = {
   human: "Human",
   info: "Info",
   link: "Link",
+  data: "Data",
 }
 
 const CONNECTOR_DASH: Record<ConnectorType, string> = {
@@ -104,6 +106,7 @@ const CONNECTOR_DASH: Record<ConnectorType, string> = {
   human: "6,4",
   info: "",
   link: "",
+  data: "",
 }
 
 /** Connectors without arrowhead (non-directional) */
@@ -120,6 +123,7 @@ const typeStyles: Record<ComponentType, string> = {
   frontend:        "rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;",
   database:        "shape=cylinder3;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;",
   table:           "rounded=0;fillColor=#fef3c7;strokeColor=#d97706;fontStyle=1;fontSize=11;",
+  schema:          "rounded=0;fillColor=#fce7f3;strokeColor=#db2777;fontStyle=1;fontSize=11;dashed=1;",
   queue:           "rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;",
   gateway:         "rhombus;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;",
   external:        "rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;dashed=1;",
@@ -143,6 +147,7 @@ const typeSizes: Record<ComponentType, { w: number; h: number }> = {
   gateway:         { w: 120, h: 60 },
   database:        { w: 60,  h: 70 },
   table:           { w: 100, h: 60 },
+  schema:          { w: 110, h: 60 },
   queue:           { w: 60,  h: 60 },
   external:        { w: 120, h: 60 },
   platform:        { w: 120, h: 60 },
@@ -170,6 +175,7 @@ const edgeDrawioStyles: Record<ConnectorType, string> = {
   human: "endArrow=open;endFill=0;dashed=1;strokeColor=#d79b00;fontSize=10;",
   info:  "endArrow=block;endFill=1;strokeColor=#2196f3;strokeWidth=2;fontSize=10;",
   link:  "endArrow=none;strokeColor=#607d8b;fontSize=10;",
+  data:  "endArrow=block;endFill=1;strokeColor=#db2777;strokeWidth=2;fontSize=10;",
 }
 
 /* ------------------------------------------------------------------ */

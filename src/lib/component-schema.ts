@@ -74,7 +74,7 @@ const KNOWN_TOP_LEVEL = new Set<string>([
 ])
 
 const KNOWN_DESCRIPTION = new Set(["oneliner", "description", "technical", "business"])
-const KNOWN_INTERFACE = new Set(["direction", "type", "target", "description"])
+const KNOWN_INTERFACE = new Set(["name", "direction", "type", "target", "description"])
 const KNOWN_RELATIONSHIP = new Set(["target", "type", "connector", "description"])
 const KNOWN_NFR = new Set([
   "availability",
@@ -324,6 +324,9 @@ export function validateComponentYaml(text: string): ValidateResult {
         }
         if (iface.target !== undefined && typeof iface.target !== "string") {
           errors.push({ path: `${p}.target`, message: "target must be a string." })
+        }
+        if (iface.name !== undefined && typeof iface.name !== "string") {
+          errors.push({ path: `${p}.name`, message: "name must be a string when provided." })
         }
         if (typeof iface.description !== "string") {
           errors.push({ path: `${p}.description`, message: "description is required." })

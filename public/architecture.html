@@ -402,8 +402,8 @@
         <div class="ext-title"><span>📐</span> Draw.io Export</div>
         <div class="ext-detail">
           format: mxlibrary XML<br>
-          19 component types pre-styled<br>
-          8 connector templates<br>
+          20 component types pre-styled<br>
+          9 connector templates<br>
           drag-and-drop palette
         </div>
       </div>
@@ -439,13 +439,13 @@
         <div><span class="field-key">id</span>: <span class="field-type">string</span> <span class="field-opt">// kebab-case · auto-generated from name when omitted</span></div>
         <div><span class="field-key">name</span>: <span class="field-type">string</span> <span class="field-opt">// the only required field</span></div>
         <div><span class="field-key">type</span>: <span class="field-type">ComponentType</span> <span class="field-opt">? // default "component"</span></div>
-        <div style="padding-left:20px"><span class="field-opt">19 types: component · service · microservice · frontend · database · table · cache · queue · data-pipeline · batch-job · storage · gateway · external · platform · library · context · boundary · application · module</span></div>
+        <div style="padding-left:20px"><span class="field-opt">20 types: component · service · microservice · frontend · database · table · schema · cache · queue · data-pipeline · batch-job · storage · gateway · external · platform · library · context · boundary · application · module</span></div>
         <div><span class="field-key">status</span>: <span class="field-type">ComponentStatus</span> <span class="field-opt">? // draft · production · deprecated · default "draft"</span></div>
         <div><span class="field-key">owner</span>: <span class="field-type">string</span> <span class="field-opt">?</span></div>
         <div><span class="field-key">tags</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>
         <div><span class="field-key">description</span>: { description } <span class="field-opt">? // unified — legacy { oneliner · technical · business } auto-migrates on read</span></div>
         <div><span class="field-key">interfaces</span>: <span class="field-type">ComponentInterface[]</span> <span class="field-opt">?</span></div>
-        <div style="padding-left:20px"><span class="field-opt">direction (provides | consumes) · type · target · description?</span></div>
+        <div style="padding-left:20px"><span class="field-opt">name? · direction (provides | consumes) · type (rest | grpc | async | db | file | human | info | link | data) · target? · description</span></div>
         <div><span class="field-key">relationships</span>: <span class="field-type">ComponentRelationship[]</span> <span class="field-opt">?</span></div>
         <div style="padding-left:20px"><span class="field-opt">7 types: parent-of · child-of · depends-on · communicates-with · reads-from · writes-to · fallback</span></div>
         <div><span class="field-key">risks</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>

@@ -7,6 +7,7 @@ const typeStyles: Record<ComponentType, string> = {
   frontend:        "rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;",
   database:        "shape=cylinder3;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;",
   table:           "rounded=0;fillColor=#fef3c7;strokeColor=#d97706;fontStyle=1;fontSize=11;",
+  schema:          "rounded=0;fillColor=#fce7f3;strokeColor=#db2777;fontStyle=1;fontSize=11;dashed=1;",
   queue:           "rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;",
   gateway:         "rhombus;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;",
   external:        "rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=11;dashed=1;",
@@ -30,6 +31,7 @@ const typeSizes: Record<ComponentType, { w: number; h: number }> = {
   gateway:         { w: 120, h: 60 },
   database:        { w: 60,  h: 70 },
   table:           { w: 100, h: 60 },
+  schema:          { w: 110, h: 60 },
   queue:           { w: 60,  h: 60 },
   external:        { w: 120, h: 60 },
   platform:        { w: 120, h: 60 },
@@ -83,6 +85,11 @@ const connectorEntries = [
   {
     title: "Link",
     xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=none;strokeColor=#607d8b;fontSize=10;" value="Link" connector_type="link" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
+    w: 120, h: 20,
+  },
+  {
+    title: "Data",
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=block;endFill=1;strokeColor=#db2777;strokeWidth=2;fontSize=10;" value="Data" connector_type="data" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
   },
 ]
