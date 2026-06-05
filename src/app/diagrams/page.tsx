@@ -23,6 +23,7 @@ import Link from "next/link"
 import type { DiagramWithSha } from "@/lib/types"
 import { drawioToMermaid } from "@/lib/drawio-preview"
 import { MermaidPreview } from "@/components/mermaid-preview"
+import { DrawioLibraryDialog } from "@/components/DrawioLibraryDialog"
 
 export default function DiagramsPage() {
   const [previewName, setPreviewName] = useState<string | null>(null)
@@ -138,6 +139,7 @@ export default function DiagramsPage() {
             repository
           </p>
         </div>
+        <DrawioLibraryDialog />
         <Link href="/diagrams/builder">
           <Button>
             <Pencil className="h-4 w-4 mr-2" />

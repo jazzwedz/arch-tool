@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { TypeIcon } from "@/components/TypeIcon"
 import { StatusBadge } from "@/components/StatusBadge"
-import { RELATIONSHIP_LABELS } from "@/lib/constants"
+import { LINK_ROLE_LABELS } from "@/lib/constants"
 import {
   AlertTriangle,
   Sparkles,
@@ -320,8 +320,13 @@ function ImpactRow({ c }: { c: ImpactedComponent }) {
         {c.name}
       </a>
       <Badge variant="outline" className="text-xs">
-        {RELATIONSHIP_LABELS[c.via.type] || c.via.type}
+        {LINK_ROLE_LABELS[c.via.role] || c.via.role}
       </Badge>
+      {c.via.protocol && (
+        <Badge variant="secondary" className="text-[10px]">
+          {c.via.protocol}
+        </Badge>
+      )}
       {c.via.fromComponent && (
         <span className="text-xs text-muted-foreground">
           via {c.via.fromComponent}

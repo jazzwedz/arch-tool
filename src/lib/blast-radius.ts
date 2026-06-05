@@ -1,9 +1,9 @@
 import type {
   Component,
-  ComponentRelationship,
+  ComponentLink,
   ComponentStatus,
   ComponentType,
-  RelationshipType,
+  LinkRole,
 } from "./types"
 
 export type ImpactSeverity = "high" | "medium" | "low"
@@ -16,8 +16,8 @@ export interface ImpactedComponent {
   owner: string
   severity: ImpactSeverity
   via: {
-    type: RelationshipType
-    connector?: string
+    role: LinkRole
+    protocol?: string
     description?: string
     fromComponent?: string
   }
@@ -49,33 +49,42 @@ export interface BlastRadiusResult {
   mermaid: string
 }
 
-const HIGH_IMPACT_RELATIONS: RelationshipType[] = [
-  "depends-on",
-  "child-of",
+// Severity from the perspective of the SOURCE component: how badly is
+// it hit when the link target goes down?
+//
+//   calls        — source actively calls target → HIGH (calls fail)
+//   reads-from   — source reads data from target → HIGH (no data)
+//   writes-to    — source writes to target → HIGH (no place to persist)
+//   part-of      — source is contained in target → HIGH (container down)
+//   contains     — source contains target (target is a child) → MEDIUM
+//                  (parent loses a child but is usually degraded, not down)
+//   serves       — source serves target (target is the caller) → LOW
+//                  (target down means no caller, no functional impact)
+const HIGH_IMPACT_ROLES: LinkRole[] = [
+  "calls",
   "reads-from",
   "writes-to",
+  "part-of",
 ]
-const MEDIUM_IMPACT_RELATIONS: RelationshipType[] = [
-  "communicates-with",
-  "parent-of",
-  "fallback",
-]
+const MEDIUM_IMPACT_ROLES: LinkRole[] = ["contains"]
 
-function severityFor(rel: RelationshipType): ImpactSeverity {
-  if (HIGH_IMPACT_RELATIONS.includes(rel)) return "high"
-  if (MEDIUM_IMPACT_RELATIONS.includes(rel)) return "medium"
+function severityFor(role: LinkRole): ImpactSeverity {
+  if (HIGH_IMPACT_ROLES.includes(role)) return "high"
+  if (MEDIUM_IMPACT_ROLES.includes(role)) return "medium"
   return "low"
 }
 
+// For each component id, who declared a link pointing at it?
 function buildReverseIndex(
   allComponents: Component[]
-): Map<string, { from: Component; rel: ComponentRelationship }[]> {
-  const reverse = new Map<string, { from: Component; rel: ComponentRelationship }[]>()
+): Map<string, { from: Component; link: ComponentLink }[]> {
+  const reverse = new Map<string, { from: Component; link: ComponentLink }[]>()
   for (const comp of allComponents) {
-    for (const rel of comp.relationships ?? []) {
-      const list = reverse.get(rel.target) ?? []
-      list.push({ from: comp, rel })
-      reverse.set(rel.target, list)
+    for (const link of comp.links ?? []) {
+      if (!link.target) continue
+      const list = reverse.get(link.target) ?? []
+      list.push({ from: comp, link })
+      reverse.set(link.target, list)
     }
   }
   return reverse
@@ -95,11 +104,15 @@ export function computeBlastRadius(
   const impacted = new Map<string, ImpactedComponent>()
   const queue: { id: string; depth: number; via: ImpactedComponent["via"] }[] = []
 
-  for (const { from, rel } of reverseIndex.get(targetId) ?? []) {
+  for (const { from, link } of reverseIndex.get(targetId) ?? []) {
     queue.push({
       id: from.id,
       depth: 1,
-      via: { type: rel.type, connector: rel.connector, description: rel.description },
+      via: {
+        role: link.role,
+        protocol: link.protocol,
+        description: link.description,
+      },
     })
   }
 
@@ -125,7 +138,7 @@ export function computeBlastRadius(
       type: comp.type,
       status: comp.status,
       owner: comp.owner,
-      severity: severityFor(via.type),
+      severity: severityFor(via.role),
       via,
       nfrGap,
       hasConfidentialData,
@@ -133,15 +146,15 @@ export function computeBlastRadius(
     })
 
     if (depth < maxDepth) {
-      for (const { from, rel } of reverseIndex.get(id) ?? []) {
+      for (const { from, link } of reverseIndex.get(id) ?? []) {
         if (from.id === targetId || impacted.has(from.id)) continue
         queue.push({
           id: from.id,
           depth: depth + 1,
           via: {
-            type: rel.type,
-            connector: rel.connector,
-            description: rel.description,
+            role: link.role,
+            protocol: link.protocol,
+            description: link.description,
             fromComponent: comp.id,
           },
         })
@@ -223,7 +236,7 @@ function buildMermaid(target: Component, impacted: ImpactedComponent[]): string 
     const toId = comp.via.fromComponent
       ? sanitizeMermaidId(comp.via.fromComponent)
       : targetId
-    lines.push(`  ${compId} -->|${comp.via.type}| ${toId}`)
+    lines.push(`  ${compId} -->|${comp.via.role}| ${toId}`)
   }
 
   lines.push(

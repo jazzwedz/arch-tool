@@ -78,6 +78,7 @@ import { isBlockVisible, isTabVisible, type DetailTabId } from "@/lib/ui-blocks"
 import { RulesImportDialog } from "@/components/RulesImportDialog"
 import type { ComponentRule } from "@/lib/types"
 import { DataModelEntityCard } from "@/components/DataModelEntityCard"
+import { DrawioLibraryDialog } from "@/components/DrawioLibraryDialog"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -1196,12 +1197,7 @@ export default function ComponentDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                <a href="/api/export/drawio" download="arch-components.xml">
-                  <Button variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Draw.io library
-                  </Button>
-                </a>
+                <DrawioLibraryDialog label="Draw.io library" />
                 <Button
                   variant="outline"
                   onClick={() => copyToClipboard(component.id, "id")}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { checkRateLimit } from "@/lib/rate-limit"
 import type { BlastRadiusResult, ImpactedComponent } from "@/lib/blast-radius"
-import { RELATIONSHIP_LABELS } from "@/lib/constants"
+import { LINK_ROLE_LABELS } from "@/lib/constants"
 import {
   getLLM,
   isLLMConfigured,
@@ -57,7 +57,7 @@ function summarizeImpacted(comps: ImpactedComponent[]): string {
       if (c.nfrGap) flags.push("no RTO")
       if (c.hasConfidentialData) flags.push("confidential data")
       const flagStr = flags.length > 0 ? ` [${flags.join(", ")}]` : ""
-      const via = RELATIONSHIP_LABELS[c.via.type] || c.via.type
+      const via = LINK_ROLE_LABELS[c.via.role] || c.via.role
       const through = c.via.fromComponent ? ` (through ${c.via.fromComponent})` : ""
       return `  - ${c.name} (${c.id}, ${c.type}, owner: ${c.owner || "unassigned"}) — ${via}${through}${flagStr}`
     })

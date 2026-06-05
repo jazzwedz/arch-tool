@@ -7,6 +7,29 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Blast Radius scan ported to `links[]`.** Phase 1 + 2 retired
+  `interfaces[]`, `relationships[]` and `data{}` but the blast-radius
+  computation was still iterating `comp.relationships`, so every
+  component's BlastRadius tab showed "0 impacted" after the refactor.
+  Reverse index now scans `links[]`; severity is derived from
+  `LinkRole` (calls / reads-from / writes-to / part-of → HIGH;
+  contains → MEDIUM; serves → LOW). The detail dialog renders the
+  `via` chip from `LINK_ROLE_LABELS` and shows the link protocol
+  alongside.
+
+### Changed
+
+- **Draw.io export consolidates to one dialog.** The standalone
+  `/export` page and the `Download Draw.io Library` button on the
+  catalog header did the same thing (hit `GET /api/export/drawio`).
+  Merged into a single `DrawioLibraryDialog` mounted on the
+  **Diagrams** page header and on the component **Documentation**
+  tab. The `Export` top-nav entry and the catalog header button are
+  removed; `/export` route is deleted. One copy of the instructions
+  (paired with the download button) lives inside the dialog.
+
 ### Refactor — Phase 2: `data{}` collapses into `links[]`
 
 The final step of the v2 schema refactor. Every input / output now

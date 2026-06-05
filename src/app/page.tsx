@@ -12,7 +12,7 @@ import {
 import { ComponentCard } from "@/components/ComponentCard"
 import { COMPONENT_TYPES, COMPONENT_STATUSES, TYPE_LABELS, TYPE_COLORS } from "@/lib/constants"
 import type { Component, ComponentType } from "@/lib/types"
-import { Search, LayoutGrid, List, Plus, Download, Grid3X3, Group } from "lucide-react"
+import { Search, LayoutGrid, List, Plus, Grid3X3, Group } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { TypeIcon } from "@/components/TypeIcon"
 import { TypeModelDialog } from "@/components/TypeModelDialog"
@@ -142,12 +142,6 @@ export default function CatalogPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <a href="/api/export/drawio" download="arch-components.xml">
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Download Draw.io Library
-            </Button>
-          </a>
           <ArchitectureDiagramDialog />
           <ConsistencyCheckDialog />
           <CatalogExportDialog />
