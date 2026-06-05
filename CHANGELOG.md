@@ -7,6 +7,36 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Links card: target shows raw id instead of name on first paint.**
+  The detail page renders the Links card before `/api/components`
+  finishes loading the catalog snapshot used to resolve `target` →
+  human name. The fallback path was treating "not yet loaded" the
+  same as "really missing" — the analyst saw a red `missing` badge
+  next to every link until the fetch finished. Added an explicit
+  `allComponentsLoaded` flag: while loading we show the raw id with
+  no badge; once loaded, only truly absent targets get the warning.
+
+- **Component picker only showed 8 options.** When adding or editing
+  a Link, the typeahead dropdown opened with at most the first 8
+  components in the catalog and the rest were unreachable without
+  typing. Cap raised to 500 (effectively unlimited for any real
+  catalog; the dropdown is `max-h-64 overflow-y-auto` so the list
+  scrolls). The analyst sees every option from the moment the
+  dropdown opens.
+
+### Added
+
+- **`table` protocol on links + connectors.** Joins the existing
+  protocol set (`rest / grpc / async / db / file / human / info /
+  link / data`) for cases where the data flow targets a specific
+  table rather than a database engine as a whole. ER-many arrow,
+  orange (`#d97706`) — matches the existing `table` component-type
+  palette. Wired into `LinkProtocol`, `CONNECTOR_TYPES`,
+  `LINK_PROTOCOLS`, the form picker, the drawio library export, and
+  the diagrams builder edge palette.
+
 ### Changed
 
 - **Technical + Business tabs collapse into one "Properties" tab.** The

@@ -55,7 +55,12 @@ interface Props {
   className?: string
 }
 
-const MAX_SUGGESTIONS = 8
+// Soft cap that's effectively unlimited for typical catalog sizes —
+// the dropdown is `max-h-64 overflow-y-auto` so a large list scrolls.
+// Set high enough that any real-world catalog renders in full when
+// the picker first opens (analysts should see "everything that exists"
+// before they start narrowing by typing).
+const MAX_SUGGESTIONS = 500
 
 export function ComponentTargetPicker({
   value,

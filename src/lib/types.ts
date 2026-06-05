@@ -38,6 +38,7 @@ export type LinkProtocol =
   | "grpc"
   | "async"
   | "db"
+  | "table"
   | "file"
   | "human"
   | "info"

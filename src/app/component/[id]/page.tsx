@@ -137,6 +137,11 @@ export default function ComponentDetailPage() {
   // mount; fine for the detail page since the list is already shown
   // on the catalog landing page anyway.
   const [allComponents, setAllComponents] = useState<{ id: string; name: string; type: string }[]>([])
+  // Distinct from `allComponents.length === 0` — the catalog might
+  // genuinely have one component (this one). The flag tells the link
+  // rows whether to render a "missing" warning or assume the lookup
+  // is still loading and just show the raw target string.
+  const [allComponentsLoaded, setAllComponentsLoaded] = useState(false)
   // Derived id → name lookup, handed to every mermaid builder so node
   // labels show the human-readable component name instead of the raw
   // YAML id. Recomputed when allComponents changes.
@@ -293,8 +298,14 @@ export default function ComponentDetailPage() {
     // rendered as clickable links when they match a component id.
     fetch(`/api/components`)
       .then(async (r) => (r.ok ? r.json() : []))
-      .then((data) => setAllComponents(Array.isArray(data) ? data : []))
-      .catch(() => setAllComponents([]))
+      .then((data) => {
+        setAllComponents(Array.isArray(data) ? data : [])
+        setAllComponentsLoaded(true)
+      })
+      .catch(() => {
+        setAllComponents([])
+        setAllComponentsLoaded(true)
+      })
 
     // v2 — single inbound-links endpoint replaces the legacy
     // inbound-interfaces + inbound-relationships pair.
@@ -1451,6 +1462,11 @@ export default function ComponentDetailPage() {
                           />
                           <span className="font-medium">{targetComp.name}</span>
                         </span>
+                      ) : !allComponentsLoaded ? (
+                        // Catalog snapshot still loading — show the
+                        // raw id without the "missing" badge so the
+                        // analyst doesn't flash a false alarm.
+                        <span className="font-medium">{rel.target || "(unset)"}</span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5">
                           <span className="font-mono">{rel.target || "(unset)"}</span>

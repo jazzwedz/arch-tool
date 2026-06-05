@@ -63,6 +63,11 @@ const connectorEntries = [
     w: 120, h: 20,
   },
   {
+    title: "Table",
+    xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=ERmany;endFill=0;strokeColor=#d97706;fontSize=10;dashed=0;" value="Table" connector_type="table" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
+    w: 120, h: 20,
+  },
+  {
     title: "gRPC",
     xml: `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" parent="1" style="endArrow=block;endFill=1;strokeColor=#9673a6;fontSize=10;" value="gRPC" connector_type="grpc" edge="1"><mxGeometry width="120" height="20" as="geometry"/></mxCell></root></mxGraphModel>`,
     w: 120, h: 20,
