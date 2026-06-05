@@ -9,6 +9,17 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Settings toggles for Capabilities / Processes / NFR / Risks now
+  actually show the card.** The four cards on the detail page were
+  gated on both the Settings visibility flag AND data-presence
+  (`component.processes && component.processes.length > 0`, etc.).
+  Result: turning the toggle ON in Settings had no effect when the
+  component had no data yet — the card stayed hidden, and the per-
+  block Edit dialog the analyst would use to add the first entry was
+  unreachable. Fix: drop the data-presence predicate from the card
+  conditional, render the card whenever the Settings flag is on, and
+  show an empty-state message inside that points at the Edit button.
+
 - **Links card: target shows raw id instead of name on first paint.**
   The detail page renders the Links card before `/api/components`
   finishes loading the catalog snapshot used to resolve `target` →

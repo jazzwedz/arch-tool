@@ -1541,8 +1541,10 @@ export default function ComponentDetailPage() {
             parent declared `parent-of: X` or X declared `child-of:
             parent`. */}
 
-        {/* Capabilities */}
-        {tab === "properties" && isBlockVisible(uiBlocks, "business", "capabilities") && component.capabilities && component.capabilities.length > 0 && (
+        {/* Capabilities — rendered whenever the Settings flag is on,
+            even with no data yet, so the analyst can use the per-block
+            Edit dialog to add the first row. */}
+        {tab === "properties" && isBlockVisible(uiBlocks, "business", "capabilities") && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1586,34 +1588,41 @@ export default function ComponentDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <table className="w-full text-sm">
-                <thead className="text-xs text-muted-foreground">
-                  <tr>
-                    <th className="text-left font-medium pb-2">Capability</th>
-                    <th className="text-left font-medium pb-2 w-32">Role</th>
-                    <th className="text-left font-medium pb-2">Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {component.capabilities.map((cap, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="py-2 font-medium">{cap.name}</td>
-                      <td className="py-2">
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${CAPABILITY_ROLE_COLORS[cap.role] || ""}`}
-                        >
-                          {CAPABILITY_ROLE_LABELS[cap.role] || cap.role}
-                        </Badge>
-                      </td>
-                      <td className="py-2 text-muted-foreground">
-                        {cap.description || "—"}
-                      </td>
+              {(!component.capabilities || component.capabilities.length === 0) ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No capabilities yet — use{" "}
+                  <span className="font-medium">Edit</span> to add the first row.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="text-xs text-muted-foreground">
+                    <tr>
+                      <th className="text-left font-medium pb-2">Capability</th>
+                      <th className="text-left font-medium pb-2 w-32">Role</th>
+                      <th className="text-left font-medium pb-2">Description</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {showCapabilitiesViz && (
+                  </thead>
+                  <tbody>
+                    {component.capabilities.map((cap, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="py-2 font-medium">{cap.name}</td>
+                        <td className="py-2">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${CAPABILITY_ROLE_COLORS[cap.role] || ""}`}
+                          >
+                            {CAPABILITY_ROLE_LABELS[cap.role] || cap.role}
+                          </Badge>
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {cap.description || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {showCapabilitiesViz && component.capabilities && component.capabilities.length > 0 && (
                 <div className="mt-4 border-t pt-3">
                   <MermaidPreview chart={buildCapabilitiesMermaid(component)} />
                 </div>
@@ -1622,8 +1631,9 @@ export default function ComponentDetailPage() {
           </Card>
         )}
 
-        {/* Processes */}
-        {tab === "properties" && isBlockVisible(uiBlocks, "business", "processes") && component.processes && component.processes.length > 0 && (
+        {/* Processes — rendered whenever the Settings flag is on so the
+            empty state can hand off to the Edit dialog. */}
+        {tab === "properties" && isBlockVisible(uiBlocks, "business", "processes") && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1652,43 +1662,52 @@ export default function ComponentDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <table className="w-full text-sm">
-                <thead className="text-xs text-muted-foreground">
-                  <tr>
-                    <th className="text-left font-medium pb-2">Process</th>
-                    <th className="text-left font-medium pb-2 w-32">Role</th>
-                    <th className="text-left font-medium pb-2">Activity</th>
-                    <th className="text-left font-medium pb-2">Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {component.processes.map((p, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="py-2 font-medium">{p.name}</td>
-                      <td className="py-2">
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${PROCESS_ROLE_COLORS[p.role] || ""}`}
-                        >
-                          {PROCESS_ROLE_LABELS[p.role] || p.role}
-                        </Badge>
-                      </td>
-                      <td className="py-2 text-muted-foreground">
-                        {p.activity || "—"}
-                      </td>
-                      <td className="py-2 text-muted-foreground">
-                        {p.description || "—"}
-                      </td>
+              {(!component.processes || component.processes.length === 0) ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No processes yet — use{" "}
+                  <span className="font-medium">Edit</span> to add the first row.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="text-xs text-muted-foreground">
+                    <tr>
+                      <th className="text-left font-medium pb-2">Process</th>
+                      <th className="text-left font-medium pb-2 w-32">Role</th>
+                      <th className="text-left font-medium pb-2">Activity</th>
+                      <th className="text-left font-medium pb-2">Description</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {component.processes.map((p, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="py-2 font-medium">{p.name}</td>
+                        <td className="py-2">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${PROCESS_ROLE_COLORS[p.role] || ""}`}
+                          >
+                            {PROCESS_ROLE_LABELS[p.role] || p.role}
+                          </Badge>
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {p.activity || "—"}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {p.description || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Non-Functional Requirements */}
-        {tab === "properties" && isBlockVisible(uiBlocks, "technical", "nfr") && component.nfr && Object.values(component.nfr).some(Boolean) && (
+        {/* Non-Functional Requirements — rendered whenever the
+            Settings flag is on so the empty state can hand off to the
+            Edit dialog. */}
+        {tab === "properties" && isBlockVisible(uiBlocks, "technical", "nfr") && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1701,56 +1720,65 @@ export default function ComponentDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                {component.nfr.availability && (
-                  <div>
-                    <span className="text-muted-foreground">Availability</span>
-                    <p className="font-medium">{component.nfr.availability}</p>
-                  </div>
-                )}
-                {component.nfr.rto && (
-                  <div>
-                    <span className="text-muted-foreground">RTO</span>
-                    <p className="font-medium">{component.nfr.rto}</p>
-                  </div>
-                )}
-                {component.nfr.rpo && (
-                  <div>
-                    <span className="text-muted-foreground">RPO</span>
-                    <p className="font-medium">{component.nfr.rpo}</p>
-                  </div>
-                )}
-                {component.nfr.max_latency && (
-                  <div>
-                    <span className="text-muted-foreground">Max Latency</span>
-                    <p className="font-medium">{component.nfr.max_latency}</p>
-                  </div>
-                )}
-                {component.nfr.throughput && (
-                  <div>
-                    <span className="text-muted-foreground">Throughput</span>
-                    <p className="font-medium">{component.nfr.throughput}</p>
-                  </div>
-                )}
-                {component.nfr.data_classification && (
-                  <div>
-                    <span className="text-muted-foreground">Data Classification</span>
-                    <p className="font-medium">{DATA_CLASSIFICATION_LABELS[component.nfr.data_classification]}</p>
-                  </div>
-                )}
-                {component.nfr.scaling && (
-                  <div>
-                    <span className="text-muted-foreground">Scaling</span>
-                    <p className="font-medium capitalize">{component.nfr.scaling}</p>
-                  </div>
-                )}
-              </div>
+              {(!component.nfr || !Object.values(component.nfr).some(Boolean)) ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No NFRs set — use{" "}
+                  <span className="font-medium">Edit</span> to fill in availability,
+                  RTO/RPO, latency, throughput, classification or scaling.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  {component.nfr.availability && (
+                    <div>
+                      <span className="text-muted-foreground">Availability</span>
+                      <p className="font-medium">{component.nfr.availability}</p>
+                    </div>
+                  )}
+                  {component.nfr.rto && (
+                    <div>
+                      <span className="text-muted-foreground">RTO</span>
+                      <p className="font-medium">{component.nfr.rto}</p>
+                    </div>
+                  )}
+                  {component.nfr.rpo && (
+                    <div>
+                      <span className="text-muted-foreground">RPO</span>
+                      <p className="font-medium">{component.nfr.rpo}</p>
+                    </div>
+                  )}
+                  {component.nfr.max_latency && (
+                    <div>
+                      <span className="text-muted-foreground">Max Latency</span>
+                      <p className="font-medium">{component.nfr.max_latency}</p>
+                    </div>
+                  )}
+                  {component.nfr.throughput && (
+                    <div>
+                      <span className="text-muted-foreground">Throughput</span>
+                      <p className="font-medium">{component.nfr.throughput}</p>
+                    </div>
+                  )}
+                  {component.nfr.data_classification && (
+                    <div>
+                      <span className="text-muted-foreground">Data Classification</span>
+                      <p className="font-medium">{DATA_CLASSIFICATION_LABELS[component.nfr.data_classification]}</p>
+                    </div>
+                  )}
+                  {component.nfr.scaling && (
+                    <div>
+                      <span className="text-muted-foreground">Scaling</span>
+                      <p className="font-medium capitalize">{component.nfr.scaling}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Risks */}
-        {tab === "overview" && isBlockVisible(uiBlocks, "overview", "risks") && component.risks && component.risks.length > 0 && (
+        {/* Risks — rendered whenever the Settings flag is on so the
+            empty state can hand off to the Edit dialog. */}
+        {tab === "overview" && isBlockVisible(uiBlocks, "overview", "risks") && (
           <Card className="lg:col-span-2">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1763,11 +1791,18 @@ export default function ComponentDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <ul className="list-disc list-inside space-y-1 text-sm">
-                {component.risks.map((risk, i) => (
-                  <li key={i}>{risk}</li>
-                ))}
-              </ul>
+              {(!component.risks || component.risks.length === 0) ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No risks listed — use{" "}
+                  <span className="font-medium">Edit</span> to add the first one.
+                </p>
+              ) : (
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  {component.risks.map((risk, i) => (
+                    <li key={i}>{risk}</li>
+                  ))}
+                </ul>
+              )}
             </CardContent>
           </Card>
         )}
