@@ -6,9 +6,8 @@ import type { Component } from "./types"
 import { escapeXml } from "./confluence"
 import {
   TYPE_LABELS,
-  RELATIONSHIP_LABELS,
+  LINK_ROLE_LABELS,
   CAPABILITY_ROLE_LABELS,
-  DATA_KIND_LABELS,
   PROCESS_ROLE_LABELS,
   RULE_KIND_LABELS,
   DATA_CLASSIFICATION_LABELS,
@@ -186,116 +185,31 @@ function buildCapabilitiesTable(component: Component): string {
   )
 }
 
-function buildInterfacesTable(component: Component): string {
-  const list = component.interfaces || []
-  if (list.length === 0) return ""
-  const rows = list
-    .map((i) => {
-      const target = i.target ? `<code>${escapeXml(i.target)}</code>` : "—"
-      return (
-        `<tr>` +
-        `<td><strong>${escapeXml(i.direction)}</strong></td>` +
-        `<td>${escapeXml(i.type)}</td>` +
-        `<td>${target}</td>` +
-        `<td>${escapeXml(i.description || "—")}</td>` +
-        `</tr>`
-      )
-    })
-    .join("")
-  return (
-    `<h2>Interfaces</h2>` +
-    `<p>What this component exposes (provides) and what it consumes from others.</p>` +
-    `<table>` +
-    `<colgroup><col style="width:15%"/><col style="width:12%"/><col style="width:25%"/><col style="width:48%"/></colgroup>` +
-    `<thead><tr><th>Direction</th><th>Type</th><th>Target</th><th>Description</th></tr></thead>` +
-    `<tbody>${rows}</tbody></table>`
-  )
-}
-
-function buildRelationshipsTable(component: Component): string {
-  const list = component.relationships || []
+// v2: single Links table replaces buildInterfacesTable +
+// buildRelationshipsTable + buildIOTables. One row per edge with
+// role + protocol + target + optional name + description.
+function buildLinksTable(component: Component): string {
+  const list = component.links || []
   if (list.length === 0) return ""
   const rows = list
     .map(
-      (r) =>
+      (l) =>
         `<tr>` +
-        `<td><strong>${escapeXml(RELATIONSHIP_LABELS[r.type] || r.type)}</strong></td>` +
-        `<td><code>${escapeXml(r.target)}</code></td>` +
-        `<td>${escapeXml(r.connector || "—")}</td>` +
-        `<td>${escapeXml(r.description || "—")}</td>` +
+        `<td><strong>${escapeXml(LINK_ROLE_LABELS[l.role] || l.role)}</strong></td>` +
+        `<td>${escapeXml(l.protocol || "—")}</td>` +
+        `<td>${l.target ? `<code>${escapeXml(l.target)}</code>` : "—"}</td>` +
+        `<td>${escapeXml(l.name || "—")}</td>` +
+        `<td>${escapeXml(l.description || "—")}</td>` +
         `</tr>`
     )
     .join("")
   return (
-    `<h2>Relationships</h2>` +
-    `<p>How this component is connected to others in the catalog.</p>` +
+    `<h2>Links</h2>` +
+    `<p>Every edge from this component to its peers — calls, serves, part-of, contains, reads-from, writes-to.</p>` +
     `<table>` +
-    `<colgroup><col style="width:20%"/><col style="width:25%"/><col style="width:15%"/><col style="width:40%"/></colgroup>` +
-    `<thead><tr><th>Type</th><th>Target</th><th>Connector</th><th>Description</th></tr></thead>` +
+    `<colgroup><col style="width:15%"/><col style="width:10%"/><col style="width:22%"/><col style="width:20%"/><col style="width:33%"/></colgroup>` +
+    `<thead><tr><th>Role</th><th>Protocol</th><th>Target</th><th>Name</th><th>Description</th></tr></thead>` +
     `<tbody>${rows}</tbody></table>`
-  )
-}
-
-function buildIOTables(component: Component): string {
-  const inputs = component.data?.inputs || []
-  const outputs = component.data?.outputs || []
-  const owns = component.data?.owns || []
-  if (inputs.length === 0 && outputs.length === 0 && owns.length === 0) return ""
-
-  const renderItems = (
-    items: NonNullable<Component["data"]>["inputs"],
-    bucket: "inputs" | "outputs" | "owns"
-  ): string => {
-    if (!items || items.length === 0) return ""
-    const rows = items
-      .map((it) => {
-        const meta =
-          bucket === "inputs"
-            ? it.source
-              ? `<code>${escapeXml(it.source)}</code>`
-              : "—"
-            : bucket === "outputs"
-            ? it.consumers && it.consumers.length > 0
-              ? it.consumers.map((c) => `<code>${escapeXml(c)}</code>`).join(", ")
-              : "—"
-            : "—"
-        return (
-          `<tr>` +
-          `<td><strong>${escapeXml(it.name)}</strong></td>` +
-          `<td>${escapeXml(DATA_KIND_LABELS[it.kind] || it.kind)}</td>` +
-          `<td>${meta}</td>` +
-          `<td>${escapeXml(it.purpose || "—")}</td>` +
-          `</tr>`
-        )
-      })
-      .join("")
-    const metaCol =
-      bucket === "inputs"
-        ? "Source"
-        : bucket === "outputs"
-        ? "Consumers"
-        : "—"
-    const heading =
-      bucket === "inputs"
-        ? "Inputs"
-        : bucket === "outputs"
-        ? "Outputs"
-        : "Owned data"
-    return (
-      `<h3>${heading}</h3>` +
-      `<table>` +
-      `<colgroup><col style="width:30%"/><col style="width:15%"/><col style="width:25%"/><col style="width:30%"/></colgroup>` +
-      `<thead><tr><th>Name</th><th>Kind</th><th>${metaCol}</th><th>Purpose</th></tr></thead>` +
-      `<tbody>${rows}</tbody></table>`
-    )
-  }
-
-  return (
-    `<h2>Inputs &amp; Outputs</h2>` +
-    `<p>Black-box view of what flows in, what flows out, and what this component is the source-of-truth for.</p>` +
-    renderItems(inputs, "inputs") +
-    renderItems(outputs, "outputs") +
-    renderItems(owns, "owns")
   )
 }
 
@@ -468,9 +382,7 @@ function buildReferenceSection(component: Component): string {
     `<p><em>The structured catalog data for this component, rendered as the canonical reference. Keep edits to these sections in arch-tool — the page is regenerated on every publish.</em></p>`,
     buildAtAGlanceTable(component),
     buildCapabilitiesTable(component),
-    buildInterfacesTable(component),
-    buildRelationshipsTable(component),
-    buildIOTables(component),
+    buildLinksTable(component),
     buildProcessesTable(component),
     buildRulesSection(component),
     buildNFRTable(component),

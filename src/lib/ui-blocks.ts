@@ -24,12 +24,19 @@ export interface UIBlocksConfig {
     risks?: boolean
   }
   technical?: {
-    interfaces?: boolean
+    /**
+     * v2: gates the unified Links card. Renamed in the docs but the
+     * key stays `relationships` so existing `config.yaml` entries
+     * keep working.
+     */
     relationships?: boolean
+    /** @deprecated v2: Interfaces collapsed into the Links card. Field kept on the type so legacy config.yaml files still validate. */
+    interfaces?: boolean
     nfr?: boolean
   }
   business?: {
     capabilities?: boolean
+    /** @deprecated v2 Phase 2: Inputs & Outputs collapsed into links[]; the card is gone. */
     data?: boolean
     processes?: boolean
   }
@@ -55,7 +62,7 @@ export const BLOCK_METAS: BlockMeta[] = [
     field: "heroContext",
     label: "Hero context diagram",
     description:
-      "Auto-rendered mermaid combining inputs, outputs, owned data and direct relationships.",
+      "Auto-rendered mermaid combining every link from this component to its peers.",
   },
   {
     tab: "overview",
@@ -82,17 +89,10 @@ export const BLOCK_METAS: BlockMeta[] = [
   {
     tab: "technical",
     group: "technical",
-    field: "interfaces",
-    label: "Interfaces",
-    description: "Provided / consumed interfaces.",
-  },
-  {
-    tab: "technical",
-    group: "technical",
     field: "relationships",
-    label: "Relationships",
+    label: "Links",
     description:
-      "Direct connections to other components (depends-on, child-of, etc.).",
+      "Every edge from this component to its peers — calls, serves, part-of, contains, reads-from, writes-to. Inbound rows merge in with their inverse label.",
   },
   {
     tab: "technical",
@@ -108,13 +108,6 @@ export const BLOCK_METAS: BlockMeta[] = [
     field: "capabilities",
     label: "Capabilities",
     description: "Business capabilities the component plays a role in.",
-  },
-  {
-    tab: "business",
-    group: "business",
-    field: "data",
-    label: "Data Perspective",
-    description: "Inputs, outputs and owned data items.",
   },
   {
     tab: "business",

@@ -22,23 +22,19 @@ const PASS_1_MAX_TOKENS = 2500
 function buildComponentContext(c: Component): string {
   const caps =
     c.capabilities?.map((cp) => cp.name).filter(Boolean).slice(0, 12).join(", ") || "(none)"
-  const interfaces =
-    c.interfaces
-      ?.map((i) => `${i.direction} ${i.type}: ${i.target}`)
-      .slice(0, 12)
+  // v2: render every edge from the unified links[] array. Roles
+  // calls / serves cover the old interfaces; reads-from / writes-to
+  // / part-of / contains cover the old relationships and data flow.
+  const links =
+    c.links
+      ?.map(
+        (l) =>
+          `${l.role}${l.protocol ? ` (${l.protocol})` : ""}: ${l.target}${
+            l.name ? ` — ${l.name}` : ""
+          }`
+      )
+      .slice(0, 16)
       .join("; ") || "(none)"
-  const dataIn =
-    c.data?.inputs
-      ?.map((d) => d.name)
-      .filter(Boolean)
-      .slice(0, 8)
-      .join(", ") || "(none)"
-  const dataOut =
-    c.data?.outputs
-      ?.map((d) => d.name)
-      .filter(Boolean)
-      .slice(0, 8)
-      .join(", ") || "(none)"
   return [
     `Component id: ${c.id}`,
     `Component name: ${c.name}`,
@@ -54,9 +50,7 @@ function buildComponentContext(c: Component): string {
     )
       .slice(0, 1200) || "(none)"}`,
     `Capabilities: ${caps}`,
-    `Interfaces: ${interfaces}`,
-    `Data in: ${dataIn}`,
-    `Data out: ${dataOut}`,
+    `Links: ${links}`,
   ].join("\n")
 }
 

@@ -7,6 +7,41 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed (more v2 fallout cleanup)
+
+- **Confluence page renderer rewritten for `links[]`.** Every component
+  published to Confluence had three separate tables — Interfaces,
+  Relationships, Inputs & Outputs — driven by the legacy arrays. After
+  Phase 1 + 2 those arrays read empty post-migration, so the
+  Confluence page lost half its content on every re-publish. Replaced
+  with a single **Links** table (role / protocol / target / name /
+  description) backed by `component.links[]`. `RELATIONSHIP_LABELS` +
+  `DATA_KIND_LABELS` imports retired.
+- **Rules import context uses `links[]`.** The AI prompt that feeds the
+  Pass-1 rules-import classifier was assembling its component
+  fingerprint from `c.interfaces`, `c.data.inputs` and `c.data.outputs`.
+  All three are dropped on read now, so the model saw empty fields and
+  classified poorly. Replaced with a single "Links" line listing every
+  edge with role + protocol + target + optional name.
+- **Component form / detail page visibility flags consolidated.** The
+  legacy `technical.interfaces` and `business.data` block flags pointed
+  at cards that no longer exist. `BLOCK_METAS` keeps only the unified
+  `technical.relationships` row (label renamed to **Links**) plus the
+  surviving Business cards (Capabilities, Processes). The TypeScript
+  `interfaces?` and `data?` keys stay on `UIBlocksConfig` so existing
+  `config.yaml` entries still validate; they are simply ignored.
+- **Hero context block description refreshed.** Settings UI now says
+  "Auto-rendered mermaid combining every link from this component to
+  its peers" instead of the old inputs / outputs / owned data wording.
+
+### Deleted
+
+- `src/app/api/components/[id]/inbound-interfaces/route.ts`
+- `src/app/api/components/[id]/inbound-relationships/route.ts`
+- `src/components/MultiComponentPicker.tsx`
+  (Both inbound routes returned empty after the migration; the picker
+  was used only by the v1 consumers field on `data.outputs`.)
+
 ### Fixed
 
 - **Blast Radius scan ported to `links[]`.** Phase 1 + 2 retired

@@ -153,8 +153,11 @@ export function ComponentForm({
   const { blocks: uiBlocks } = useUIConfig()
   const showDescription = isBlockVisible(uiBlocks, "overview", "descriptions")
   const showRisks = isBlockVisible(uiBlocks, "overview", "risks")
-  const showInterfaces = isBlockVisible(uiBlocks, "technical", "interfaces")
-  const showRelationships = isBlockVisible(uiBlocks, "technical", "relationships")
+  // v2: single Links card replaces the legacy Interfaces +
+  // Relationships pair. The `relationships` config key keeps its
+  // name so existing config.yaml entries continue to work; the UI
+  // label is now "Links".
+  const showLinks = isBlockVisible(uiBlocks, "technical", "relationships")
   const showNfr = isBlockVisible(uiBlocks, "technical", "nfr")
   const showCapabilities = isBlockVisible(uiBlocks, "business", "capabilities")
   const showProcesses = isBlockVisible(uiBlocks, "business", "processes")
@@ -698,7 +701,7 @@ export function ComponentForm({
           contains / reads-from / writes-to), optionally pick a
           protocol (rest / grpc / async / db / file / human / info /
           link / data), give it a short name and a description. */}
-      {(showInterfaces || showRelationships) && (
+      {showLinks && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
