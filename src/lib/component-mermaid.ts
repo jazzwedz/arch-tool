@@ -13,7 +13,6 @@ import type { Component } from "./types"
 import {
   RELATIONSHIP_LABELS,
   CAPABILITY_ROLE_LABELS,
-  DATA_KIND_LABELS,
 } from "./constants"
 
 export type NameLookup = Map<string, string>
@@ -46,55 +45,6 @@ function displayTarget(id: string, lookup?: NameLookup): string {
   return lookup?.get(id) || id
 }
 
-/**
- * Visualise the component's interfaces.
- *
- * Layout: this component sits in the middle. `provides` interfaces extend
- * to "External callers" (or named target if present); `consumes` interfaces
- * point inward from "External providers" (or named target).
- */
-export function buildInterfacesMermaid(
-  component: Component,
-  nameLookup?: NameLookup
-): string {
-  const lines: string[] = ["flowchart LR"]
-  const me = safeId(component.id)
-  lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
-
-  const interfaces = component.interfaces || []
-  if (interfaces.length === 0) {
-    lines.push(`  noop["No interfaces defined"]:::muted`)
-    lines.push(`  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px`)
-    lines.push(`  classDef muted fill:#f3f4f6,stroke:#9ca3af,color:#6b7280`)
-    return lines.join("\n")
-  }
-
-  let counter = 0
-  for (const iface of interfaces) {
-    counter++
-    const otherId = iface.target ? safeId(iface.target) : `caller_${counter}`
-    const otherLabel = iface.target
-      ? displayTarget(iface.target, nameLookup)
-      : iface.direction === "provides"
-      ? "External caller"
-      : "External source"
-    lines.push(`  ${otherId}["${escLabel(otherLabel)}"]:::peer`)
-    // Edge label: prefer the interface name when set, fall back to
-    // the connector type. Description goes after the name for context.
-    const head = iface.name || iface.type
-    const tail = iface.description ? `: ${iface.description.slice(0, 40)}` : ""
-    const protoLabel = `${head}${tail}`
-    if (iface.direction === "provides") {
-      lines.push(`  ${otherId} -->|${escLabel(protoLabel)}| ${me}`)
-    } else {
-      lines.push(`  ${me} -->|${escLabel(protoLabel)}| ${otherId}`)
-    }
-  }
-
-  lines.push(`  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px`)
-  lines.push(`  classDef peer fill:#f9fafb,stroke:#6b7280,color:#374151`)
-  return lines.join("\n")
-}
 
 /**
  * Visualise the component's capabilities — which business capabilities it
@@ -138,56 +88,6 @@ export function buildCapabilitiesMermaid(component: Component): string {
 }
 
 /**
- * Visualise the component's inputs / outputs / owned data as a flow.
- * Inputs sit on the left, the component in the centre, outputs on the right;
- * owned data attaches underneath with a dotted edge (state, not flow).
- */
-export function buildIOMermaid(component: Component): string {
-  const lines: string[] = ["flowchart LR"]
-  const me = safeId(component.id)
-  lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
-
-  const inputs = component.data?.inputs || []
-  const outputs = component.data?.outputs || []
-  const owns = component.data?.owns || []
-
-  if (inputs.length === 0 && outputs.length === 0 && owns.length === 0) {
-    lines.push(`  noop["No inputs, outputs, or owned data defined"]:::muted`)
-    lines.push(`  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px`)
-    lines.push(`  classDef muted fill:#f3f4f6,stroke:#9ca3af,color:#6b7280`)
-    return lines.join("\n")
-  }
-
-  inputs.forEach((item, i) => {
-    const nid = `in_${i}_${safeId(item.name).slice(0, 24) || "x"}`
-    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
-    lines.push(`  ${nid}["${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>"]:::input`)
-    const edgeLabel = item.purpose ? item.purpose.slice(0, 32) : kindLabel
-    lines.push(`  ${nid} -->|${escLabel(edgeLabel)}| ${me}`)
-  })
-
-  outputs.forEach((item, i) => {
-    const nid = `out_${i}_${safeId(item.name).slice(0, 24) || "x"}`
-    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
-    lines.push(`  ${nid}["${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>"]:::output`)
-    const edgeLabel = item.purpose ? item.purpose.slice(0, 32) : kindLabel
-    lines.push(`  ${me} -->|${escLabel(edgeLabel)}| ${nid}`)
-  })
-
-  owns.forEach((item, i) => {
-    const nid = `own_${i}_${safeId(item.name).slice(0, 24) || "x"}`
-    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
-    // Cylinder-shape node hints "stored data" in mermaid syntax: id[(label)]
-    lines.push(`  ${nid}[("${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>")]:::owned`)
-    lines.push(`  ${me} -.owns.- ${nid}`)
-  })
-
-  lines.push(`  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px`)
-  lines.push(`  classDef input fill:#dcfce7,stroke:#16a34a,color:#14532d`)
-  lines.push(`  classDef output fill:#fce7f3,stroke:#be185d,color:#831843`)
-  lines.push(`  classDef owned fill:#f5f3ff,stroke:#7c3aed,color:#4c1d95`)
-  return lines.join("\n")
-}
 
 /**
  * Hero "Component context" diagram — combines interfaces, relationships,
@@ -203,35 +103,27 @@ export function buildHeroContextMermaid(
   component: Component,
   nameLookup?: NameLookup,
   /**
-   * Optional merged relationships list (outbound + inverted inbound).
-   * When provided the hero diagram draws THIS list instead of the
-   * component's own `relationships` field, so inverse edges declared
-   * on other components surface here too. Falls back to outbound only
-   * when omitted.
+   * Optional merged links list (outbound + inverted inbound). When
+   * omitted the hero diagram falls back to whatever is on
+   * `component.links` directly. Each entry is { target, displayLabel }.
    */
-  relationshipsOverride?: RelationshipForViz[]
+  linksOverride?: RelationshipForViz[]
 ): string {
   const lines: string[] = ["flowchart LR"]
   const me = safeId(component.id)
 
-  const interfaces = (component.interfaces || []).slice(0, 6)
-  const inputs = (component.data?.inputs || []).slice(0, 8)
-  const outputs = (component.data?.outputs || []).slice(0, 8)
-  const owns = (component.data?.owns || []).slice(0, 6)
-  const relsSource =
-    relationshipsOverride ??
-    (component.relationships || []).map((r) => ({
-      target: r.target,
-      displayLabel: RELATIONSHIP_LABELS[r.type] || r.type,
+  const allLinks =
+    linksOverride ??
+    (component.links || []).map((l) => ({
+      target: l.target,
+      displayLabel: l.name || l.protocol || l.role,
     }))
-  const rels = relsSource.slice(0, 6)
+  const links = allLinks.slice(0, 12)
 
-  const total =
-    interfaces.length + inputs.length + outputs.length + owns.length + rels.length
-  if (total === 0) {
+  if (links.length === 0) {
     lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
     lines.push(
-      `  noop["No connections, inputs/outputs or owned data yet — start by adding them in Edit"]:::muted`
+      `  noop["No links yet — start by adding them in Edit"]:::muted`
     )
     lines.push(
       `  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px`
@@ -240,83 +132,19 @@ export function buildHeroContextMermaid(
     return lines.join("\n")
   }
 
-  // Inputs (left).
-  inputs.forEach((item, i) => {
-    const nid = `in_${i}_${safeId(item.name).slice(0, 18) || "x"}`
-    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
-    lines.push(
-      `  ${nid}["${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>"]:::input`
-    )
-    const edge = item.purpose ? item.purpose.slice(0, 24) : kindLabel
-    lines.push(`  ${nid} -->|${escLabel(edge)}| ${me}`)
-  })
-
-  // Self.
   lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
 
-  // Outputs (right).
-  outputs.forEach((item, i) => {
-    const nid = `out_${i}_${safeId(item.name).slice(0, 18) || "x"}`
-    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
-    lines.push(
-      `  ${nid}["${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>"]:::output`
-    )
-    const edge = item.purpose ? item.purpose.slice(0, 24) : kindLabel
-    lines.push(`  ${me} -->|${escLabel(edge)}| ${nid}`)
-  })
-
-  // Interfaces — direction-aware. provides: external caller → me;
-  // consumes: me → external target. Edge label prefers the interface
-  // name and falls back to the connector type.
-  let ifCounter = 0
-  for (const iface of interfaces) {
-    ifCounter++
-    const otherId = iface.target
-      ? `iface_t_${safeId(iface.target).slice(0, 18)}`
-      : `iface_anon_${ifCounter}`
-    const otherLabel = iface.target
-      ? displayTarget(iface.target, nameLookup)
-      : iface.direction === "provides"
-      ? "External caller"
-      : "External source"
-    lines.push(`  ${otherId}["${escLabel(otherLabel)}"]:::peer`)
-    const head = iface.name || iface.type
-    const edgeLabel = head.slice(0, 32)
-    if (iface.direction === "provides") {
-      lines.push(`  ${otherId} -->|${escLabel(edgeLabel)}| ${me}`)
-    } else {
-      lines.push(`  ${me} -->|${escLabel(edgeLabel)}| ${otherId}`)
-    }
-  }
-
-  // Relationships (peers, dotted gray). Target id resolved to name
-  // when possible. The label comes straight from rel.displayLabel —
-  // already inverted when the row originated from an inbound edge
-  // declared on the other side.
-  rels.forEach((rel, i) => {
-    const nid = `rel_${i}_${safeId(rel.target).slice(0, 18)}`
-    const otherLabel = displayTarget(rel.target, nameLookup)
+  links.forEach((l, i) => {
+    const nid = `link_${i}_${safeId(l.target).slice(0, 18)}`
+    const otherLabel = displayTarget(l.target, nameLookup)
     lines.push(`  ${nid}["${escLabel(otherLabel)}"]:::peer`)
-    lines.push(`  ${me} -.${escLabel(rel.displayLabel)}.- ${nid}`)
-  })
-
-  // Owned data (cylinders, dotted).
-  owns.forEach((item, i) => {
-    const nid = `own_${i}_${safeId(item.name).slice(0, 18) || "x"}`
-    const kindLabel = DATA_KIND_LABELS[item.kind] || item.kind
-    lines.push(
-      `  ${nid}[("${escLabel(item.name)}<br/><i>${escLabel(kindLabel)}</i>")]:::owned`
-    )
-    lines.push(`  ${me} -.owns.- ${nid}`)
+    lines.push(`  ${me} -.${escLabel(l.displayLabel)}.- ${nid}`)
   })
 
   lines.push(
     `  classDef self fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:3px`
   )
-  lines.push(`  classDef input fill:#dcfce7,stroke:#16a34a,color:#14532d`)
-  lines.push(`  classDef output fill:#fce7f3,stroke:#be185d,color:#831843`)
   lines.push(`  classDef peer fill:#f9fafb,stroke:#6b7280,color:#374151`)
-  lines.push(`  classDef owned fill:#f5f3ff,stroke:#7c3aed,color:#4c1d95`)
   return lines.join("\n")
 }
 

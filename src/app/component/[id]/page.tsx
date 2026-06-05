@@ -16,8 +16,6 @@ import {
   DATA_CLASSIFICATION_LABELS,
   CAPABILITY_ROLE_LABELS,
   CAPABILITY_ROLE_COLORS,
-  DATA_KIND_LABELS,
-  DATA_KIND_COLORS,
   PROCESS_ROLE_LABELS,
   PROCESS_ROLE_COLORS,
   RULE_KIND_LABELS,
@@ -69,7 +67,6 @@ import { MermaidPreview } from "@/components/mermaid-preview"
 import {
   buildRelationshipsMermaid,
   buildCapabilitiesMermaid,
-  buildIOMermaid,
   buildHeroContextMermaid,
 } from "@/lib/component-mermaid"
 import { computeMaturity } from "@/lib/component-maturity"
@@ -144,24 +141,10 @@ export default function ComponentDetailPage() {
     link: ComponentLink
   }
   const [inboundLinks, setInboundLinks] = useState<InboundLinkRef[] | null>(null)
-  // Inbound data backlinks — "other components that point at me via
-  // their inputs[].source or outputs[].consumers". Two `via` values
-  // distinguish the two directions in the response.
-  type InboundDataRef = {
-    id: string
-    name: string
-    type: string
-    via: "input-source" | "output-consumer"
-    dataItem: {
-      name: string
-      kind: string
-      source?: string
-      consumers?: string[]
-      purpose?: string
-      description?: string
-    }
-  }
-  const [inboundData, setInboundData] = useState<InboundDataRef[] | null>(null)
+  // v2 Phase 2: data{} is gone — inputs/outputs are now reads-from /
+  // writes-to links and their backlinks surface through inboundLinks
+  // above. The old inbound-data endpoint and the InboundDataRef shape
+  // are no longer used.
 
   // v2 — unified links list. Outbound (declared on this component)
   // PLUS inbound inverted (declared on other components, presented
@@ -214,7 +197,6 @@ export default function ComponentDetailPage() {
   // existing setShowRelationshipsViz state for backward continuity.
   const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
   const [showCapabilitiesViz, setShowCapabilitiesViz] = useState(false)
-  const [showIOViz, setShowIOViz] = useState(false)
   // Hero context diagram (Overview tab) — open by default for impact.
   const [showHeroDiagram, setShowHeroDiagram] = useState(true)
   // Active tab on the detail page.
@@ -308,12 +290,6 @@ export default function ComponentDetailPage() {
       .then((data) => setInboundLinks(Array.isArray(data) ? data : []))
       .catch(() => setInboundLinks([]))
 
-    // Inbound data backlinks — components that reference this one as
-    // an input source or output consumer, surfaced in the Business tab.
-    fetch(`/api/components/${encodeURIComponent(id)}/inbound-data`)
-      .then(async (r) => (r.ok ? r.json() : []))
-      .then((data) => setInboundData(Array.isArray(data) ? data : []))
-      .catch(() => setInboundData([]))
   }, [id, router])
 
   const generateDocs = async () => {
@@ -1590,253 +1566,6 @@ export default function ComponentDetailPage() {
             </CardContent>
           </Card>
         )}
-
-        {/* Inputs & Outputs */}
-        {tab === "business" && isBlockVisible(uiBlocks, "business", "data") && component.data &&
-          (component.data.owns?.length ||
-            component.data.inputs?.length ||
-            component.data.outputs?.length) ? (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  Inputs &amp; Outputs
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help">
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-xs text-left">
-                      <p className="font-semibold mb-1">What this component receives, emits, and owns.</p>
-                      <ul className="text-xs space-y-0.5">
-                        <li><strong>Inputs</strong> — events / commands / data received</li>
-                        <li><strong>Outputs</strong> — events / decisions / documents emitted</li>
-                        <li><strong>Owns</strong> — source-of-truth for this data</li>
-                      </ul>
-                    </TooltipContent>
-                  </Tooltip>
-                </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowIOViz((v) => !v)}
-                  title="Visualize inputs, outputs and owned data as a flow"
-                >
-                  {showIOViz ? (
-                    <EyeOff className="h-4 w-4 mr-1" />
-                  ) : (
-                    <Eye className="h-4 w-4 mr-1" />
-                  )}
-                  Visualize
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(["inputs", "outputs", "owns"] as const).map((bucket) => {
-                const items = component.data?.[bucket] || []
-                if (items.length === 0) return null
-                const label =
-                  bucket === "inputs"
-                    ? "Inputs"
-                    : bucket === "outputs"
-                    ? "Outputs"
-                    : "Owned data"
-                return (
-                  <div key={bucket}>
-                    <h4 className="text-sm font-semibold mb-2">{label}</h4>
-                    <div className="space-y-1.5">
-                      {items.map((item, i) => (
-                        <div
-                          key={i}
-                          className="flex flex-wrap items-center gap-2 text-sm border-b last:border-0 pb-2"
-                        >
-                          <span className="font-mono text-xs font-semibold">
-                            {item.name}
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${DATA_KIND_COLORS[item.kind] || ""}`}
-                          >
-                            {DATA_KIND_LABELS[item.kind] || item.kind}
-                          </Badge>
-                          {item.purpose && (
-                            <span className="text-muted-foreground text-xs">
-                              {item.purpose}
-                            </span>
-                          )}
-                          {bucket === "inputs" && item.source && (() => {
-                            // Resolve source against the live catalog.
-                            // Matched → show TypeIcon + name + working
-                            // link. Unmatched (deleted, typo, or
-                            // external label) → flag with a red
-                            // "missing" badge so the analyst sees the
-                            // stale ref inline.
-                            const sourceComp = allComponents.find(
-                              (c) => c.id === item.source
-                            )
-                            return sourceComp ? (
-                              <Link
-                                href={`/component/${item.source}`}
-                                className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline ml-auto"
-                                title={`Open ${sourceComp.name}`}
-                              >
-                                <TypeIcon
-                                  type={sourceComp.type as never}
-                                  className="h-3 w-3"
-                                />
-                                source: {sourceComp.name}
-                              </Link>
-                            ) : (
-                              <span
-                                className="inline-flex items-center gap-1 text-xs ml-auto"
-                                title="Source not in catalog"
-                              >
-                                <span className="text-muted-foreground">source:</span>
-                                <span className="font-mono">{item.source}</span>
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] uppercase border-red-300 bg-red-50 text-red-700"
-                                >
-                                  missing
-                                </Badge>
-                              </span>
-                            )
-                          })()}
-                          {bucket === "outputs" && item.consumers && item.consumers.length > 0 && (
-                            <span className="inline-flex flex-wrap items-center gap-1 text-xs ml-auto">
-                              <span className="text-muted-foreground">consumers:</span>
-                              {item.consumers.map((cId, ci) => {
-                                const linked = allComponents.find(
-                                  (c) => c.id === cId
-                                )
-                                return linked ? (
-                                  <Link
-                                    key={`${cId}-${ci}`}
-                                    href={`/component/${cId}`}
-                                    className="inline-flex items-center gap-0.5 text-blue-700 hover:underline"
-                                    title={`Open ${linked.name}`}
-                                  >
-                                    <TypeIcon
-                                      type={linked.type as never}
-                                      className="h-3 w-3"
-                                    />
-                                    {linked.name}
-                                  </Link>
-                                ) : (
-                                  <span
-                                    key={`${cId}-${ci}`}
-                                    className="inline-flex items-center gap-1"
-                                    title="Consumer not in catalog"
-                                  >
-                                    <span className="font-mono">{cId}</span>
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] uppercase border-red-300 bg-red-50 text-red-700"
-                                    >
-                                      missing
-                                    </Badge>
-                                  </span>
-                                )
-                              })}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-              {showIOViz && (
-                <div className="mt-4 border-t pt-3">
-                  <MermaidPreview chart={buildIOMermaid(component)} />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {/* Inbound data backlinks. Two groups shown together (each
-            with its own subheader): downstream consumers (they put me
-            in inputs[].source) and upstream emitters (they put me in
-            outputs[].consumers). Gated by the same Inputs & Outputs
-            visibility flag — when an admin hides the IO card, the
-            backlinks hide with it. */}
-        {tab === "business" &&
-          isBlockVisible(uiBlocks, "business", "data") &&
-          inboundData !== null &&
-          inboundData.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Data referenced by other components
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help">
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-sm text-left">
-                      <p className="font-semibold mb-1">Two directions of data flow:</p>
-                      <ul className="text-xs space-y-0.5">
-                        <li>
-                          <strong>Downstream consumers</strong> — they list this
-                          component as the <code>source</code> of one of their inputs
-                        </li>
-                        <li>
-                          <strong>Upstream emitters</strong> — they list this
-                          component in the <code>consumers</code> of one of their outputs
-                        </li>
-                      </ul>
-                    </TooltipContent>
-                  </Tooltip>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {(["input-source", "output-consumer"] as const).map((via) => {
-                  const rows = inboundData.filter((r) => r.via === via)
-                  if (rows.length === 0) return null
-                  const heading =
-                    via === "input-source"
-                      ? "Downstream consumers (they read this as a source)"
-                      : "Upstream emitters (they list this as a consumer of their output)"
-                  return (
-                    <div key={via}>
-                      <h4 className="text-sm font-semibold mb-2">{heading}</h4>
-                      <div className="space-y-1.5">
-                        {rows.map((ref, i) => (
-                          <Link
-                            key={`${ref.id}-${via}-${i}`}
-                            href={`/component/${ref.id}`}
-                            className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
-                          >
-                            <TypeIcon
-                              type={ref.type as never}
-                              className="h-4 w-4 text-muted-foreground shrink-0"
-                            />
-                            <span className="font-medium">{ref.name}</span>
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {ref.dataItem.name}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] ${
-                                DATA_KIND_COLORS[ref.dataItem.kind as never] || ""
-                              }`}
-                            >
-                              {DATA_KIND_LABELS[ref.dataItem.kind as never] ||
-                                ref.dataItem.kind}
-                            </Badge>
-                            {ref.dataItem.purpose && (
-                              <span className="text-xs text-muted-foreground truncate">
-                                {ref.dataItem.purpose}
-                              </span>
-                            )}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
-          )}
 
         {/* Processes */}
         {tab === "business" && isBlockVisible(uiBlocks, "business", "processes") && component.processes && component.processes.length > 0 && (

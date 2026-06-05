@@ -19,7 +19,6 @@ import {
   CONNECTOR_TYPES,
   INTERFACE_DIRECTIONS,
   RELATIONSHIP_TYPES,
-  DATA_KINDS,
   DATA_CLASSIFICATIONS,
   SCALING_MODELS,
   CAPABILITY_ROLES,
@@ -506,63 +505,27 @@ export function validateComponentYaml(text: string): ValidateResult {
     }
   }
 
-  // --- data ---
+  // --- data (legacy v1 — read tolerant, write never) ---
+  //
+  // v2 Phase 2 dropped `data{}` entirely; every input/output is now a
+  // link with role `reads-from` / `writes-to`. We still accept the
+  // shape from the Import dialog so pre-v2 YAML pasted into the
+  // catalog validates and the read-time migration in github.ts can
+  // collapse it into links[]. The validation only checks that the
+  // legacy fields are arrays of objects with a name — kind / source /
+  // consumers are not enum-checked any more because they will be
+  // remapped (or dropped) on read.
   let data: Component["data"]
   if (raw.data !== undefined) {
     if (!isPlainObject(raw.data)) {
       errors.push({ path: "data", message: "data must be an object." })
     } else {
-      const out: NonNullable<Component["data"]> = {}
-      for (const bucket of ["inputs", "outputs", "owns"] as const) {
-        if (raw.data[bucket] === undefined) continue
-        if (!Array.isArray(raw.data[bucket])) {
-          errors.push({ path: `data.${bucket}`, message: "Must be a list." })
-          continue
-        }
-        const items: NonNullable<NonNullable<Component["data"]>[typeof bucket]> = []
-        ;(raw.data[bucket] as unknown[]).forEach((it, i) => {
-          const p = `data.${bucket}[${i}]`
-          if (!isPlainObject(it)) {
-            errors.push({ path: p, message: "Must be an object." })
-            return
-          }
-          for (const k of Object.keys(it)) {
-            if (!KNOWN_DATA_ITEM.has(k)) {
-              warnings.push({ path: `${p}.${k}`, message: "Unknown field — ignored." })
-            }
-          }
-          if (typeof it.name !== "string" || it.name === "") {
-            errors.push({ path: `${p}.name`, message: "name is required." })
-          }
-          if (
-            typeof it.kind !== "string" ||
-            !DATA_KINDS.includes(it.kind as (typeof DATA_KINDS)[number])
-          ) {
-            errors.push({
-              path: `${p}.kind`,
-              message: `kind must be one of: ${DATA_KINDS.join(", ")}.`,
-            })
-          }
-          if (it.source !== undefined && typeof it.source !== "string") {
-            errors.push({ path: `${p}.source`, message: "source must be a string." })
-          }
-          if (it.consumers !== undefined && !isStringArray(it.consumers)) {
-            errors.push({
-              path: `${p}.consumers`,
-              message: "consumers must be a list of strings.",
-            })
-          }
-          items.push(it as unknown as NonNullable<NonNullable<Component["data"]>[typeof bucket]>[number])
-        })
-        out[bucket] = items
-      }
-      // Warn on unknown sub-keys of `data`.
-      for (const k of Object.keys(raw.data)) {
-        if (k !== "inputs" && k !== "outputs" && k !== "owns") {
-          warnings.push({ path: `data.${k}`, message: "Unknown field — ignored." })
-        }
-      }
-      data = out
+      warnings.push({
+        path: "data",
+        message:
+          "Legacy v1 field — will be migrated into links[] on next read. New YAML should write links[] directly.",
+      })
+      data = raw.data as unknown as Component["data"]
     }
   }
 

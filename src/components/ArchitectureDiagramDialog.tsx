@@ -48,10 +48,6 @@ export function ArchitectureDiagramDialog() {
     "arch:showInterfaces",
     true
   )
-  const [showDataFlow, setShowDataFlow] = useStoredState(
-    "arch:showDataFlow",
-    false
-  )
   const [groupByType, setGroupByType] = useStoredState("arch:groupByType", true)
 
   // Fetch fresh on every dialog open so an architecture change made in
@@ -87,10 +83,9 @@ export function ArchitectureDiagramDialog() {
       buildArchitectureMermaid(components, {
         showRelationships,
         showInterfaces,
-        showDataFlow,
         groupByType,
       }),
-    [components, showRelationships, showInterfaces, showDataFlow, groupByType]
+    [components, showRelationships, showInterfaces, groupByType]
   )
 
   const edgeCount = useMemo(() => {
@@ -139,11 +134,6 @@ export function ArchitectureDiagramDialog() {
               label="Interfaces"
               checked={showInterfaces}
               onChange={setShowInterfaces}
-            />
-            <Toggle
-              label="Data flow"
-              checked={showDataFlow}
-              onChange={setShowDataFlow}
             />
             <span className="h-4 w-px bg-border" />
             <Toggle

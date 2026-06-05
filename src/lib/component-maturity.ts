@@ -72,15 +72,6 @@ export function computeMaturity(component: Component): MaturityResult {
       filled: (component.risks || []).length > 0,
     },
     {
-      key: "data",
-      label: "Inputs / outputs / owned data",
-      filled:
-        !!component.data &&
-        ((component.data.inputs || []).length > 0 ||
-          (component.data.outputs || []).length > 0 ||
-          (component.data.owns || []).length > 0),
-    },
-    {
       key: "processes",
       label: "Processes",
       filled: (component.processes || []).length > 0,

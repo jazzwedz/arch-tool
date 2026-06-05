@@ -37,7 +37,7 @@ import {
 
 interface Issue {
   id: string
-  category: "links" | "data"
+  category: "links"
   applyTo: string
   applyToName: string
   declaredOn: string
@@ -59,14 +59,11 @@ type RowState =
 
 const CATEGORY_HEADINGS: Record<Issue["category"], string> = {
   links: "Links",
-  data: "Data flow",
 }
 
 const CATEGORY_DESCRIPTIONS: Record<Issue["category"], string> = {
   links:
-    "calls ↔ serves and part-of ↔ contains mirror pairs (reads-from / writes-to stay directional)",
-  data:
-    "inputs[].source ↔ outputs[].consumers — matching name + reciprocal references",
+    "calls ↔ serves, part-of ↔ contains and reads-from ↔ writes-to mirror pairs (target + role + protocol + name)",
 }
 
 export function ConsistencyCheckDialog() {
@@ -164,7 +161,6 @@ export function ConsistencyCheckDialog() {
   // Group issues by category for the rendered list.
   const grouped: Record<Issue["category"], Issue[]> = {
     links: [],
-    data: [],
   }
   for (const it of issues || []) grouped[it.category].push(it)
 
@@ -254,7 +250,7 @@ export function ConsistencyCheckDialog() {
 
             {issues.length > 0 && (
               <div className="space-y-5">
-                {(["links", "data"] as const).map((cat) => {
+                {(["links"] as const).map((cat) => {
                   const items = grouped[cat]
                   if (items.length === 0) return null
                   return (

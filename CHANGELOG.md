@@ -7,6 +7,32 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Refactor — Phase 2: `data{}` collapses into `links[]`
+
+The final step of the v2 schema refactor. Every input / output now
+lives as a link with role `reads-from` / `writes-to`; `data.owns` is
+dropped entirely; the 16-value `DataKind` ontology is gone.
+
+- **Migration rules** (`migrateToLinksV2` in `src/lib/github.ts`):
+  - `data.inputs[name=X, source=B, purpose=P]` → `links[reads-from B, name=X, description=P]`.
+  - `data.outputs[name=X, consumers=[B,C], purpose=P]` → two links: `[writes-to B, name=X]` and `[writes-to C, name=X]`.
+  - `data.owns` → **dropped** (no edge target; source-of-truth semantics retire).
+  - DataKind, source-of-truth marker, owns metadata — **not preserved**.
+  - Orphan inputs (no source) and outputs without consumers are dropped.
+- **Mirror pair extended:** `reads-from ↔ writes-to` added to `LINK_ROLE_INVERSE`. Consistency check matches mirrors on `(target, role, protocol, name)` so a data flow declared from both sides collapses to one edge, and a mismatched name surfaces as a missing-mirror finding.
+- **UI dropped wholesale:**
+  - Form: the entire "Inputs / Outputs / Owns" section is gone — every flow is a Link row now.
+  - Detail page: "Inputs & Outputs" card and "Data referenced by other components" card both removed; the Links card surfaces inbound flow via inverted role labels (`reads-from` ↔ `writes-to`, `Read by` / `Written to by`).
+  - Architecture overview: `Data flow` toggle dropped — `reads-from` / `writes-to` render under the Relationships toggle alongside the other structural roles.
+  - Consistency Check: data category gone — one `Links` category covers every mirror check. Fix kinds `addOutput`, `addInput`, `addOutputConsumer`, `setInputSource` removed; only `addLink` remains.
+  - Catalog Export: per-component Data flow block removed; Coverage matrix Data column dropped; cross-cutting external-target scan reads `links[]` exclusively.
+  - Hero context diagram: simplified to a single ring of inbound/outbound links labelled by `name` or `protocol` or `role`. No more inputs / outputs / owns groupings.
+- **Backbone cleanup:**
+  - `GET /api/components/[id]/inbound-data` route deleted.
+  - `buildIOMermaid` + `buildInterfacesMermaid` removed from `component-mermaid.ts`.
+  - `DATA_KIND_*` constants stay in `constants.ts` for legacy YAML parsing in the Import dialog (deprecated; not surfaced in any UI).
+  - Component type still carries `data?: ComponentData` as a `@deprecated` field so pre-v2 YAML still type-checks; `normaliseForSave` strips it on every write.
+
 ### Refactor — Phase 1: `links[]` replaces `interfaces[]` + `relationships[]`
 
 The component schema gains a single edge primitive: `ComponentLink` with

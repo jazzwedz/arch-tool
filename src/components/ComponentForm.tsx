@@ -27,10 +27,6 @@ import {
   SCALING_MODELS,
   CAPABILITY_ROLES,
   CAPABILITY_ROLE_LABELS,
-  FORMAT_DATA_KINDS,
-  BUSINESS_DATA_KINDS,
-  TECHNICAL_DATA_KINDS,
-  DATA_KIND_LABELS,
   PROCESS_ROLES,
   PROCESS_ROLE_LABELS,
   RULE_KINDS,
@@ -44,9 +40,6 @@ import type {
   ComponentCapability,
   CapabilityRole,
   ComponentType,
-  DataItem,
-  DataKind,
-  ComponentData,
   ComponentProcess,
   ProcessRole,
   ComponentRule,
@@ -66,7 +59,6 @@ import { useUIConfig } from "@/components/UIConfigProvider"
 import { isBlockVisible } from "@/lib/ui-blocks"
 import { DataModelLinkCard } from "@/components/DataModelLinkCard"
 import { ComponentTargetPicker } from "@/components/ComponentTargetPicker"
-import { MultiComponentPicker } from "@/components/MultiComponentPicker"
 import {
   Tooltip,
   TooltipTrigger,
@@ -105,13 +97,6 @@ const emptyCapability: ComponentCapability = {
   role: "indirect",
   description: "",
 }
-
-const emptyDataItem: DataItem = {
-  name: "",
-  kind: "business",
-}
-
-type DataBucket = "owns" | "inputs" | "outputs"
 
 const emptyProcess: ComponentProcess = {
   name: "",
@@ -172,7 +157,6 @@ export function ComponentForm({
   const showRelationships = isBlockVisible(uiBlocks, "technical", "relationships")
   const showNfr = isBlockVisible(uiBlocks, "technical", "nfr")
   const showCapabilities = isBlockVisible(uiBlocks, "business", "capabilities")
-  const showData = isBlockVisible(uiBlocks, "business", "data")
   const showProcesses = isBlockVisible(uiBlocks, "business", "processes")
   const showRules = isBlockVisible(uiBlocks, "rules", "section")
   // Fresh catalog snapshot, fetched once per form mount. Used by both
@@ -286,43 +270,6 @@ export function ComponentForm({
     }))
   }
 
-  // Widened to accept string | string[] so the consumers multi-picker
-  // can replace the whole array. The narrow case (single string) still
-  // covers name / kind / source / purpose / description on a single
-  // item.
-  const updateDataItem = (
-    bucket: DataBucket,
-    index: number,
-    field: keyof DataItem,
-    value: string | string[]
-  ) => {
-    setForm((prev) => {
-      const dataPrev = prev.data || {}
-      const list = (dataPrev[bucket] || []).map((item, i) =>
-        i === index ? { ...item, [field]: value } : item
-      )
-      return { ...prev, data: { ...dataPrev, [bucket]: list } }
-    })
-  }
-
-  const addDataItem = (bucket: DataBucket) => {
-    setForm((prev) => {
-      const dataPrev = prev.data || {}
-      const list = [...(dataPrev[bucket] || []), { ...emptyDataItem }]
-      return { ...prev, data: { ...dataPrev, [bucket]: list } }
-    })
-  }
-
-  const removeDataItem = (bucket: DataBucket, index: number) => {
-    // No companion UI-text state to keep in sync anymore — consumers
-    // are managed directly on the item.
-    setForm((prev) => {
-      const dataPrev = prev.data || {}
-      const list = (dataPrev[bucket] || []).filter((_, i) => i !== index)
-      return { ...prev, data: { ...dataPrev, [bucket]: list } }
-    })
-  }
-
   const updateProcess = (
     index: number,
     field: keyof ComponentProcess,
@@ -410,48 +357,9 @@ export function ComponentForm({
           : {}),
       }))
 
-    // Clean data: drop rows with empty name in each bucket; parse outputs.consumers
-    // from the per-row textarea state; drop the whole `data` block if everything is empty.
-    const cleanBucket = (
-      bucket: DataBucket,
-      items: DataItem[] | undefined
-    ): DataItem[] | undefined => {
-      const list = (items || [])
-        .map((item, i) => {
-          const name = item.name?.trim() || ""
-          if (!name) return null
-          const out: DataItem = { name, kind: item.kind }
-          if (item.purpose && item.purpose.trim())
-            out.purpose = item.purpose.trim()
-          if (item.description && item.description.trim())
-            out.description = item.description.trim()
-          if (bucket === "inputs" && item.source && item.source.trim())
-            out.source = item.source.trim()
-          if (bucket === "outputs" && item.consumers && item.consumers.length > 0) {
-            // Consumers come straight from the multi-picker as a clean
-            // string[] — no more comma-separated text intermediary to
-            // parse. Drop empty / whitespace-only entries defensively.
-            const cleaned = item.consumers
-              .map((c) => (typeof c === "string" ? c.trim() : ""))
-              .filter(Boolean)
-            if (cleaned.length > 0) out.consumers = cleaned
-          }
-          return out
-        })
-        .filter((x): x is DataItem => x !== null)
-      return list.length > 0 ? list : undefined
-    }
-
-    const cleanData: ComponentData = {
-      owns: cleanBucket("owns", form.data?.owns),
-      inputs: cleanBucket("inputs", form.data?.inputs),
-      outputs: cleanBucket("outputs", form.data?.outputs),
-    }
-    const hasData = !!(
-      cleanData.owns ||
-      cleanData.inputs ||
-      cleanData.outputs
-    )
+    // v2 Phase 2: data{} is gone. Every input/output is a link with
+    // role reads-from / writes-to (migration in github.ts collapses
+    // legacy entries on read, normaliseForSave drops `data` on write).
 
     // Clean processes: drop rows with empty name; trim activity/description.
     const cleanProcesses: ComponentProcess[] = (form.processes || [])
@@ -530,9 +438,9 @@ export function ComponentForm({
       // read time for any YAML that still has the old shape.
       description: cleanDescription,
       capabilities: cleanCapabilities.length > 0 ? cleanCapabilities : undefined,
-      // Drop any legacy field on save so the YAML is upgraded.
+      // Drop legacy fields on save so the YAML upgrades to v2.
       business_capabilities: undefined,
-      data: hasData ? cleanData : undefined,
+      data: undefined,
       processes: cleanProcesses.length > 0 ? cleanProcesses : undefined,
       rules: cleanRules.length > 0 ? cleanRules : undefined,
       nfr: hasNfr ? (cleanNfr as ComponentNFR) : undefined,
@@ -1054,181 +962,6 @@ export function ComponentForm({
 
       )}
 
-      {/* Inputs & Outputs (data) */}
-      {showData && (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Inputs &amp; Outputs
-            <Tooltip>
-              <TooltipTrigger className="cursor-help">
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs text-left">
-                <p className="font-semibold mb-1">What this component receives and emits, and what it owns.</p>
-                <ul className="text-xs space-y-0.5">
-                  <li><strong>Inputs</strong> — events / commands / data the component receives</li>
-                  <li><strong>Outputs</strong> — events / decisions / documents the component emits</li>
-                  <li><strong>Owns</strong> — data the component is the source-of-truth for</li>
-                </ul>
-                <p className="mt-2 text-xs">
-                  <strong>Format kinds:</strong> table, file, stream, message, form.{" "}
-                  <strong>Business kinds:</strong> event, command, document, decision, signal.{" "}
-                  <strong>Technical kinds:</strong> business state, reference, cache, config, transient, logs.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {(["inputs", "outputs", "owns"] as DataBucket[]).map((bucket) => {
-            const items = form.data?.[bucket] || []
-            const bucketLabel =
-              bucket === "inputs"
-                ? "Inputs"
-                : bucket === "outputs"
-                ? "Outputs"
-                : "Owned data"
-            const bucketHint =
-              bucket === "inputs"
-                ? "what comes in"
-                : bucket === "outputs"
-                ? "what goes out"
-                : "what this component is source-of-truth for"
-            return (
-              <div key={bucket} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-semibold">{bucketLabel}</h4>
-                    <p className="text-xs text-muted-foreground">{bucketHint}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => addDataItem(bucket)}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add
-                  </Button>
-                </div>
-                {items.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No items.</p>
-                ) : (
-                  items.map((item, i) => (
-                    <div
-                      key={i}
-                      className="grid grid-cols-[1.2fr,auto,1.5fr,auto] gap-2 items-start"
-                    >
-                      <Input
-                        placeholder={
-                          bucket === "inputs"
-                            ? "Input name (e.g. OrderRequest)"
-                            : bucket === "outputs"
-                            ? "Output name (e.g. OrderCreated)"
-                            : "Data name (e.g. Customer record)"
-                        }
-                        value={item.name}
-                        onChange={(e) =>
-                          updateDataItem(bucket, i, "name", e.target.value)
-                        }
-                        className="h-9"
-                      />
-                      <Select
-                        value={item.kind}
-                        onValueChange={(v) =>
-                          updateDataItem(bucket, i, "kind", v as DataKind)
-                        }
-                      >
-                        <SelectTrigger className="h-9 w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                            Format
-                          </div>
-                          {FORMAT_DATA_KINDS.map((k) => (
-                            <SelectItem key={k} value={k}>
-                              {DATA_KIND_LABELS[k]}
-                            </SelectItem>
-                          ))}
-                          <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t">
-                            Business
-                          </div>
-                          {BUSINESS_DATA_KINDS.map((k) => (
-                            <SelectItem key={k} value={k}>
-                              {DATA_KIND_LABELS[k]}
-                            </SelectItem>
-                          ))}
-                          <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t">
-                            Technical
-                          </div>
-                          {TECHNICAL_DATA_KINDS.map((k) => (
-                            <SelectItem key={k} value={k}>
-                              {DATA_KIND_LABELS[k]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <div className="space-y-1.5">
-                        <Input
-                          placeholder="Purpose (optional)"
-                          value={item.purpose || ""}
-                          onChange={(e) =>
-                            updateDataItem(bucket, i, "purpose", e.target.value)
-                          }
-                          className="h-9"
-                        />
-                        {bucket === "inputs" && (
-                          // Source: which component supplies this input.
-                          // Picker matches the interface target picker —
-                          // pick an existing component or type a free
-                          // external label.
-                          <ComponentTargetPicker
-                            value={item.source || ""}
-                            onChange={(v) =>
-                              updateDataItem(bucket, i, "source", v)
-                            }
-                            placeholder="Source (component or external, optional)"
-                            excludeId={form.id}
-                            components={existingComponents}
-                          />
-                        )}
-                        {bucket === "outputs" && (
-                          // Consumers: who reads this output. Multi-pick
-                          // with chip badges so the analyst can build the
-                          // list one at a time and visually confirm each
-                          // entry resolved to a known component.
-                          <MultiComponentPicker
-                            values={item.consumers || []}
-                            onChange={(next) =>
-                              updateDataItem(bucket, i, "consumers", next)
-                            }
-                            components={existingComponents}
-                            excludeId={form.id}
-                            placeholder="Add a consumer (pick or type)"
-                          />
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() => removeDataItem(bucket, i)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            )
-          })}
-        </CardContent>
-      </Card>
-
-      )}
 
       {/* Processes */}
       {showProcesses && (

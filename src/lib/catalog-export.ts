@@ -22,12 +22,11 @@
 // so the same input always produces byte-identical output (handy when
 // piping into git or diffing across days).
 
-import type { Component, ComponentLink, DataItem } from "./types"
+import type { Component, ComponentLink } from "./types"
 import {
   TYPE_LABELS,
   LINK_ROLE_LABELS,
   INVERSE_LINK_ROLE_LABELS,
-  DATA_KIND_LABELS,
   CAPABILITY_ROLE_LABELS,
   PROCESS_ROLE_LABELS,
   RULE_KIND_LABELS,
@@ -44,10 +43,8 @@ export interface CatalogExportOptions {
 }
 
 interface BacklinkBundle {
-  /** v2: unified `links` source replaces the legacy relationships + interfaces split. */
+  /** v2: unified `links` source covers every inbound edge — relationships, interfaces and data flow. */
   links: Array<{ from: Component; link: ComponentLink }>
-  inputSources: Array<{ from: Component; dataItem: DataItem }>
-  outputConsumers: Array<{ from: Component; dataItem: DataItem }>
 }
 
 export function buildCatalogMarkdown(
@@ -196,28 +193,23 @@ function renderAtAGlance(components: Component[]): string[] {
 function renderCoverageMatrix(components: Component[]): string[] {
   const lines: string[] = []
   lines.push(
-    `| ID | Name | Type | Status | Owner | Maturity | Desc | Ifaces | Rels | Caps | Procs | Rules | Data (I/O/Owns) | NFR | Risks |`
+    `| ID | Name | Type | Status | Owner | Maturity | Desc | Links | Caps | Procs | Rules | NFR | Risks |`
   )
   lines.push(
-    `|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|`
+    `|---|---|---|---|---|---|---|---|---|---|---|---|---|`
   )
   for (const c of components) {
     const m = computeMaturity(c)
     const desc = m.fields.find((f) => f.key === "description")?.filled ? "✓" : "❌"
-    const ifaces = (c.interfaces || []).length
-    const rels = (c.relationships || []).length
+    const links = (c.links || []).length
     const caps = (c.capabilities || []).length
     const procs = (c.processes || []).length
     const rules = (c.rules || []).length
-    const ins = (c.data?.inputs || []).length
-    const outs = (c.data?.outputs || []).length
-    const owns = (c.data?.owns || []).length
-    const dataStr = ins + outs + owns === 0 ? "❌" : `${ins}/${outs}/${owns}`
     const nfr =
       c.nfr && Object.values(c.nfr).some((v) => !!v) ? "✓" : "❌"
     const risks = (c.risks || []).length
     lines.push(
-      `| \`${c.id}\` | ${c.name} | ${c.type} | ${c.status} | ${c.owner || "❌"} | ${m.percent}% | ${desc} | ${ifaces || "❌"} | ${rels || "❌"} | ${caps || "❌"} | ${procs || "❌"} | ${rules || "❌"} | ${dataStr} | ${nfr} | ${risks || "❌"} |`
+      `| \`${c.id}\` | ${c.name} | ${c.type} | ${c.status} | ${c.owner || "❌"} | ${m.percent}% | ${desc} | ${links || "❌"} | ${caps || "❌"} | ${procs || "❌"} | ${rules || "❌"} | ${nfr} | ${risks || "❌"} |`
     )
   }
   return lines
@@ -279,34 +271,15 @@ function renderCrossCutting(components: Component[]): string[] {
   const idSet = new Set(components.map((c) => c.id))
   const externalTargets = new Map<string, { id: string; name: string; via: string }[]>()
   for (const c of components) {
-    for (const iface of c.interfaces || []) {
-      if (iface.target && !idSet.has(iface.target)) {
-        const arr = externalTargets.get(iface.target) ?? []
-        arr.push({ id: c.id, name: c.name, via: `interface (${iface.direction} ${iface.type})` })
-        externalTargets.set(iface.target, arr)
-      }
-    }
-    for (const rel of c.relationships || []) {
-      if (rel.target && !idSet.has(rel.target)) {
-        const arr = externalTargets.get(rel.target) ?? []
-        arr.push({ id: c.id, name: c.name, via: `relationship (${rel.type})` })
-        externalTargets.set(rel.target, arr)
-      }
-    }
-    for (const inp of c.data?.inputs || []) {
-      if (inp.source && !idSet.has(inp.source)) {
-        const arr = externalTargets.get(inp.source) ?? []
-        arr.push({ id: c.id, name: c.name, via: `data input (${inp.name})` })
-        externalTargets.set(inp.source, arr)
-      }
-    }
-    for (const out of c.data?.outputs || []) {
-      for (const cons of out.consumers || []) {
-        if (cons && !idSet.has(cons)) {
-          const arr = externalTargets.get(cons) ?? []
-          arr.push({ id: c.id, name: c.name, via: `data output consumer (${out.name})` })
-          externalTargets.set(cons, arr)
-        }
+    for (const link of c.links || []) {
+      if (link.target && !idSet.has(link.target)) {
+        const arr = externalTargets.get(link.target) ?? []
+        arr.push({
+          id: c.id,
+          name: c.name,
+          via: `link (${link.role}${link.protocol ? `, ${link.protocol}` : ""})`,
+        })
+        externalTargets.set(link.target, arr)
       }
     }
   }
@@ -388,34 +361,16 @@ function renderComponent(c: Component, backlinks: Map<string, BacklinkBundle>): 
   const bl = backlinks.get(c.id)
   lines.push(`**Inbound (declared on other components)**`)
   lines.push(``)
-  if (!bl || (bl.links.length === 0 && bl.inputSources.length === 0 && bl.outputConsumers.length === 0)) {
+  if (!bl || bl.links.length === 0) {
     lines.push(MISSING_BLOCK)
   } else {
-    if (bl.links.length > 0) {
-      lines.push(`- *Links pointing here:*`)
-      for (const r of bl.links) {
-        const inv = INVERSE_LINK_ROLE_LABELS[r.link.role] ?? r.link.role
-        const proto = r.link.protocol ? ` [${r.link.protocol}]` : ""
-        lines.push(
-          `  - ${r.from.name} (\`${r.from.id}\`) declares "${r.link.role}"${proto} → reads here as "${inv}"`
-        )
-      }
-    }
-    if (bl.inputSources.length > 0) {
-      lines.push(`- *Components reading from here as input source:*`)
-      for (const r of bl.inputSources) {
-        lines.push(
-          `  - ${r.from.name} (\`${r.from.id}\`) reads "${r.dataItem.name}" [${r.dataItem.kind}]`
-        )
-      }
-    }
-    if (bl.outputConsumers.length > 0) {
-      lines.push(`- *Components declaring this one as their output consumer:*`)
-      for (const r of bl.outputConsumers) {
-        lines.push(
-          `  - ${r.from.name} (\`${r.from.id}\`) emits "${r.dataItem.name}" [${r.dataItem.kind}] to here`
-        )
-      }
+    for (const r of bl.links) {
+      const inv = INVERSE_LINK_ROLE_LABELS[r.link.role] ?? r.link.role
+      const proto = r.link.protocol ? ` [${r.link.protocol}]` : ""
+      const name = r.link.name ? ` "${r.link.name}"` : ""
+      lines.push(
+        `- ${r.from.name} (\`${r.from.id}\`) declares "${r.link.role}"${proto}${name} → reads here as "${inv}"`
+      )
     }
   }
   lines.push(``)
@@ -475,35 +430,10 @@ function renderComponent(c: Component, backlinks: Map<string, BacklinkBundle>): 
   }
   lines.push(``)
 
-  // Data
-  const ins = c.data?.inputs || []
-  const outs = c.data?.outputs || []
-  const owns = c.data?.owns || []
-  lines.push(`**Data flow** — Inputs: ${ins.length} · Outputs: ${outs.length} · Owns: ${owns.length}`)
-  lines.push(``)
-  if (ins.length === 0 && outs.length === 0 && owns.length === 0) {
-    lines.push(MISSING_LIST)
-  } else {
-    if (owns.length > 0) {
-      lines.push(`- *Owns (source-of-truth):*`)
-      for (const it of owns) lines.push(`  - ${renderDataItem(it, "owns")}`)
-    } else {
-      lines.push(`- Owns: ${MISSING_BLOCK}`)
-    }
-    if (ins.length > 0) {
-      lines.push(`- *Inputs (consumed by this component):*`)
-      for (const it of ins) lines.push(`  - ${renderDataItem(it, "inputs")}`)
-    } else {
-      lines.push(`- Inputs: ${MISSING_BLOCK}`)
-    }
-    if (outs.length > 0) {
-      lines.push(`- *Outputs (emitted by this component):*`)
-      for (const it of outs) lines.push(`  - ${renderDataItem(it, "outputs")}`)
-    } else {
-      lines.push(`- Outputs: ${MISSING_BLOCK}`)
-    }
-  }
-  lines.push(``)
+  // v2 Phase 2: data{} is gone — input/output flows are now
+  // reads-from / writes-to entries inside the Links section above.
+  // No separate Data flow block; the link's `name` field carries the
+  // legacy DataItem name when one existed.
 
   // NFR
   lines.push(`**Non-functional requirements**`)
@@ -573,24 +503,6 @@ function renderComponent(c: Component, backlinks: Map<string, BacklinkBundle>): 
   return lines
 }
 
-function renderDataItem(it: DataItem, bucket: "inputs" | "outputs" | "owns"): string {
-  const kind = DATA_KIND_LABELS[it.kind] ?? it.kind
-  const parts: string[] = [`**${it.name}** [${kind}]`]
-  if (bucket === "inputs") {
-    parts.push(it.source ? `← \`${it.source}\`` : `← ${MISSING_FIELD}`)
-  }
-  if (bucket === "outputs") {
-    if (it.consumers && it.consumers.length > 0) {
-      parts.push(`→ ${it.consumers.map((c) => `\`${c}\``).join(", ")}`)
-    } else {
-      parts.push(`→ ${MISSING_FIELD}`)
-    }
-  }
-  if (it.purpose) parts.push(`(${it.purpose})`)
-  if (it.description) parts.push(`— ${it.description}`)
-  return parts.join(" ")
-}
-
 // ============================ backlink index ============================
 
 function buildBacklinkIndex(components: Component[]): Map<string, BacklinkBundle> {
@@ -598,33 +510,18 @@ function buildBacklinkIndex(components: Component[]): Map<string, BacklinkBundle
   const ensure = (id: string): BacklinkBundle => {
     let bundle = map.get(id)
     if (!bundle) {
-      bundle = {
-        links: [],
-        inputSources: [],
-        outputConsumers: [],
-      }
+      bundle = { links: [] }
       map.set(id, bundle)
     }
     return bundle
   }
 
   for (const c of components) {
-    // v2: scan unified links[] instead of separate
-    // relationships[] / interfaces[] arrays. Migration in
-    // github.ts has already collapsed legacy data into links.
+    // v2: scan unified links[]. Data flow (reads-from / writes-to)
+    // is part of the same array now, so one pass covers every edge.
     for (const link of c.links || []) {
       if (!link.target) continue
       ensure(link.target).links.push({ from: c, link })
-    }
-    for (const inp of c.data?.inputs || []) {
-      if (!inp.source) continue
-      ensure(inp.source).inputSources.push({ from: c, dataItem: inp })
-    }
-    for (const out of c.data?.outputs || []) {
-      for (const cons of out.consumers || []) {
-        if (!cons) continue
-        ensure(cons).outputConsumers.push({ from: c, dataItem: out })
-      }
     }
   }
   return map

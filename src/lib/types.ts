@@ -294,6 +294,13 @@ export interface Component {
   /** @deprecated use `capabilities` (rich object) instead. Migrated at read time. */
   business_capabilities?: string[]
   capabilities?: ComponentCapability[]
+  /**
+   * @deprecated v2 Phase 2: `data{}` is gone. Every input/output is
+   * now a link with role `reads-from` / `writes-to`, the DataItem
+   * name + purpose carrying over as link.name + link.description.
+   * `data.owns` is dropped entirely. Field kept on the type only so
+   * legacy YAML still parses; migration drops it on read.
+   */
   data?: ComponentData
   processes?: ComponentProcess[]
   rules?: ComponentRule[]

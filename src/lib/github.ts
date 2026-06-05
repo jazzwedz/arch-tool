@@ -144,14 +144,19 @@ function migrateToLinksV2(raw: Record<string, any>): void {
     : []
   const out: ComponentLink[] = [...existingLinks]
 
-  // Dedupe key on (target, role, protocol?) so an interface that was
-  // already moved to links by a previous save does not get duplicated
-  // by a still-present legacy entry that someone manually re-pasted.
+  // Dedupe key on (target, role, protocol?, name?) so an entry that
+  // was already moved to links by a previous save does not get
+  // duplicated by a still-present legacy entry that someone manually
+  // re-pasted. The name field is part of the key so two data items
+  // flowing from B to A on the same role (e.g. two writes-to with
+  // different `name`) stay as two distinct edges.
   const seen = new Set(
-    out.map((l) => `${l.target}::${l.role}::${l.protocol ?? ""}`)
+    out.map(
+      (l) => `${l.target}::${l.role}::${l.protocol ?? ""}::${l.name ?? ""}`
+    )
   )
   const push = (l: ComponentLink) => {
-    const key = `${l.target}::${l.role}::${l.protocol ?? ""}`
+    const key = `${l.target}::${l.role}::${l.protocol ?? ""}::${l.name ?? ""}`
     if (seen.has(key)) return
     seen.add(key)
     out.push(l)
@@ -194,6 +199,61 @@ function migrateToLinksV2(raw: Record<string, any>): void {
     }
   }
 
+  // v2 Phase 2: data{} → links[] using reads-from / writes-to roles.
+  //
+  //   data.inputs[name=X, source=B, purpose=P]
+  //     → links[reads-from B, name=X, description=P]
+  //
+  //   data.outputs[name=X, consumers=[B,C], purpose=P]
+  //     → 2 links: writes-to B name=X, writes-to C name=X
+  //
+  //   data.owns  → DROPPED (per Phase 2 spec: "source-of-truth" is
+  //                not an edge to another component; the analyst
+  //                expresses it via tags / capabilities going forward).
+  //
+  // DataKind on the legacy DataItem is intentionally NOT preserved
+  // — the 16-value ontology disappears in v2; only name + purpose
+  // (as description) carry over.
+  if (raw.data && typeof raw.data === "object") {
+    if (Array.isArray(raw.data.inputs)) {
+      for (const item of raw.data.inputs) {
+        if (!item || typeof item !== "object") continue
+        const source = typeof item.source === "string" ? item.source : ""
+        if (!source) continue // orphan input (no source) — dropped per agreed spec
+        const link: ComponentLink = { target: source, role: "reads-from" }
+        if (typeof item.name === "string" && item.name.trim()) link.name = item.name
+        const desc =
+          (typeof item.purpose === "string" && item.purpose.trim()) ||
+          (typeof item.description === "string" && item.description.trim()) ||
+          ""
+        if (desc) link.description = desc
+        push(link)
+      }
+    }
+    if (Array.isArray(raw.data.outputs)) {
+      for (const item of raw.data.outputs) {
+        if (!item || typeof item !== "object") continue
+        const consumers: string[] = Array.isArray(item.consumers)
+          ? (item.consumers.filter(
+              (c: unknown) => typeof c === "string" && c.trim()
+            ) as string[])
+          : []
+        if (consumers.length === 0) continue // no consumers — drop
+        const desc =
+          (typeof item.purpose === "string" && item.purpose.trim()) ||
+          (typeof item.description === "string" && item.description.trim()) ||
+          ""
+        for (const c of consumers) {
+          const link: ComponentLink = { target: c, role: "writes-to" }
+          if (typeof item.name === "string" && item.name.trim()) link.name = item.name
+          if (desc) link.description = desc
+          push(link)
+        }
+      }
+    }
+    // data.owns intentionally skipped.
+  }
+
   // Always commit the merged list, even when it equals the existing
   // one — keeps schema_version invariant after a no-op pass.
   raw.links = out
@@ -203,6 +263,7 @@ function migrateToLinksV2(raw: Record<string, any>): void {
   // consistency check, mermaid builders) sees a clean v2 object.
   delete raw.interfaces
   delete raw.relationships
+  delete raw.data
 }
 
 export async function listComponents(): Promise<Component[]> {
@@ -268,6 +329,8 @@ function normaliseForSave(component: Component): Component {
   // Drop legacy edge containers — links[] is authoritative on disk.
   delete raw.interfaces
   delete raw.relationships
+  // Drop legacy data{} — every input/output now lives as a link.
+  delete raw.data
   // Drop legacy capability shape.
   delete raw.business_capabilities
   // Drop empty links to keep the YAML clean.

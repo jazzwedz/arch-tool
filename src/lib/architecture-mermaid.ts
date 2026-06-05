@@ -29,7 +29,8 @@ import { TYPE_COLORS, TYPE_LABELS } from "./constants"
 export interface ArchitectureMermaidOptions {
   showRelationships: boolean
   showInterfaces: boolean
-  showDataFlow: boolean
+  /** @deprecated v2 Phase 2: data flow is now part of links[]; toggle is a no-op. */
+  showDataFlow?: boolean
   groupByType: boolean
 }
 
@@ -198,33 +199,9 @@ function collectEdges(
     }
   }
 
-  // Data flow — direction is always source → consumer regardless of
-  // which side declared it.
-  if (options.showDataFlow) {
-    for (const c of components) {
-      for (const inp of c.data?.inputs || []) {
-        if (!inp.source || !inp.name) continue
-        push({
-          from: inp.source,
-          to: c.id,
-          label: inp.name,
-          style: "data",
-        })
-      }
-      for (const out of c.data?.outputs || []) {
-        if (!out.name) continue
-        for (const consumer of out.consumers || []) {
-          if (!consumer) continue
-          push({
-            from: c.id,
-            to: consumer,
-            label: out.name,
-            style: "data",
-          })
-        }
-      }
-    }
-  }
+  // v2 Phase 2: data flow now lives inside `links[]` as reads-from /
+  // writes-to roles. The Relationships toggle covers both — no
+  // separate Data Flow toggle.
 
   return Array.from(seen.values())
 }

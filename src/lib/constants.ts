@@ -248,15 +248,23 @@ export const INVERSE_LINK_ROLE_LABELS: Record<LinkRole, string> = {
 /**
  * Mirror pair lookup. When non-undefined, the consistency check
  * expects the target to declare the inverse role pointing back at
- * the source. `reads-from` / `writes-to` are intentionally absent —
- * passive targets (databases, queues, storage) do not need to
- * declare the reciprocal direction.
+ * the source.
+ *
+ *   calls       ↔ serves       — API edge declared from both sides
+ *   part-of     ↔ contains     — containment declared from both sides
+ *   reads-from  ↔ writes-to    — v2 data flow (Phase 2). A reads X
+ *                                from B is the same edge as B writes
+ *                                X to A; mirror match also requires
+ *                                the `name` field to agree so the
+ *                                data item identity carries through.
  */
 export const LINK_ROLE_INVERSE: Partial<Record<LinkRole, LinkRole>> = {
   "calls": "serves",
   "serves": "calls",
   "part-of": "contains",
   "contains": "part-of",
+  "reads-from": "writes-to",
+  "writes-to": "reads-from",
 }
 
 // Reuses CONNECTOR_TYPES for the protocol enum so existing form
