@@ -209,6 +209,79 @@ export const INVERSE_RELATIONSHIP_LABELS: Record<string, string> = {
   "fallback": "Has fallback",
 }
 
+// -------------------------- v2: links[] role / protocol --------------------------
+
+import type { LinkRole, LinkProtocol } from "./types"
+
+export const LINK_ROLES: LinkRole[] = [
+  "calls",
+  "serves",
+  "part-of",
+  "contains",
+  "reads-from",
+  "writes-to",
+]
+
+export const LINK_ROLE_LABELS: Record<LinkRole, string> = {
+  "calls": "Calls",
+  "serves": "Serves",
+  "part-of": "Part of",
+  "contains": "Contains",
+  "reads-from": "Reads from",
+  "writes-to": "Writes to",
+}
+
+/**
+ * Label shown on the **target** component's detail page when this
+ * component declares a link toward it. Inverse direction of the
+ * declared role.
+ */
+export const INVERSE_LINK_ROLE_LABELS: Record<LinkRole, string> = {
+  "calls": "Called by",
+  "serves": "Served by",
+  "part-of": "Contains",
+  "contains": "Part of",
+  "reads-from": "Read by",
+  "writes-to": "Written to by",
+}
+
+/**
+ * Mirror pair lookup. When non-undefined, the consistency check
+ * expects the target to declare the inverse role pointing back at
+ * the source. `reads-from` / `writes-to` are intentionally absent —
+ * passive targets (databases, queues, storage) do not need to
+ * declare the reciprocal direction.
+ */
+export const LINK_ROLE_INVERSE: Partial<Record<LinkRole, LinkRole>> = {
+  "calls": "serves",
+  "serves": "calls",
+  "part-of": "contains",
+  "contains": "part-of",
+}
+
+// Reuses CONNECTOR_TYPES for the protocol enum so existing form
+// pickers, drawio export, and validator entries all stay valid.
+export const LINK_PROTOCOLS: LinkProtocol[] = [
+  "rest",
+  "grpc",
+  "async",
+  "db",
+  "file",
+  "human",
+  "info",
+  "link",
+  "data",
+]
+
+export const LINK_ROLE_COLORS: Record<LinkRole, string> = {
+  "calls":      "bg-blue-100 text-blue-800 border-blue-300",
+  "serves":     "bg-emerald-100 text-emerald-800 border-emerald-300",
+  "part-of":    "bg-purple-100 text-purple-800 border-purple-300",
+  "contains":   "bg-purple-100 text-purple-800 border-purple-300",
+  "reads-from": "bg-amber-100 text-amber-800 border-amber-300",
+  "writes-to":  "bg-rose-100 text-rose-800 border-rose-300",
+}
+
 export const CAPABILITY_ROLES: CapabilityRole[] = [
   "owner",
   "contributor",

@@ -37,7 +37,7 @@ import {
 
 interface Issue {
   id: string
-  category: "relationships" | "interfaces" | "data"
+  category: "links" | "data"
   applyTo: string
   applyToName: string
   declaredOn: string
@@ -58,16 +58,13 @@ type RowState =
   | { kind: "error"; message: string }
 
 const CATEGORY_HEADINGS: Record<Issue["category"], string> = {
-  relationships: "Relationships",
-  interfaces: "Interfaces",
+  links: "Links",
   data: "Data flow",
 }
 
 const CATEGORY_DESCRIPTIONS: Record<Issue["category"], string> = {
-  relationships:
-    "parent-of ↔ child-of and communicates-with ↔ communicates-with mirror pairs",
-  interfaces:
-    "provides ↔ consumes mirror, same connector type and target",
+  links:
+    "calls ↔ serves and part-of ↔ contains mirror pairs (reads-from / writes-to stay directional)",
   data:
     "inputs[].source ↔ outputs[].consumers — matching name + reciprocal references",
 }
@@ -166,8 +163,7 @@ export function ConsistencyCheckDialog() {
 
   // Group issues by category for the rendered list.
   const grouped: Record<Issue["category"], Issue[]> = {
-    relationships: [],
-    interfaces: [],
+    links: [],
     data: [],
   }
   for (const it of issues || []) grouped[it.category].push(it)
@@ -258,7 +254,7 @@ export function ConsistencyCheckDialog() {
 
             {issues.length > 0 && (
               <div className="space-y-5">
-                {(["relationships", "interfaces", "data"] as const).map((cat) => {
+                {(["links", "data"] as const).map((cat) => {
                   const items = grouped[cat]
                   if (items.length === 0) return null
                   return (

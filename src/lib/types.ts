@@ -1,3 +1,68 @@
+// -------------------------- v2 schema: ComponentLink --------------------------
+//
+// `links[]` replaces the legacy `interfaces[]` and `relationships[]`
+// arrays. One primitive describes every edge between this component
+// and another. Six roles cover the cases the old shape carried:
+//
+//   calls       — this actively calls / consumes from target
+//                 (was: interfaces[provides=consumes], relationships[depends-on],
+//                  relationships[communicates-with], relationships[fallback])
+//   serves      — this exposes / provides to target
+//                 (was: interfaces[provides])
+//   part-of     — this is contained in target
+//                 (was: relationships[child-of])
+//   contains    — this contains target
+//                 (was: relationships[parent-of])
+//   reads-from  — this reads data from target
+//                 (was: relationships[reads-from])
+//   writes-to   — this writes data to target
+//                 (was: relationships[writes-to])
+//
+// Mirror pairs (consistency check + UI dedup):
+//   calls    ↔ serves
+//   part-of  ↔ contains
+//
+// `reads-from` / `writes-to` are directional with no required reverse
+// (the target is passive — typically a database / storage / queue).
+
+export type LinkRole =
+  | "calls"
+  | "serves"
+  | "part-of"
+  | "contains"
+  | "reads-from"
+  | "writes-to"
+
+export type LinkProtocol =
+  | "rest"
+  | "grpc"
+  | "async"
+  | "db"
+  | "file"
+  | "human"
+  | "info"
+  | "link"
+  | "data"
+
+export interface ComponentLink {
+  /** Component id OR free-form external label. */
+  target: string
+  role: LinkRole
+  /** Optional — typically omitted for `part-of` / `contains`. */
+  protocol?: LinkProtocol
+  /** Short human label — e.g. "Orders API", "Stock checker". */
+  name?: string
+  /** What happens on this edge. */
+  description?: string
+}
+
+// -------------------------- legacy shapes --------------------------
+
+/**
+ * @deprecated v2: superseded by ComponentLink with role `calls` / `serves`.
+ * Read-time migration in `migrateComponent` converts every entry into
+ * `links[]` and drops this field on the next save.
+ */
 export interface ComponentInterface {
   /**
    * Short human-readable name for the interface — e.g. "Orders API",
@@ -30,6 +95,11 @@ export type RelationshipType =
   | "writes-to"
   | "fallback"
 
+/**
+ * @deprecated v2: superseded by ComponentLink with role mapped per
+ * the table in §LinkRole above. Read-time migration converts every
+ * entry into `links[]` and drops this field on the next save.
+ */
 export interface ComponentRelationship {
   target: string
   type: RelationshipType
@@ -196,6 +266,16 @@ export interface ComponentDataModelLink {
 }
 
 export interface Component {
+  /**
+   * On-disk schema version.
+   *   `undefined` / `1` → legacy (interfaces + relationships authoritative).
+   *   `2` → v2, links[] authoritative; legacy fields absent.
+   *
+   * The read-time migration in `migrateComponent` sets this to 2 in
+   * memory whenever it populates `links[]`. The first save after that
+   * persists v2 and drops the legacy fields from disk.
+   */
+  schema_version?: number
   id: string
   name: string
   type: ComponentType
@@ -204,8 +284,12 @@ export interface Component {
   owner: string
   tags: string[]
   description: ComponentDescription
-  interfaces: ComponentInterface[]
-  relationships: ComponentRelationship[]
+  /** v2 — single primitive for every edge to another component. */
+  links?: ComponentLink[]
+  /** @deprecated v2: read-migrated to links[], dropped on next save. */
+  interfaces?: ComponentInterface[]
+  /** @deprecated v2: read-migrated to links[], dropped on next save. */
+  relationships?: ComponentRelationship[]
   risks?: string[]
   /** @deprecated use `capabilities` (rich object) instead. Migrated at read time. */
   business_capabilities?: string[]

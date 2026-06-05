@@ -25,6 +25,8 @@ import {
   CAPABILITY_ROLES,
   PROCESS_ROLES,
   RULE_KINDS,
+  LINK_ROLES,
+  LINK_PROTOCOLS,
 } from "./constants"
 import type { Component } from "./types"
 
@@ -53,6 +55,7 @@ export type ValidateResult =
 // ---------- known field sets ----------
 
 const KNOWN_TOP_LEVEL = new Set<string>([
+  "schema_version",
   "id",
   "name",
   "type",
@@ -60,8 +63,9 @@ const KNOWN_TOP_LEVEL = new Set<string>([
   "owner",
   "tags",
   "description",
-  "interfaces",
-  "relationships",
+  "links",                 // v2 — single primitive for every edge
+  "interfaces",            // legacy, migrated at read time
+  "relationships",         // legacy, migrated at read time
   "risks",
   "business_capabilities", // legacy, migrated at read time
   "capabilities",
@@ -76,6 +80,7 @@ const KNOWN_TOP_LEVEL = new Set<string>([
 const KNOWN_DESCRIPTION = new Set(["oneliner", "description", "technical", "business"])
 const KNOWN_INTERFACE = new Set(["name", "direction", "type", "target", "description"])
 const KNOWN_RELATIONSHIP = new Set(["target", "type", "connector", "description"])
+const KNOWN_LINK = new Set(["target", "role", "protocol", "name", "description"])
 const KNOWN_NFR = new Set([
   "availability",
   "rto",
@@ -331,7 +336,7 @@ export function validateComponentYaml(text: string): ValidateResult {
         if (typeof iface.description !== "string") {
           errors.push({ path: `${p}.description`, message: "description is required." })
         }
-        out.push(iface as unknown as Component["interfaces"][number])
+        out.push(iface as unknown as NonNullable<Component["interfaces"]>[number])
       })
       interfaces = out
     }
@@ -377,9 +382,64 @@ export function validateComponentYaml(text: string): ValidateResult {
             message: `connector must be one of: ${CONNECTOR_TYPES.join(", ")}.`,
           })
         }
-        out.push(rel as unknown as Component["relationships"][number])
+        out.push(rel as unknown as NonNullable<Component["relationships"]>[number])
       })
       relationships = out
+    }
+  }
+
+  // --- links (v2) ---
+  let links: Component["links"]
+  if (raw.links !== undefined) {
+    if (!Array.isArray(raw.links)) {
+      errors.push({ path: "links", message: "links must be a list." })
+    } else {
+      const out: NonNullable<Component["links"]> = []
+      raw.links.forEach((link, i) => {
+        const p = `links[${i}]`
+        if (!isPlainObject(link)) {
+          errors.push({ path: p, message: "Must be an object." })
+          return
+        }
+        for (const k of Object.keys(link)) {
+          if (!KNOWN_LINK.has(k)) {
+            warnings.push({ path: `${p}.${k}`, message: "Unknown field — ignored." })
+          }
+        }
+        if (typeof link.target !== "string" || link.target.trim() === "") {
+          errors.push({ path: `${p}.target`, message: "target is required." })
+        }
+        if (
+          typeof link.role !== "string" ||
+          !LINK_ROLES.includes(link.role as (typeof LINK_ROLES)[number])
+        ) {
+          errors.push({
+            path: `${p}.role`,
+            message: `role must be one of: ${LINK_ROLES.join(", ")}.`,
+          })
+        }
+        if (
+          link.protocol !== undefined &&
+          (typeof link.protocol !== "string" ||
+            !LINK_PROTOCOLS.includes(link.protocol as (typeof LINK_PROTOCOLS)[number]))
+        ) {
+          errors.push({
+            path: `${p}.protocol`,
+            message: `protocol must be one of: ${LINK_PROTOCOLS.join(", ")}.`,
+          })
+        }
+        if (link.name !== undefined && typeof link.name !== "string") {
+          errors.push({ path: `${p}.name`, message: "name must be a string when provided." })
+        }
+        if (link.description !== undefined && typeof link.description !== "string") {
+          errors.push({
+            path: `${p}.description`,
+            message: "description must be a string when provided.",
+          })
+        }
+        out.push(link as unknown as NonNullable<Component["links"]>[number])
+      })
+      links = out
     }
   }
 
@@ -683,9 +743,14 @@ export function validateComponentYaml(text: string): ValidateResult {
     owner,
     tags,
     description,
-    interfaces,
-    relationships,
   }
+  // Legacy edge containers — only emitted when present in the input
+  // (they get migrated to links[] when the YAML is read back via
+  // listComponents / getComponent).
+  if (interfaces !== undefined && interfaces.length > 0) out.interfaces = interfaces
+  if (relationships !== undefined && relationships.length > 0)
+    out.relationships = relationships
+  if (links !== undefined && links.length > 0) out.links = links
   if (risks !== undefined) out.risks = risks
   if (businessCapabilities !== undefined) out.business_capabilities = businessCapabilities
   if (capabilities !== undefined) out.capabilities = capabilities

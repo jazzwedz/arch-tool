@@ -10,8 +10,9 @@ import { TypeIcon } from "@/components/TypeIcon"
 import { StatusBadge } from "@/components/StatusBadge"
 import {
   TYPE_LABELS,
-  RELATIONSHIP_LABELS,
-  INVERSE_RELATIONSHIP_LABELS,
+  LINK_ROLE_LABELS,
+  INVERSE_LINK_ROLE_LABELS,
+  LINK_ROLE_COLORS,
   DATA_CLASSIFICATION_LABELS,
   CAPABILITY_ROLE_LABELS,
   CAPABILITY_ROLE_COLORS,
@@ -22,7 +23,7 @@ import {
   RULE_KIND_LABELS,
   RULE_KIND_COLORS,
 } from "@/lib/constants"
-import type { ComponentWithSha } from "@/lib/types"
+import type { ComponentWithSha, ComponentLink, LinkRole } from "@/lib/types"
 import {
   ArrowLeft,
   Copy,
@@ -66,7 +67,6 @@ import {
 } from "@/components/ui/select"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import {
-  buildInterfacesMermaid,
   buildRelationshipsMermaid,
   buildCapabilitiesMermaid,
   buildIOMermaid,
@@ -133,35 +133,17 @@ export default function ComponentDetailPage() {
     [allComponents]
   )
 
-  // Inbound interface backlinks — "which other components point at me
-  // via interfaces[].target". Computed by the server.
-  type InboundInterfaceRef = {
+  // v2 — inbound link backlinks. Single endpoint scans every
+  // component's links[] looking for matches on `target === this.id`.
+  // Replaces the legacy inbound-interfaces + inbound-relationships
+  // pair (both now obsolete since v1 fields are dropped on save).
+  type InboundLinkRef = {
     id: string
     name: string
     type: string
-    iface: {
-      name?: string
-      direction: "provides" | "consumes"
-      type: string
-      target?: string
-      description: string
-    }
+    link: ComponentLink
   }
-  const [inboundInterfaces, setInboundInterfaces] = useState<InboundInterfaceRef[] | null>(null)
-  // Inbound relationship backlinks — "which other components point at
-  // me via relationships[].target".
-  type InboundRelationshipRef = {
-    id: string
-    name: string
-    type: string
-    relationship: {
-      target: string
-      type: string
-      connector?: string
-      description?: string
-    }
-  }
-  const [inboundRelationships, setInboundRelationships] = useState<InboundRelationshipRef[] | null>(null)
+  const [inboundLinks, setInboundLinks] = useState<InboundLinkRef[] | null>(null)
   // Inbound data backlinks — "other components that point at me via
   // their inputs[].source or outputs[].consumers". Two `via` values
   // distinguish the two directions in the response.
@@ -181,59 +163,55 @@ export default function ComponentDetailPage() {
   }
   const [inboundData, setInboundData] = useState<InboundDataRef[] | null>(null)
 
-  // Unified relationships list — outbound (declared on this component)
-  // PLUS inbound inverted (declared on other components, presented from
-  // this side using INVERSE_RELATIONSHIP_LABELS). The user-facing
-  // Relationships section renders ONE merged list so the analyst sees
-  // "Parent of X" on the parent's page regardless of whether the
-  // parent declared `parent-of: X` or X declared `child-of: parent`.
-  //
-  // Dedupe key: `displayLabel + target`. Both sides legitimately
-  // declaring the same logical edge (e.g. A:parent-of:B + B:child-of:A)
-  // collapses to a single row, with the outbound side winning so the
-  // editable connector/description from THIS component's YAML stays.
-  type UnifiedRelationship = {
+  // v2 — unified links list. Outbound (declared on this component)
+  // PLUS inbound inverted (declared on other components, presented
+  // from this side via INVERSE_LINK_ROLE_LABELS). Same dedup rule as
+  // the previous combinedLinks: when both sides declared the
+  // same logical edge (e.g. A.calls:B + B.serves:A) only one row is
+  // shown, with the outbound side winning.
+  type UnifiedLink = {
     target: string
+    role: LinkRole
     displayLabel: string
-    connector?: string
+    protocol?: string
+    name?: string
     description?: string
     isInverse: boolean
     /** When inverse, the name of the component that declared it. */
     declaredOn?: string
   }
-  const combinedRelationships = useMemo<UnifiedRelationship[]>(() => {
-    const outbound: UnifiedRelationship[] = (component?.relationships || []).map(
-      (rel) => ({
-        target: rel.target,
-        displayLabel: RELATIONSHIP_LABELS[rel.type] || rel.type,
-        connector: rel.connector,
-        description: rel.description,
-        isInverse: false,
-      })
-    )
+  const combinedLinks = useMemo<UnifiedLink[]>(() => {
+    const outbound: UnifiedLink[] = (component?.links || []).map((l) => ({
+      target: l.target,
+      role: l.role,
+      displayLabel: LINK_ROLE_LABELS[l.role] || l.role,
+      protocol: l.protocol,
+      name: l.name,
+      description: l.description,
+      isInverse: false,
+    }))
     const outboundKeys = new Set(
       outbound.map((r) => `${r.displayLabel}::${r.target}`)
     )
-    const inverted: UnifiedRelationship[] = (inboundRelationships || []).map(
-      (ref) => ({
-        target: ref.id,
-        displayLabel:
-          INVERSE_RELATIONSHIP_LABELS[ref.relationship.type] ||
-          ref.relationship.type,
-        connector: ref.relationship.connector,
-        description: ref.relationship.description,
-        isInverse: true,
-        declaredOn: ref.name,
-      })
-    )
-    // Drop inverse rows that duplicate an explicit outbound row.
+    const inverted: UnifiedLink[] = (inboundLinks || []).map((ref) => ({
+      target: ref.id,
+      role: ref.link.role,
+      displayLabel:
+        INVERSE_LINK_ROLE_LABELS[ref.link.role] || ref.link.role,
+      protocol: ref.link.protocol,
+      name: ref.link.name,
+      description: ref.link.description,
+      isInverse: true,
+      declaredOn: ref.name,
+    }))
     const filteredInverse = inverted.filter(
       (r) => !outboundKeys.has(`${r.displayLabel}::${r.target}`)
     )
     return [...outbound, ...filteredInverse]
-  }, [component, inboundRelationships])
+  }, [component, inboundLinks])
   // Per-section visualization toggles
-  const [showInterfacesViz, setShowInterfacesViz] = useState(false)
+  // v2: only one viz toggle now — the unified Links card uses the
+  // existing setShowRelationshipsViz state for backward continuity.
   const [showRelationshipsViz, setShowRelationshipsViz] = useState(false)
   const [showCapabilitiesViz, setShowCapabilitiesViz] = useState(false)
   const [showIOViz, setShowIOViz] = useState(false)
@@ -323,19 +301,12 @@ export default function ComponentDetailPage() {
       .then((data) => setAllComponents(Array.isArray(data) ? data : []))
       .catch(() => setAllComponents([]))
 
-    // Inbound interface backlinks — populates the "Referenced by
-    // interfaces from" card below the Interfaces card.
-    fetch(`/api/components/${encodeURIComponent(id)}/inbound-interfaces`)
+    // v2 — single inbound-links endpoint replaces the legacy
+    // inbound-interfaces + inbound-relationships pair.
+    fetch(`/api/components/${encodeURIComponent(id)}/inbound-links`)
       .then(async (r) => (r.ok ? r.json() : []))
-      .then((data) => setInboundInterfaces(Array.isArray(data) ? data : []))
-      .catch(() => setInboundInterfaces([]))
-
-    // Inbound relationship backlinks — mirrors the interfaces sub-route
-    // but scans relationships[].target instead.
-    fetch(`/api/components/${encodeURIComponent(id)}/inbound-relationships`)
-      .then(async (r) => (r.ok ? r.json() : []))
-      .then((data) => setInboundRelationships(Array.isArray(data) ? data : []))
-      .catch(() => setInboundRelationships([]))
+      .then((data) => setInboundLinks(Array.isArray(data) ? data : []))
+      .catch(() => setInboundLinks([]))
 
     // Inbound data backlinks — components that reference this one as
     // an input source or output consumer, surfaced in the Business tab.
@@ -871,7 +842,7 @@ export default function ComponentDetailPage() {
                   chart={buildHeroContextMermaid(
                     component,
                     nameLookup,
-                    combinedRelationships
+                    combinedLinks
                   )}
                 />
               </CardContent>
@@ -1396,207 +1367,36 @@ export default function ComponentDetailPage() {
         </Card>
         )}
 
-        {/* Interfaces */}
-        {tab === "technical" && isBlockVisible(uiBlocks, "technical", "interfaces") && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                Interfaces
-                <Tooltip>
-                  <TooltipTrigger className="cursor-help">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs">
-                    What this component exposes to others (provides) and what it consumes from other components. Interfaces describe the API surface — the protocols, directions, and purposes of each connection point.
-                  </TooltipContent>
-                </Tooltip>
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowInterfacesViz((v) => !v)}
-                disabled={component.interfaces.length === 0}
-                title="Visualize interfaces as a flow diagram"
-              >
-                {showInterfacesViz ? (
-                  <EyeOff className="h-4 w-4 mr-1" />
-                ) : (
-                  <Eye className="h-4 w-4 mr-1" />
-                )}
-                Visualize
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {component.interfaces.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No interfaces defined.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {component.interfaces.map((iface, i) => {
-                  // Resolve the target string against the catalog snapshot —
-                  // when it matches a known component id, render as a link
-                  // with the type icon so the analyst can click through.
-                  const linkedTarget = iface.target
-                    ? allComponents.find((c) => c.id === iface.target)
-                    : undefined
-                  return (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 text-sm border-b last:border-0 pb-2"
-                  >
-                    <Badge
-                      variant={
-                        iface.direction === "provides" ? "default" : "outline"
-                      }
-                      className="text-xs w-20 justify-center"
-                    >
-                      {iface.direction}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {iface.type}
-                    </Badge>
-                    {/* Name primary when set; description shown next to it
-                        as muted context. Older entries (no name) keep
-                        the description as the primary label. */}
-                    {iface.name ? (
-                      <span className="flex-1 flex items-baseline gap-2 min-w-0">
-                        <span className="font-medium truncate">{iface.name}</span>
-                        {iface.description && (
-                          <span className="text-muted-foreground text-xs truncate">
-                            — {iface.description}
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="flex-1">{iface.description}</span>
-                    )}
-                    {iface.target && (
-                      linkedTarget ? (
-                        <Link
-                          href={`/component/${linkedTarget.id}`}
-                          className="inline-flex items-center gap-1 text-blue-700 hover:underline font-mono text-xs"
-                          title={`Open ${linkedTarget.name}`}
-                        >
-                          <TypeIcon
-                            type={linkedTarget.type as never}
-                            className="h-3 w-3"
-                          />
-                          → {linkedTarget.name}
-                        </Link>
-                      ) : (
-                        <span
-                          className="text-muted-foreground font-mono text-xs"
-                          title="External label — no matching component in catalog"
-                        >
-                          → {iface.target}
-                        </span>
-                      )
-                    )}
-                  </div>
-                  )
-                })}
-              </div>
-            )}
-            {showInterfacesViz && component.interfaces.length > 0 && (
-              <div className="mt-4 border-t pt-3">
-                <MermaidPreview chart={buildInterfacesMermaid(component, nameLookup)} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        )}
+        {/* v2: Interfaces + Relationships unified into the Links card
+            below. Inbound versions of both are merged into that same
+            card with their inverse role labels (calls ↔ serves,
+            part-of ↔ contains), so the analyst sees one list. */}
 
-        {/* Inbound interfaces (backlinks) — "who points at me".
-            Sits in the same Technical tab as Interfaces and is gated
-            by the same visibility flag so the two halves of the
-            interface story stay together. */}
-        {tab === "technical" &&
-          isBlockVisible(uiBlocks, "technical", "interfaces") &&
-          inboundInterfaces !== null &&
-          inboundInterfaces.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Referenced by interfaces from
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help">
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-xs">
-                      Other components that name this one as the target of one
-                      of their interfaces. Direction is shown from the source
-                      component&apos;s perspective.
-                    </TooltipContent>
-                  </Tooltip>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {inboundInterfaces.map((ref, i) => (
-                    <Link
-                      key={`${ref.id}-${i}`}
-                      href={`/component/${ref.id}`}
-                      className="flex items-center gap-3 text-sm p-2 rounded-md hover:bg-muted transition-colors"
-                    >
-                      <TypeIcon
-                        type={ref.type as never}
-                        className="h-4 w-4 text-muted-foreground shrink-0"
-                      />
-                      <span className="font-medium">{ref.name}</span>
-                      <Badge
-                        variant={
-                          ref.iface.direction === "provides"
-                            ? "default"
-                            : "outline"
-                        }
-                        className="text-[10px] w-20 justify-center"
-                      >
-                        {ref.iface.direction}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {ref.iface.type}
-                      </Badge>
-                      {ref.iface.name && (
-                        <span className="text-xs font-medium truncate">
-                          {ref.iface.name}
-                        </span>
-                      )}
-                      {ref.iface.description && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {ref.iface.description}
-                        </span>
-                      )}
-                    </Link>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-        {/* Relationships */}
+        {/* Links — v2 unified edges card */}
         {tab === "technical" && isBlockVisible(uiBlocks, "technical", "relationships") && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                Relationships
+                Links
                 <Tooltip>
                   <TooltipTrigger className="cursor-help">
                     <Info className="h-4 w-4 text-muted-foreground" />
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs text-left">
-                    <p className="font-semibold mb-1">How this component relates to others:</p>
+                  <TooltipContent side="right" className="max-w-sm text-left">
+                    <p className="font-semibold mb-1">Every edge to another component:</p>
                     <ul className="text-xs space-y-0.5">
-                      <li><strong>Parent of</strong> — contains/owns another component</li>
-                      <li><strong>Child of</strong> — belongs to a parent component</li>
-                      <li><strong>Depends on</strong> — requires another to function</li>
-                      <li><strong>Communicates with</strong> — exchanges data with a peer</li>
-                      <li><strong>Reads / Writes</strong> — directional data flow</li>
-                      <li><strong>Fallback for</strong> — backup when another is unavailable</li>
+                      <li><strong>Calls</strong> — this actively calls / consumes from target</li>
+                      <li><strong>Serves</strong> — this exposes / provides to target</li>
+                      <li><strong>Part of</strong> — this is contained in target</li>
+                      <li><strong>Contains</strong> — this contains target</li>
+                      <li><strong>Reads from</strong> — this reads data from target</li>
+                      <li><strong>Writes to</strong> — this writes data to target</li>
                     </ul>
+                    <p className="text-xs mt-1 text-muted-foreground">
+                      Inbound rows (declared on other components) are
+                      merged in with their inverse label.
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </CardTitle>
@@ -1604,8 +1404,8 @@ export default function ComponentDetailPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowRelationshipsViz((v) => !v)}
-                disabled={combinedRelationships.length === 0}
-                title="Visualize relationships as a graph"
+                disabled={combinedLinks.length === 0}
+                title="Visualize links as a graph"
               >
                 {showRelationshipsViz ? (
                   <EyeOff className="h-4 w-4 mr-1" />
@@ -1617,23 +1417,22 @@ export default function ComponentDetailPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {combinedRelationships.length === 0 ? (
+            {combinedLinks.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No relationships defined.
+                No links defined.
               </p>
             ) : (
               <div className="space-y-2">
-                {combinedRelationships.map((rel, i) => {
-                  // Resolve target against the catalog snapshot. When
-                  // the target exists, render the name + type icon and
-                  // make the row a working link. When the target has
-                  // been deleted (or was a typo), drop the link, show
-                  // a "missing" warning badge, and surface the raw id.
+                {combinedLinks.map((rel, i) => {
+                  // Resolve target against the catalog snapshot.
                   const targetComp = allComponents.find((c) => c.id === rel.target)
                   const body = (
                     <>
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      <Badge variant="outline" className="text-xs shrink-0">
+                      <Badge
+                        variant="outline"
+                        className={`text-xs shrink-0 ${LINK_ROLE_COLORS[rel.role] || ""}`}
+                      >
                         {rel.displayLabel}
                       </Badge>
                       {targetComp ? (
@@ -1655,22 +1454,21 @@ export default function ComponentDetailPage() {
                           </Badge>
                         </span>
                       )}
-                      {rel.connector && (
+                      {rel.protocol && (
                         <Badge variant="secondary" className="text-xs">
-                          {rel.connector}
+                          {rel.protocol}
                         </Badge>
+                      )}
+                      {rel.name && (
+                        <span className="text-xs font-medium truncate">
+                          {rel.name}
+                        </span>
                       )}
                       {rel.description && (
                         <span className="text-muted-foreground text-xs truncate">
                           {rel.description}
                         </span>
                       )}
-                      {/* Inverse rows are derived from the other
-                          component's YAML — surface that on hover so
-                          the analyst knows where to go if they need to
-                          edit the underlying declaration. No badge in
-                          the row body — keep visual parity with
-                          outbound rows per request. */}
                     </>
                   )
                   const titleAttr = rel.isInverse
@@ -1697,13 +1495,13 @@ export default function ComponentDetailPage() {
                 })}
               </div>
             )}
-            {showRelationshipsViz && combinedRelationships.length > 0 && (
+            {showRelationshipsViz && combinedLinks.length > 0 && (
               <div className="mt-4 border-t pt-3">
                 <MermaidPreview
                   chart={buildRelationshipsMermaid(
                     component,
                     nameLookup,
-                    combinedRelationships
+                    combinedLinks
                   )}
                 />
               </div>

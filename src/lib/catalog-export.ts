@@ -22,11 +22,11 @@
 // so the same input always produces byte-identical output (handy when
 // piping into git or diffing across days).
 
-import type { Component, ComponentInterface, DataItem } from "./types"
+import type { Component, ComponentLink, DataItem } from "./types"
 import {
   TYPE_LABELS,
-  RELATIONSHIP_LABELS,
-  INVERSE_RELATIONSHIP_LABELS,
+  LINK_ROLE_LABELS,
+  INVERSE_LINK_ROLE_LABELS,
   DATA_KIND_LABELS,
   CAPABILITY_ROLE_LABELS,
   PROCESS_ROLE_LABELS,
@@ -44,8 +44,8 @@ export interface CatalogExportOptions {
 }
 
 interface BacklinkBundle {
-  relationships: Array<{ from: Component; type: string; connector?: string; description?: string }>
-  interfaces: Array<{ from: Component; iface: ComponentInterface }>
+  /** v2: unified `links` source replaces the legacy relationships + interfaces split. */
+  links: Array<{ from: Component; link: ComponentLink }>
   inputSources: Array<{ from: Component; dataItem: DataItem }>
   outputConsumers: Array<{ from: Component; dataItem: DataItem }>
 }
@@ -362,37 +362,24 @@ function renderComponent(c: Component, backlinks: Map<string, BacklinkBundle>): 
   }
   lines.push(``)
 
-  // Interfaces
-  lines.push(`**Interfaces (${(c.interfaces || []).length})**`)
+  // v2 — single Links section replaces the legacy
+  // Interfaces + Outbound relationships pair. Read every edge from
+  // `links[]` and present role / protocol / target / description.
+  const links = c.links || []
+  lines.push(`**Links (${links.length})**`)
   lines.push(``)
-  if ((c.interfaces || []).length === 0) {
+  if (links.length === 0) {
     lines.push(MISSING_LIST)
   } else {
-    for (const iface of c.interfaces) {
-      const head = iface.name ? `"${iface.name}"` : ""
-      const target = iface.target ? ` → \`${iface.target}\`` : " → (no target)"
-      lines.push(
-        `- [${iface.direction}] [${iface.type}] ${head}${target}`
-      )
-      if (iface.description?.trim()) {
-        lines.push(`  ${iface.description.trim()}`)
+    for (const link of links) {
+      const role = LINK_ROLE_LABELS[link.role] ?? link.role
+      const proto = link.protocol ? ` [${link.protocol}]` : ""
+      const head = link.name ? ` "${link.name}"` : ""
+      const target = link.target ? ` → \`${link.target}\`` : " → (no target)"
+      lines.push(`- ${role}${proto}${head}${target}`)
+      if (link.description?.trim()) {
+        lines.push(`  ${link.description.trim()}`)
       }
-    }
-  }
-  lines.push(``)
-
-  // Outbound relationships
-  lines.push(`**Outbound relationships (${(c.relationships || []).length})**`)
-  lines.push(``)
-  if ((c.relationships || []).length === 0) {
-    lines.push(MISSING_LIST)
-  } else {
-    for (const rel of c.relationships) {
-      const label = RELATIONSHIP_LABELS[rel.type] ?? rel.type
-      const conn = rel.connector ? ` (${rel.connector})` : ""
-      lines.push(
-        `- ${label} → \`${rel.target || "(no target)"}\`${conn}${rel.description ? ` — ${rel.description}` : ""}`
-      )
     }
   }
   lines.push(``)
@@ -401,24 +388,16 @@ function renderComponent(c: Component, backlinks: Map<string, BacklinkBundle>): 
   const bl = backlinks.get(c.id)
   lines.push(`**Inbound (declared on other components)**`)
   lines.push(``)
-  if (!bl || (bl.relationships.length === 0 && bl.interfaces.length === 0 && bl.inputSources.length === 0 && bl.outputConsumers.length === 0)) {
+  if (!bl || (bl.links.length === 0 && bl.inputSources.length === 0 && bl.outputConsumers.length === 0)) {
     lines.push(MISSING_BLOCK)
   } else {
-    if (bl.relationships.length > 0) {
-      lines.push(`- *Relationships pointing here:*`)
-      for (const r of bl.relationships) {
-        const inv =
-          INVERSE_RELATIONSHIP_LABELS[r.type] ?? r.type
+    if (bl.links.length > 0) {
+      lines.push(`- *Links pointing here:*`)
+      for (const r of bl.links) {
+        const inv = INVERSE_LINK_ROLE_LABELS[r.link.role] ?? r.link.role
+        const proto = r.link.protocol ? ` [${r.link.protocol}]` : ""
         lines.push(
-          `  - ${r.from.name} (\`${r.from.id}\`) declares "${r.type}" → reads here as "${inv}"`
-        )
-      }
-    }
-    if (bl.interfaces.length > 0) {
-      lines.push(`- *Interfaces pointing here:*`)
-      for (const r of bl.interfaces) {
-        lines.push(
-          `  - ${r.from.name} (\`${r.from.id}\`) ${r.iface.direction} ${r.iface.type}${r.iface.name ? ` "${r.iface.name}"` : ""}`
+          `  - ${r.from.name} (\`${r.from.id}\`) declares "${r.link.role}"${proto} → reads here as "${inv}"`
         )
       }
     }
@@ -620,8 +599,7 @@ function buildBacklinkIndex(components: Component[]): Map<string, BacklinkBundle
     let bundle = map.get(id)
     if (!bundle) {
       bundle = {
-        relationships: [],
-        interfaces: [],
+        links: [],
         inputSources: [],
         outputConsumers: [],
       }
@@ -631,18 +609,12 @@ function buildBacklinkIndex(components: Component[]): Map<string, BacklinkBundle
   }
 
   for (const c of components) {
-    for (const rel of c.relationships || []) {
-      if (!rel.target) continue
-      ensure(rel.target).relationships.push({
-        from: c,
-        type: rel.type,
-        connector: rel.connector,
-        description: rel.description,
-      })
-    }
-    for (const iface of c.interfaces || []) {
-      if (!iface.target) continue
-      ensure(iface.target).interfaces.push({ from: c, iface })
+    // v2: scan unified links[] instead of separate
+    // relationships[] / interfaces[] arrays. Migration in
+    // github.ts has already collapsed legacy data into links.
+    for (const link of c.links || []) {
+      if (!link.target) continue
+      ensure(link.target).links.push({ from: c, link })
     }
     for (const inp of c.data?.inputs || []) {
       if (!inp.source) continue

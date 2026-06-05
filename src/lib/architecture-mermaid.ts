@@ -24,7 +24,7 @@
 // is a pure string producer.
 
 import type { Component } from "./types"
-import { RELATIONSHIP_LABELS, TYPE_COLORS, TYPE_LABELS } from "./constants"
+import { TYPE_COLORS, TYPE_LABELS } from "./constants"
 
 export interface ArchitectureMermaidOptions {
   showRelationships: boolean
@@ -157,54 +157,44 @@ function collectEdges(
     if (!seen.has(key)) seen.set(key, e)
   }
 
-  // Relationships
-  if (options.showRelationships) {
-    for (const c of components) {
-      for (const rel of c.relationships || []) {
-        if (!rel.target) continue
-        // Normalise inverse pairs to one canonical direction so two
-        // declarations of the same architectural fact do not become
-        // two arrows.
-        let from = c.id
-        let to = rel.target
-        let type = rel.type
-        if (type === "child-of") {
-          ;[from, to] = [to, from]
-          type = "parent-of"
-        } else if (type === "communicates-with" && from > to) {
-          // Symmetric — pick a stable canonical orientation by id.
-          ;[from, to] = [to, from]
-        }
-        push({
-          from,
-          to,
-          label: RELATIONSHIP_LABELS[type] || type,
-          style: "relationship",
-        })
-      }
-    }
-  }
+  // v2: links[] replaces both relationships[] and interfaces[]. The
+  // Relationships toggle covers `part-of` / `contains` / `reads-from`
+  // / `writes-to` (structural and data-direction roles), the
+  // Interfaces toggle covers `calls` / `serves` (active API edges).
+  // Direction is normalised so mirror pairs collapse to one arrow.
+  for (const c of components) {
+    for (const link of c.links || []) {
+      if (!link.target) continue
 
-  // Interfaces — normalise to consumer → provider so the diagram reads
-  // as "B uses A's API".
-  if (options.showInterfaces) {
-    for (const c of components) {
-      for (const iface of c.interfaces || []) {
-        if (!iface.target) continue
-        let from: string
-        let to: string
-        if (iface.direction === "provides") {
-          // c provides — caller is iface.target, provider is c
-          from = iface.target
-          to = c.id
-        } else {
-          // c consumes — caller is c, provider is iface.target
-          from = c.id
-          to = iface.target
-        }
-        const label = iface.name || iface.type
-        push({ from, to, label, style: "interface" })
+      const isInterfaceRole = link.role === "calls" || link.role === "serves"
+      const isRelationshipRole = !isInterfaceRole
+      if (isInterfaceRole && !options.showInterfaces) continue
+      if (isRelationshipRole && !options.showRelationships) continue
+
+      // Direction normalisation per role:
+      //   calls    — already source → target
+      //   serves   — flip so caller (target) → provider (source)
+      //   contains — already source → target (parent → child)
+      //   part-of  — flip so parent (target) → child (source) becomes parent → child
+      //   reads-from / writes-to — keep source → target literal
+      let from = c.id
+      let to = link.target
+      let canonicalLabel = link.role
+      if (link.role === "serves") {
+        ;[from, to] = [to, from]
+        canonicalLabel = "calls"
+      } else if (link.role === "part-of") {
+        ;[from, to] = [to, from]
+        canonicalLabel = "contains"
       }
+
+      const label = link.name || link.protocol || canonicalLabel
+      push({
+        from,
+        to,
+        label,
+        style: isInterfaceRole ? "interface" : "relationship",
+      })
     }
   }
 

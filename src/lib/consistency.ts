@@ -39,21 +39,19 @@
 
 import type {
   Component,
-  ComponentInterface,
-  ComponentRelationship,
+  ComponentLink,
   DataItem,
-  RelationshipType,
 } from "./types"
+import { LINK_ROLE_INVERSE, LINK_ROLE_LABELS } from "./constants"
 
 export type ConsistencyFix =
-  | { kind: "addRelationship"; relationship: ComponentRelationship }
-  | { kind: "addInterface"; interface: ComponentInterface }
+  | { kind: "addLink"; link: ComponentLink }
   | { kind: "addOutput"; dataItem: DataItem }
   | { kind: "addInput"; dataItem: DataItem }
   | { kind: "addOutputConsumer"; outputName: string; consumerId: string }
   | { kind: "setInputSource"; inputName: string; sourceId: string }
 
-export type IssueCategory = "relationships" | "interfaces" | "data"
+export type IssueCategory = "links" | "data"
 
 export interface ConsistencyIssue {
   /**
@@ -84,8 +82,7 @@ export function findInconsistencies(components: Component[]): ConsistencyIssue[]
   const byId = new Map<string, Component>(components.map((c) => [c.id, c]))
 
   for (const source of components) {
-    checkRelationships(source, byId, issues)
-    checkInterfaces(source, byId, issues)
+    checkLinks(source, byId, issues)
     checkDataInputs(source, byId, issues)
     checkDataOutputs(source, byId, issues)
   }
@@ -93,9 +90,8 @@ export function findInconsistencies(components: Component[]): ConsistencyIssue[]
   // Sort: by category, then by applyTo name so rows in the same
   // target component cluster visually in the UI.
   const categoryOrder: Record<IssueCategory, number> = {
-    relationships: 0,
-    interfaces: 1,
-    data: 2,
+    links: 0,
+    data: 1,
   }
   return issues.sort((a, b) => {
     const c = categoryOrder[a.category] - categoryOrder[b.category]
@@ -106,107 +102,55 @@ export function findInconsistencies(components: Component[]): ConsistencyIssue[]
   })
 }
 
-// --- relationships ---
+// --- v2 links: mirror pair check ---
+//
+// Only the mirror-pair roles (calls ↔ serves, part-of ↔ contains) are
+// audited. `reads-from` / `writes-to` are intentionally directional —
+// the target of a data read is passive (database, queue, storage) and
+// is not expected to declare the reciprocal direction.
 
-function inverseRelationshipType(t: RelationshipType): RelationshipType | null {
-  switch (t) {
-    case "parent-of":
-      return "child-of"
-    case "child-of":
-      return "parent-of"
-    case "communicates-with":
-      return "communicates-with"
-    default:
-      return null
-  }
-}
-
-function checkRelationships(
+function checkLinks(
   source: Component,
   byId: Map<string, Component>,
   out: ConsistencyIssue[]
 ): void {
-  for (const rel of source.relationships || []) {
-    if (!rel.target) continue
-    const target = byId.get(rel.target)
-    if (!target) continue // broken ref — surfaced elsewhere
-
-    const inverse = inverseRelationshipType(rel.type)
-    if (!inverse) continue
-
-    const hasInverse = (target.relationships || []).some(
-      (r) => r.target === source.id && r.type === inverse
-    )
-    if (hasInverse) continue
-
-    out.push({
-      id: `rel:${source.id}:${rel.type}:${target.id}`,
-      category: "relationships",
-      applyTo: target.id,
-      applyToName: target.name,
-      declaredOn: source.id,
-      declaredOnName: source.name,
-      title: `${target.name} is missing "${inverse}: ${source.id}"`,
-      details: `${source.name} declares "${rel.type}: ${source.id === target.id ? "self" : target.id}", so ${target.name} should declare "${inverse}: ${source.id}" in return.`,
-      fix: {
-        kind: "addRelationship",
-        relationship: {
-          target: source.id,
-          type: inverse,
-          ...(rel.connector ? { connector: rel.connector } : {}),
-          ...(rel.description ? { description: rel.description } : {}),
-        },
-      },
-    })
-  }
-}
-
-// --- interfaces ---
-
-function checkInterfaces(
-  source: Component,
-  byId: Map<string, Component>,
-  out: ConsistencyIssue[]
-): void {
-  for (const iface of source.interfaces || []) {
-    if (!iface.target) continue
-    const target = byId.get(iface.target)
+  for (const link of source.links || []) {
+    if (!link.target) continue
+    const target = byId.get(link.target)
     if (!target) continue
 
-    const mirrorDir: ComponentInterface["direction"] =
-      iface.direction === "provides" ? "consumes" : "provides"
+    const inverseRole = LINK_ROLE_INVERSE[link.role]
+    if (!inverseRole) continue
 
-    // Match by target + direction + connector type. Multiple interfaces
-    // on the same target with different types are valid distinct edges.
-    const hasMirror = (target.interfaces || []).some(
-      (i) =>
-        i.target === source.id &&
-        i.direction === mirrorDir &&
-        i.type === iface.type
+    // Match key allows multiple distinct edges on the same target with
+    // different protocols (e.g. one calls rest + one calls async to
+    // the same component is two real edges). Mirror lookup matches
+    // target + role + protocol.
+    const hasMirror = (target.links || []).some(
+      (l) =>
+        l.target === source.id &&
+        l.role === inverseRole &&
+        (l.protocol ?? "") === (link.protocol ?? "")
     )
     if (hasMirror) continue
 
     out.push({
-      id: `iface:${source.id}:${iface.direction}:${iface.type}:${target.id}`,
-      category: "interfaces",
+      id: `link:${source.id}:${link.role}:${link.protocol ?? ""}:${target.id}`,
+      category: "links",
       applyTo: target.id,
       applyToName: target.name,
       declaredOn: source.id,
       declaredOnName: source.name,
-      title: `${target.name} is missing a ${mirrorDir} ${iface.type} interface to ${source.id}`,
-      details: `${source.name} ${iface.direction} ${iface.type}${iface.name ? ` (${iface.name})` : ""} ${iface.direction === "provides" ? "to" : "from"} ${source.id}, but ${target.name} doesn't declare the mirror side.`,
+      title: `${target.name} is missing "${inverseRole}: ${source.id}"`,
+      details: `${source.name} declares "${LINK_ROLE_LABELS[link.role]}: ${target.id}"${link.protocol ? ` over ${link.protocol}` : ""}, so ${target.name} should declare "${LINK_ROLE_LABELS[inverseRole]}: ${source.id}" in return.`,
       fix: {
-        kind: "addInterface",
-        interface: {
-          ...(iface.name ? { name: iface.name } : {}),
-          direction: mirrorDir,
-          type: iface.type,
+        kind: "addLink",
+        link: {
           target: source.id,
-          description:
-            iface.description ||
-            (mirrorDir === "consumes"
-              ? `Consumes ${iface.type} from ${source.id}`
-              : `Provides ${iface.type} to ${source.id}`),
+          role: inverseRole,
+          ...(link.protocol ? { protocol: link.protocol } : {}),
+          ...(link.name ? { name: link.name } : {}),
+          ...(link.description ? { description: link.description } : {}),
         },
       },
     })
@@ -359,12 +303,8 @@ export function applyFix(component: Component, fix: ConsistencyFix): Component {
   const next = JSON.parse(JSON.stringify(component)) as Component
 
   switch (fix.kind) {
-    case "addRelationship": {
-      next.relationships = [...(next.relationships || []), fix.relationship]
-      return next
-    }
-    case "addInterface": {
-      next.interfaces = [...(next.interfaces || []), fix.interface]
+    case "addLink": {
+      next.links = [...(next.links || []), fix.link]
       return next
     }
     case "addOutput": {

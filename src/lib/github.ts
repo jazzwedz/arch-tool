@@ -9,7 +9,15 @@
 
 import yaml from "js-yaml"
 import { getGit, GitNotFoundError } from "./git"
-import type { Component, ComponentWithSha, DiagramWithSha } from "./types"
+import type {
+  Component,
+  ComponentWithSha,
+  ComponentLink,
+  DiagramWithSha,
+  LinkRole,
+  LinkProtocol,
+  RelationshipType,
+} from "./types"
 import { getLogger } from "./log"
 
 // Backward compatibility for legacy YAML shapes.
@@ -74,7 +82,127 @@ function migrateComponent(raw: Record<string, any>): Component {
       }
     }
   }
+
+  // ---- v2: collapse interfaces + relationships into links[] ----
+  //
+  // Always idempotent: a YAML already at schema_version >= 2 still
+  // gets a no-op pass (no legacy fields to migrate). The legacy
+  // fields are removed from the in-memory object so neither the form
+  // nor the detail page can accidentally render them; the next save
+  // therefore drops them from disk too.
+  migrateToLinksV2(raw)
+
   return raw as Component
+}
+
+// Translate one legacy relationship type to a v2 link role. Used by
+// both the read-time migration below and by the consistency check's
+// internal mapping.
+function relationshipTypeToLinkRole(t: RelationshipType): LinkRole {
+  switch (t) {
+    case "parent-of":
+      return "contains"
+    case "child-of":
+      return "part-of"
+    case "depends-on":
+      return "calls"
+    case "communicates-with":
+      return "calls"
+    case "reads-from":
+      return "reads-from"
+    case "writes-to":
+      return "writes-to"
+    case "fallback":
+      return "calls"
+  }
+}
+
+function relationshipTypeDescription(
+  t: RelationshipType,
+  existing: string | undefined
+): string | undefined {
+  // Preserve the original description when set; otherwise hint at
+  // the legacy semantic so v1 nuance ("fallback for", "communicates
+  // with") is not silently lost.
+  if (existing && existing.trim()) return existing
+  switch (t) {
+    case "communicates-with":
+      return "Communicates with (bidirectional)"
+    case "fallback":
+      return "Fallback / backup"
+    case "depends-on":
+      return "Depends on"
+    default:
+      return undefined
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateToLinksV2(raw: Record<string, any>): void {
+  const existingLinks: ComponentLink[] = Array.isArray(raw.links)
+    ? (raw.links as ComponentLink[])
+    : []
+  const out: ComponentLink[] = [...existingLinks]
+
+  // Dedupe key on (target, role, protocol?) so an interface that was
+  // already moved to links by a previous save does not get duplicated
+  // by a still-present legacy entry that someone manually re-pasted.
+  const seen = new Set(
+    out.map((l) => `${l.target}::${l.role}::${l.protocol ?? ""}`)
+  )
+  const push = (l: ComponentLink) => {
+    const key = `${l.target}::${l.role}::${l.protocol ?? ""}`
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push(l)
+  }
+
+  // interfaces[] → calls / serves
+  if (Array.isArray(raw.interfaces)) {
+    for (const iface of raw.interfaces) {
+      if (!iface || typeof iface !== "object") continue
+      const target = typeof iface.target === "string" ? iface.target : ""
+      if (!target) continue
+      const role: LinkRole =
+        iface.direction === "provides" ? "serves" : "calls"
+      const link: ComponentLink = { target, role }
+      if (typeof iface.type === "string") link.protocol = iface.type as LinkProtocol
+      if (typeof iface.name === "string" && iface.name.trim()) link.name = iface.name
+      if (typeof iface.description === "string" && iface.description.trim())
+        link.description = iface.description
+      push(link)
+    }
+  }
+
+  // relationships[] → mapped roles
+  if (Array.isArray(raw.relationships)) {
+    for (const rel of raw.relationships) {
+      if (!rel || typeof rel !== "object") continue
+      const target = typeof rel.target === "string" ? rel.target : ""
+      if (!target) continue
+      const t = rel.type as RelationshipType
+      const role = relationshipTypeToLinkRole(t)
+      const link: ComponentLink = { target, role }
+      if (typeof rel.connector === "string" && rel.connector.trim())
+        link.protocol = rel.connector as LinkProtocol
+      const desc = relationshipTypeDescription(
+        t,
+        typeof rel.description === "string" ? rel.description : undefined
+      )
+      if (desc) link.description = desc
+      push(link)
+    }
+  }
+
+  // Always commit the merged list, even when it equals the existing
+  // one — keeps schema_version invariant after a no-op pass.
+  raw.links = out
+  raw.schema_version = 2
+
+  // Drop legacy in-memory so downstream code (form, detail page,
+  // consistency check, mermaid builders) sees a clean v2 object.
+  delete raw.interfaces
+  delete raw.relationships
 }
 
 export async function listComponents(): Promise<Component[]> {
@@ -116,7 +244,13 @@ export async function saveComponent(
 ): Promise<void> {
   const git = getGit()
   const path = `components/${component.id}.yaml`
-  const content = yaml.dump(component, {
+  // Defensive: normalise to v2 shape before serialising. The form
+  // should already hand us a v2 object (links[] populated, no legacy
+  // fields), but consistency-check fixes and the import dialog can
+  // emit either shape, so stripping here is the single chokepoint
+  // that guarantees disk converges to v2 over time.
+  const normalised = normaliseForSave(component)
+  const content = yaml.dump(normalised, {
     lineWidth: -1,
     noRefs: true,
     sortKeys: false,
@@ -125,6 +259,21 @@ export async function saveComponent(
     ? `feat: update component ${component.id}`
     : `feat: add component ${component.id}`
   await git.putFile(path, content, message, sha)
+}
+
+// Strip legacy fields and stamp the v2 schema_version. Idempotent.
+function normaliseForSave(component: Component): Component {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = JSON.parse(JSON.stringify(component)) as Record<string, any>
+  // Drop legacy edge containers — links[] is authoritative on disk.
+  delete raw.interfaces
+  delete raw.relationships
+  // Drop legacy capability shape.
+  delete raw.business_capabilities
+  // Drop empty links to keep the YAML clean.
+  if (Array.isArray(raw.links) && raw.links.length === 0) delete raw.links
+  raw.schema_version = 2
+  return raw as Component
 }
 
 export async function deleteComponent(id: string, sha: string): Promise<void> {

@@ -55,14 +55,9 @@ export function computeMaturity(component: Component): MaturityResult {
       filled: (component.capabilities || []).length > 0,
     },
     {
-      key: "interfaces",
-      label: "Interfaces",
-      filled: (component.interfaces || []).length > 0,
-    },
-    {
-      key: "relationships",
-      label: "Relationships",
-      filled: (component.relationships || []).length > 0,
+      key: "links",
+      label: "Links (relationships & interfaces)",
+      filled: (component.links || []).length > 0,
     },
     {
       key: "nfr",

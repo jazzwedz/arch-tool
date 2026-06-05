@@ -7,6 +7,58 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Refactor — Phase 1: `links[]` replaces `interfaces[]` + `relationships[]`
+
+The component schema gains a single edge primitive: `ComponentLink` with
+six roles (`calls`, `serves`, `part-of`, `contains`, `reads-from`,
+`writes-to`) and an optional `protocol`. The legacy `interfaces[]` and
+`relationships[]` arrays migrate on read, get dropped from disk on
+next save, and disappear from the UI entirely.
+
+- **`schema_version: 2`** on every component as the migration marker.
+  Read of v1 YAML auto-populates `links[]` from the old arrays; first
+  save writes v2 and strips the legacy fields.
+- **Migration rules** in `src/lib/github.ts` (`migrateToLinksV2`):
+  `interfaces[provides]` → `links[serves]`,
+  `interfaces[consumes]` → `links[calls]`,
+  `relationships[parent-of]` → `links[contains]`,
+  `relationships[child-of]` → `links[part-of]`,
+  `relationships[depends-on / communicates-with / fallback]` → `links[calls]` (description preserves the legacy nuance),
+  `relationships[reads-from]` → `links[reads-from]`,
+  `relationships[writes-to]` → `links[writes-to]`.
+  Dedup on `(target, role, protocol)` so a partial migration cannot
+  duplicate entries.
+- **Form** (`ComponentForm.tsx`): the separate "Interfaces" and
+  "Relationships" sections collapse into a single **Links** card.
+  Each row picks target (typeahead picker), role (6-value select),
+  optional protocol, plus name + description.
+- **Detail page** (`/component/[id]`): one **Links** card replaces the
+  Interfaces card + Inbound interfaces card + Relationships card +
+  Inbound relationships card. Outbound + inverted inbound merge into
+  one list via `combinedLinks`; mirror pairs (calls↔serves,
+  part-of↔contains) dedup so the analyst sees the edge once.
+- **Inbound endpoint**: new `GET /api/components/[id]/inbound-links`
+  replaces inbound-interfaces and inbound-relationships. Single scan
+  over every other component's `links[]` looking for `target === id`.
+- **Consistency Check**: categories collapse from {relationships,
+  interfaces, data} to {links, data}. Mirror rule:
+  `calls ↔ serves`, `part-of ↔ contains`. `reads-from` / `writes-to`
+  stay directional (passive target). Fix kind `addLink` replaces
+  `addRelationship` + `addInterface`.
+- **Architecture overview**: edge collection iterates `links[]` and
+  classifies by role — calls / serves render as the "Interfaces"
+  edge family, the other four as "Relationships" edge family. Mirror
+  pairs normalised so each architectural edge appears once.
+- **Catalog Export**: per-component "Interfaces" + "Outbound
+  relationships" sections merge into one "Links" section; inbound
+  block now lists rows from `links[]` with inverse role labels.
+- **Maturity scoring**: two fields (`Interfaces`, `Relationships`)
+  collapse to one (`Links (relationships & interfaces)`). Existing
+  totals adjust automatically.
+
+`data{}` (inputs / outputs / owns) is intentionally **untouched**
+in this phase — that's Phase 2.
+
 ### Added
 
 - **Data Model Registry integration (read-only).** Components of type `table` can be linked to an entity in an external REST metadata service via a new `data_model.entity` field. The edit form gains a "Data model registry link" card and the detail page renders attributes + relationships fetched live from the registry — the catalog never copies the registry data into YAML so the registry stays the single source of truth. One-way pull only: arch-tool never writes back. Generic across vendors — the base URL, API path prefix, entity endpoint and relationships endpoint are all configurable so any standards-compliant REST metadata service fits.

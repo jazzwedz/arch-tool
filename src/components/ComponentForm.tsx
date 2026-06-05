@@ -18,10 +18,9 @@ import {
   COMPONENT_TYPES,
   COMPONENT_STATUSES,
   TYPE_LABELS,
-  CONNECTOR_TYPES,
-  INTERFACE_DIRECTIONS,
-  RELATIONSHIP_TYPES,
-  RELATIONSHIP_LABELS,
+  LINK_ROLES,
+  LINK_ROLE_LABELS,
+  LINK_PROTOCOLS,
   BUSINESS_CAPABILITIES,
   DATA_CLASSIFICATIONS,
   DATA_CLASSIFICATION_LABELS,
@@ -40,8 +39,7 @@ import {
 } from "@/lib/constants"
 import type {
   Component,
-  ComponentInterface,
-  ComponentRelationship,
+  ComponentLink,
   ComponentNFR,
   ComponentCapability,
   CapabilityRole,
@@ -94,18 +92,12 @@ interface ComponentFormProps {
   onSavingChange?: (saving: boolean) => void
 }
 
-const emptyInterface: ComponentInterface = {
-  name: "",
-  direction: "provides",
-  type: "rest",
+// v2 — single edge primitive replacing emptyInterface + emptyRelationship.
+// Default role is the most common one (calls); the analyst flips it
+// through the role select in the row.
+const emptyLink: ComponentLink = {
   target: "",
-  description: "",
-}
-
-const emptyRelationship: ComponentRelationship = {
-  target: "",
-  type: "depends-on",
-  description: "",
+  role: "calls",
 }
 
 const emptyCapability: ComponentCapability = {
@@ -200,14 +192,17 @@ export function ComponentForm({
     owner: "",
     tags: [],
     description: { oneliner: "", description: "" },
-    interfaces: [],
-    relationships: [],
+    // v2 — single edge primitive. Migration in github.ts collapses
+    // legacy interfaces[] + relationships[] into this on read; the
+    // form authors only this shape.
+    links: [],
     risks: [],
     capabilities: [],
     data: undefined,
     processes: [],
     rules: [],
     nfr: {},
+    schema_version: 2,
     ...(initialData || {}),
   })
 
@@ -256,15 +251,17 @@ export function ComponentForm({
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const updateInterface = (
+  // v2: single edge primitive. updateLink replaces the legacy
+  // updateInterface + updateRelationship pair.
+  const updateLink = (
     index: number,
-    field: keyof ComponentInterface,
-    value: string
+    field: keyof ComponentLink,
+    value: string | undefined
   ) => {
     setForm((prev) => ({
       ...prev,
-      interfaces: prev.interfaces.map((iface, i) =>
-        i === index ? { ...iface, [field]: value } : iface
+      links: (prev.links ?? []).map((link, i) =>
+        i === index ? { ...link, [field]: value } : link
       ),
     }))
   }
@@ -273,19 +270,6 @@ export function ComponentForm({
     setForm((prev) => ({
       ...prev,
       nfr: { ...prev.nfr, [field]: value || undefined },
-    }))
-  }
-
-  const updateRelationship = (
-    index: number,
-    field: keyof ComponentRelationship,
-    value: string
-  ) => {
-    setForm((prev) => ({
-      ...prev,
-      relationships: prev.relationships.map((rel, i) =>
-        i === index ? { ...rel, [field]: value } : rel
-      ),
     }))
   }
 
@@ -800,291 +784,168 @@ export function ComponentForm({
         />
       )}
 
-      {/* Interfaces */}
-      {showInterfaces && (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            Interfaces
-            <Tooltip>
-              <TooltipTrigger className="cursor-help">
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs">
-                What this component exposes to others (provides) and what it consumes from other components. Interfaces describe the API surface — the protocols, directions, and purposes of each connection point.
-              </TooltipContent>
-            </Tooltip>
-          </CardTitle>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              updateField("interfaces", [
-                ...form.interfaces,
-                { ...emptyInterface },
-              ])
-            }
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {form.interfaces.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No interfaces defined yet.
-            </p>
-          )}
-          {form.interfaces.map((iface, i) => (
-            <div
-              key={i}
-              className="space-y-2 border-l-2 border-muted pl-3 py-2"
+      {/* Links — v2 single edge primitive that replaces the legacy
+          Interfaces + Relationships sections. One row per edge: pick
+          the target, choose a role (calls / serves / part-of /
+          contains / reads-from / writes-to), optionally pick a
+          protocol (rest / grpc / async / db / file / human / info /
+          link / data), give it a short name and a description. */}
+      {(showInterfaces || showRelationships) && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              Links
+              <Tooltip>
+                <TooltipTrigger className="cursor-help">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-sm text-left">
+                  <p className="font-semibold mb-1">Every edge to another component:</p>
+                  <ul className="text-xs space-y-0.5">
+                    <li><strong>Calls</strong> — this actively calls / consumes from target</li>
+                    <li><strong>Serves</strong> — this exposes / provides to target</li>
+                    <li><strong>Part of</strong> — this is contained in target</li>
+                    <li><strong>Contains</strong> — this contains target</li>
+                    <li><strong>Reads from</strong> — this reads data from target</li>
+                    <li><strong>Writes to</strong> — this writes data to target</li>
+                  </ul>
+                  <p className="text-xs mt-1 text-muted-foreground">
+                    Mirror pairs (calls ↔ serves, part-of ↔ contains) are
+                    deduped in the diagram and the consistency check
+                    flags missing mirrors.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                updateField("links", [
+                  ...(form.links ?? []),
+                  { ...emptyLink },
+                ])
+              }
             >
-              <div>
-                <Label className="text-xs">Name</Label>
-                <Input
-                  className="h-9"
-                  placeholder="Interface name (e.g. Orders API, Stock checker)"
-                  value={iface.name || ""}
-                  onChange={(e) => updateInterface(i, "name", e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-[120px_100px_1fr_1fr_40px] gap-2 items-end">
-              <div>
-                <Label className="text-xs">Direction</Label>
-                <Select
-                  value={iface.direction}
-                  onValueChange={(v) => updateInterface(i, "direction", v)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INTERFACE_DIRECTIONS.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Type</Label>
-                <Select
-                  value={iface.type}
-                  onValueChange={(v) => updateInterface(i, "type", v)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CONNECTOR_TYPES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Target</Label>
-                {/* Typeahead picker: suggests existing components and
-                    accepts free text for external systems. The stored
-                    value is the component id when picked, or whatever
-                    the user typed when no suggestion was selected. */}
-                <ComponentTargetPicker
-                  value={iface.target || ""}
-                  onChange={(v) => updateInterface(i, "target", v)}
-                  placeholder="Component or external label"
-                  excludeId={form.id}
-                  components={existingComponents}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Description</Label>
-                <Input
-                  className="h-9"
-                  placeholder="What it does"
-                  value={iface.description}
-                  onChange={(e) =>
-                    updateInterface(i, "description", e.target.value)
-                  }
-                  required
-                />
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9"
-                onClick={() =>
-                  updateField(
-                    "interfaces",
-                    form.interfaces.filter((_, idx) => idx !== i)
-                  )
-                }
+              <Plus className="h-4 w-4 mr-1" />
+              Add link
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(form.links ?? []).length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No links defined yet.
+              </p>
+            )}
+            {(form.links ?? []).map((link, i) => (
+              <div
+                key={i}
+                className="space-y-2 border-l-2 border-muted pl-3 py-2"
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      )}
-
-      {/* Relationships */}
-      {showRelationships && (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            Relationships
-            <Tooltip>
-              <TooltipTrigger className="cursor-help">
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs text-left">
-                <p className="font-semibold mb-1">How this component relates to others:</p>
-                <ul className="text-xs space-y-0.5">
-                  <li><strong>Parent of</strong> — this component contains/owns another (e.g. platform owns a module)</li>
-                  <li><strong>Child of</strong> — this component belongs to a parent (e.g. module in a platform)</li>
-                  <li><strong>Depends on</strong> — requires another component to function</li>
-                  <li><strong>Communicates with</strong> — exchanges data with a peer</li>
-                  <li><strong>Reads from</strong> — consumes data from another component</li>
-                  <li><strong>Writes to</strong> — sends data to another component</li>
-                  <li><strong>Fallback for</strong> — acts as backup when another component is unavailable</li>
-                </ul>
-              </TooltipContent>
-            </Tooltip>
-          </CardTitle>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              updateField("relationships", [
-                ...form.relationships,
-                { ...emptyRelationship },
-              ])
-            }
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {form.relationships.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No relationships defined yet.
-            </p>
-          )}
-          {form.relationships.map((rel, i) => {
-            const hideConnector = rel.type === "parent-of" || rel.type === "child-of"
-            return (
-            <div
-              key={i}
-              className="grid grid-cols-[160px_1fr_120px_1fr_40px] gap-2 items-end"
-            >
-              <div>
-                <Label className="text-xs">Relationship</Label>
-                <Select
-                  value={rel.type}
-                  onValueChange={(v) => {
-                    updateRelationship(i, "type", v)
-                    // Clear connector for non-technical relationships
-                    if (v === "parent-of" || v === "child-of") {
-                      updateRelationship(i, "connector", "")
+                <div className="grid grid-cols-[1fr_140px_120px_40px] gap-2 items-end">
+                  <div>
+                    <Label className="text-xs">Target</Label>
+                    <ComponentTargetPicker
+                      value={link.target}
+                      onChange={(v) => updateLink(i, "target", v)}
+                      placeholder="Component or external label"
+                      excludeId={form.id}
+                      components={existingComponents}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Role</Label>
+                    <Select
+                      value={link.role}
+                      onValueChange={(v) =>
+                        updateLink(i, "role", v as ComponentLink["role"])
+                      }
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LINK_ROLES.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {LINK_ROLE_LABELS[r]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Protocol</Label>
+                    <Select
+                      value={link.protocol || "none"}
+                      onValueChange={(v) =>
+                        updateLink(
+                          i,
+                          "protocol",
+                          v === "none"
+                            ? undefined
+                            : (v as ComponentLink["protocol"])
+                        )
+                      }
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <span className="text-muted-foreground">(none)</span>
+                        </SelectItem>
+                        {LINK_PROTOCOLS.map((p) => (
+                          <SelectItem key={p} value={p}>
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() =>
+                      updateField(
+                        "links",
+                        (form.links ?? []).filter((_, idx) => idx !== i)
+                      )
                     }
-                  }}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {RELATIONSHIP_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {RELATIONSHIP_LABELS[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-[1fr_2fr] gap-2">
+                  <div>
+                    <Label className="text-xs">Name (optional)</Label>
+                    <Input
+                      className="h-9"
+                      placeholder="e.g. Orders API, Stock feed"
+                      value={link.name || ""}
+                      onChange={(e) =>
+                        updateLink(i, "name", e.target.value || undefined)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Description (optional)</Label>
+                    <Input
+                      className="h-9"
+                      placeholder="What happens on this edge"
+                      value={link.description || ""}
+                      onChange={(e) =>
+                        updateLink(i, "description", e.target.value || undefined)
+                      }
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <Label className="text-xs">Target Component</Label>
-                {/* Typeahead picker — same component the interface row
-                    uses. Relationships still expect an existing
-                    component id, so the analyst will normally pick from
-                    the dropdown; the input still accepts free text for
-                    forward references to components not in the catalog
-                    yet (e.g. while modelling a future system in
-                    parallel). Catalog data flows in from the form's
-                    one fetch — no module cache, no stale entries. */}
-                <ComponentTargetPicker
-                  value={rel.target}
-                  onChange={(v) => updateRelationship(i, "target", v)}
-                  placeholder="Pick or type a component id"
-                  excludeId={form.id}
-                  components={existingComponents}
-                />
-              </div>
-              {hideConnector ? (
-                <div />
-              ) : (
-              <div>
-                <Label className="text-xs">Connector</Label>
-                <Select
-                  value={rel.connector || "none"}
-                  onValueChange={(v) => updateRelationship(i, "connector", v === "none" ? "" : v)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">
-                      <span className="text-muted-foreground">none</span>
-                    </SelectItem>
-                    {CONNECTOR_TYPES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              )}
-              <div>
-                <Label className="text-xs">Description</Label>
-                <Input
-                  className="h-9"
-                  placeholder="Optional note"
-                  value={rel.description || ""}
-                  onChange={(e) =>
-                    updateRelationship(i, "description", e.target.value)
-                  }
-                />
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9"
-                onClick={() =>
-                  updateField(
-                    "relationships",
-                    form.relationships.filter((_, idx) => idx !== i)
-                  )
-                }
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-            )
-          })}
-        </CardContent>
-      </Card>
-
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       {/* Capabilities */}
