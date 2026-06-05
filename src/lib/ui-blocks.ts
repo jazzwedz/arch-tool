@@ -8,8 +8,13 @@
 
 export type DetailTabId =
   | "overview"
-  | "technical"
-  | "business"
+  /**
+   * v2: the legacy "technical" and "business" tabs collapse into one.
+   * The UIBlocksConfig group keys (`technical`, `business`) stay so
+   * existing `config.yaml` entries keep validating — only the tab a
+   * block renders on changed.
+   */
+  | "properties"
   | "rules"
   | "blast-radius"
   | "documentation"
@@ -87,7 +92,7 @@ export const BLOCK_METAS: BlockMeta[] = [
     description: "Known risks attached to the component.",
   },
   {
-    tab: "technical",
+    tab: "properties",
     group: "technical",
     field: "relationships",
     label: "Links",
@@ -95,7 +100,7 @@ export const BLOCK_METAS: BlockMeta[] = [
       "Every edge from this component to its peers — calls, serves, part-of, contains, reads-from, writes-to. Inbound rows merge in with their inverse label.",
   },
   {
-    tab: "technical",
+    tab: "properties",
     group: "technical",
     field: "nfr",
     label: "Non-Functional Requirements",
@@ -103,14 +108,14 @@ export const BLOCK_METAS: BlockMeta[] = [
       "Availability, RTO, RPO, latency, throughput, data classification, scaling.",
   },
   {
-    tab: "business",
+    tab: "properties",
     group: "business",
     field: "capabilities",
     label: "Capabilities",
     description: "Business capabilities the component plays a role in.",
   },
   {
-    tab: "business",
+    tab: "properties",
     group: "business",
     field: "processes",
     label: "Processes",

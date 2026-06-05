@@ -24,8 +24,7 @@ import { useUIConfig } from "@/components/UIConfigProvider"
 
 const TAB_LABELS: Record<DetailTabId, string> = {
   overview: "Overview",
-  technical: "Technical",
-  business: "Business",
+  properties: "Properties",
   rules: "Rules & Calculations",
   "blast-radius": "Blast Radius",
   documentation: "Documentation",
@@ -265,8 +264,7 @@ export default function SettingsPage() {
 
   const tabsInOrder: DetailTabId[] = [
     "overview",
-    "technical",
-    "business",
+    "properties",
     "rules",
     "blast-radius",
     "documentation",

@@ -7,6 +7,28 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Technical + Business tabs collapse into one "Properties" tab.** The
+  Technical (Links, NFR) and Business (Capabilities, Processes) tabs
+  carried four cards between them — light enough to live on a single
+  tab. They now share the new **Properties** tab. The `UIBlocksConfig`
+  group keys (`technical`, `business`) are unchanged so existing
+  `config.yaml` toggles keep working; only `BlockMeta.tab` and
+  `DetailTabId` were updated.
+- **Per-block edit dialogs.** Each card on the detail page (Description,
+  Links, Capabilities, Processes, Rules, NFR, Risks) now exposes its
+  own small `Edit` button that opens a focused modal — the analyst
+  can fix one block without scrolling through the full Edit form. The
+  modal reuses `ComponentForm` with a new `focusBlock` prop that
+  hides every other section and the Basic Information header. The
+  modal fetches a fresh copy of the component on open (sha-aware), the
+  form saves through the existing PUT endpoint with the rest of the
+  component carried over from `initialData`, and the parent detail
+  page re-fetches on success so the new state shows up without a
+  navigation. Full Edit (the `Edit` button in the page header) still
+  works for identity-level fields and bulk edits.
+
 ### Fixed (more v2 fallout cleanup)
 
 - **Confluence page renderer rewritten for `links[]`.** Every component

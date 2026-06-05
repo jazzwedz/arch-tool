@@ -79,11 +79,25 @@ import { RulesImportDialog } from "@/components/RulesImportDialog"
 import type { ComponentRule } from "@/lib/types"
 import { DataModelEntityCard } from "@/components/DataModelEntityCard"
 import { DrawioLibraryDialog } from "@/components/DrawioLibraryDialog"
+import { BlockEditDialog } from "@/components/BlockEditDialog"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [component, setComponent] = useState<ComponentWithSha | null>(null)
+  // Lightweight refetch — used by BlockEditDialog after a per-block
+  // save so the detail page picks up the new state without a full
+  // route navigation.
+  const refreshComponent = async () => {
+    try {
+      const r = await fetch(`/api/components/${id}`)
+      if (!r.ok) return
+      const fresh = (await r.json()) as ComponentWithSha
+      setComponent(fresh)
+    } catch {
+      // Network blip — leave the in-page state alone; next nav will fix it.
+    }
+  }
   const [loading, setLoading] = useState(true)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -203,8 +217,7 @@ export default function ComponentDetailPage() {
   // Active tab on the detail page.
   type DetailTab =
     | "overview"
-    | "technical"
-    | "business"
+    | "properties"
     | "rules"
     | "blast-radius"
     | "documentation"
@@ -220,8 +233,7 @@ export default function ComponentDetailPage() {
     if (isTabVisible(uiBlocks, tab as DetailTabId)) return
     const order: DetailTab[] = [
       "overview",
-      "technical",
-      "business",
+      "properties",
       "rules",
       "blast-radius",
       "documentation",
@@ -753,8 +765,7 @@ export default function ComponentDetailPage() {
           {(
             [
               { id: "overview", label: "Overview" },
-              { id: "technical", label: "Technical" },
-              { id: "business", label: "Business" },
+              { id: "properties", label: "Properties" },
               { id: "rules", label: "Rules & Calculations" },
               { id: "blast-radius", label: "Blast Radius" },
               { id: "documentation", label: "Documentation" },
@@ -865,27 +876,38 @@ export default function ComponentDetailPage() {
                   digging into source code.
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setRulesImportOpen(true)}
-                title="AI scans a PDF or Confluence page for rules relevant to this component"
-              >
-                <Sparkles className="h-4 w-4 mr-1" />
-                Import from documents
-              </Button>
+              <div className="flex items-center gap-1">
+                <BlockEditDialog
+                  componentId={component.id}
+                  block="rules"
+                  onSaved={refreshComponent}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRulesImportOpen(true)}
+                  title="AI scans a PDF or Confluence page for rules relevant to this component"
+                >
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  Import from documents
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             {(!component.rules || component.rules.length === 0) ? (
               <div className="text-sm text-muted-foreground py-4 text-center">
                 No rules defined.{" "}
-                <Link
-                  href={`/edit/${component.id}`}
-                  className="text-blue-700 hover:underline"
-                >
-                  Add the first rule in Edit
-                </Link>
+                <BlockEditDialog
+                  componentId={component.id}
+                  block="rules"
+                  onSaved={refreshComponent}
+                  trigger={
+                    <button className="text-blue-700 hover:underline" type="button">
+                      Add the first rule
+                    </button>
+                  }
+                />
                 .
               </div>
             ) : (
@@ -1286,7 +1308,14 @@ export default function ComponentDetailPage() {
         {tab === "overview" && isBlockVisible(uiBlocks, "overview", "descriptions") && (
         <Card>
           <CardHeader>
-            <CardTitle>Description</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Description</CardTitle>
+              <BlockEditDialog
+                componentId={component.id}
+                block="description"
+                onSaved={refreshComponent}
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {component.description?.oneliner && (
@@ -1345,7 +1374,7 @@ export default function ComponentDetailPage() {
             part-of ↔ contains), so the analyst sees one list. */}
 
         {/* Links — v2 unified edges card */}
-        {tab === "technical" && isBlockVisible(uiBlocks, "technical", "relationships") && (
+        {tab === "properties" && isBlockVisible(uiBlocks, "technical", "relationships") && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -1372,20 +1401,27 @@ export default function ComponentDetailPage() {
                   </TooltipContent>
                 </Tooltip>
               </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowRelationshipsViz((v) => !v)}
-                disabled={combinedLinks.length === 0}
-                title="Visualize links as a graph"
-              >
-                {showRelationshipsViz ? (
-                  <EyeOff className="h-4 w-4 mr-1" />
-                ) : (
-                  <Eye className="h-4 w-4 mr-1" />
-                )}
-                Visualize
-              </Button>
+              <div className="flex items-center gap-1">
+                <BlockEditDialog
+                  componentId={component.id}
+                  block="links"
+                  onSaved={refreshComponent}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowRelationshipsViz((v) => !v)}
+                  disabled={combinedLinks.length === 0}
+                  title="Visualize links as a graph"
+                >
+                  {showRelationshipsViz ? (
+                    <EyeOff className="h-4 w-4 mr-1" />
+                  ) : (
+                    <Eye className="h-4 w-4 mr-1" />
+                  )}
+                  Visualize
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -1490,7 +1526,7 @@ export default function ComponentDetailPage() {
             parent`. */}
 
         {/* Capabilities */}
-        {tab === "business" && isBlockVisible(uiBlocks, "business", "capabilities") && component.capabilities && component.capabilities.length > 0 && (
+        {tab === "properties" && isBlockVisible(uiBlocks, "business", "capabilities") && component.capabilities && component.capabilities.length > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1511,19 +1547,26 @@ export default function ComponentDetailPage() {
                     </TooltipContent>
                   </Tooltip>
                 </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowCapabilitiesViz((v) => !v)}
-                  title="Visualize capabilities as a graph"
-                >
-                  {showCapabilitiesViz ? (
-                    <EyeOff className="h-4 w-4 mr-1" />
-                  ) : (
-                    <Eye className="h-4 w-4 mr-1" />
-                  )}
-                  Visualize
-                </Button>
+                <div className="flex items-center gap-1">
+                  <BlockEditDialog
+                    componentId={component.id}
+                    block="capabilities"
+                    onSaved={refreshComponent}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCapabilitiesViz((v) => !v)}
+                    title="Visualize capabilities as a graph"
+                  >
+                    {showCapabilitiesViz ? (
+                      <EyeOff className="h-4 w-4 mr-1" />
+                    ) : (
+                      <Eye className="h-4 w-4 mr-1" />
+                    )}
+                    Visualize
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -1564,10 +1607,11 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Processes */}
-        {tab === "business" && isBlockVisible(uiBlocks, "business", "processes") && component.processes && component.processes.length > 0 && (
+        {tab === "properties" && isBlockVisible(uiBlocks, "business", "processes") && component.processes && component.processes.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
                 Processes
                 <Tooltip>
                   <TooltipTrigger className="cursor-help">
@@ -1583,7 +1627,13 @@ export default function ComponentDetailPage() {
                     </ul>
                   </TooltipContent>
                 </Tooltip>
-              </CardTitle>
+                </CardTitle>
+                <BlockEditDialog
+                  componentId={component.id}
+                  block="processes"
+                  onSaved={refreshComponent}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <table className="w-full text-sm">
@@ -1622,10 +1672,17 @@ export default function ComponentDetailPage() {
         )}
 
         {/* Non-Functional Requirements */}
-        {tab === "technical" && isBlockVisible(uiBlocks, "technical", "nfr") && component.nfr && Object.values(component.nfr).some(Boolean) && (
+        {tab === "properties" && isBlockVisible(uiBlocks, "technical", "nfr") && component.nfr && Object.values(component.nfr).some(Boolean) && (
           <Card>
             <CardHeader>
-              <CardTitle>Non-Functional Requirements</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Non-Functional Requirements</CardTitle>
+                <BlockEditDialog
+                  componentId={component.id}
+                  block="nfr"
+                  onSaved={refreshComponent}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
@@ -1680,7 +1737,14 @@ export default function ComponentDetailPage() {
         {tab === "overview" && isBlockVisible(uiBlocks, "overview", "risks") && component.risks && component.risks.length > 0 && (
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Risks</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Risks</CardTitle>
+                <BlockEditDialog
+                  componentId={component.id}
+                  block="risks"
+                  onSaved={refreshComponent}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <ul className="list-disc list-inside space-y-1 text-sm">

@@ -82,7 +82,32 @@ interface ComponentFormProps {
   // Callback mirror of the internal saving flag — parent uses this to
   // disable the header Save button while a save is in flight.
   onSavingChange?: (saving: boolean) => void
+  /**
+   * When set, the form renders ONLY the matching block (e.g. just the
+   * Links card or just the NFR card). The Basic Information card and
+   * every other section is hidden, but every field's value is still
+   * kept in `form` state from `initialData` so save constructs a
+   * full Component object. Used by `BlockEditDialog` to give the
+   * analyst a focused edit modal on each detail-page card.
+   */
+  focusBlock?: BlockKey
+  /**
+   * Optional override for the post-save action. When provided, called
+   * instead of the default `router.push(`/component/<id>`)`. Used by
+   * BlockEditDialog to close the modal and trigger a parent refetch
+   * without navigating away from the detail page.
+   */
+  onSaveSuccess?: () => void
 }
+
+export type BlockKey =
+  | "description"
+  | "links"
+  | "capabilities"
+  | "processes"
+  | "rules"
+  | "nfr"
+  | "risks"
 
 // v2 — single edge primitive replacing emptyInterface + emptyRelationship.
 // Default role is the most common one (calls); the analyst flips it
@@ -133,6 +158,8 @@ export function ComponentForm({
   readOnly = false,
   formId,
   onSavingChange,
+  focusBlock,
+  onSaveSuccess,
 }: ComponentFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -151,17 +178,26 @@ export function ComponentForm({
   // display anywhere. Basic Information is always visible — the Name
   // input is the only required field on the form.
   const { blocks: uiBlocks } = useUIConfig()
-  const showDescription = isBlockVisible(uiBlocks, "overview", "descriptions")
-  const showRisks = isBlockVisible(uiBlocks, "overview", "risks")
+  // When focusBlock is set, only that one card is visible; every
+  // other flag flips to false even when Settings would allow it.
+  const visible = (block: BlockKey): boolean =>
+    focusBlock === undefined || focusBlock === block
+  const showBasicInfo = focusBlock === undefined
+  const showDescription =
+    visible("description") && isBlockVisible(uiBlocks, "overview", "descriptions")
+  const showRisks = visible("risks") && isBlockVisible(uiBlocks, "overview", "risks")
   // v2: single Links card replaces the legacy Interfaces +
   // Relationships pair. The `relationships` config key keeps its
   // name so existing config.yaml entries continue to work; the UI
   // label is now "Links".
-  const showLinks = isBlockVisible(uiBlocks, "technical", "relationships")
-  const showNfr = isBlockVisible(uiBlocks, "technical", "nfr")
-  const showCapabilities = isBlockVisible(uiBlocks, "business", "capabilities")
-  const showProcesses = isBlockVisible(uiBlocks, "business", "processes")
-  const showRules = isBlockVisible(uiBlocks, "rules", "section")
+  const showLinks =
+    visible("links") && isBlockVisible(uiBlocks, "technical", "relationships")
+  const showNfr = visible("nfr") && isBlockVisible(uiBlocks, "technical", "nfr")
+  const showCapabilities =
+    visible("capabilities") && isBlockVisible(uiBlocks, "business", "capabilities")
+  const showProcesses =
+    visible("processes") && isBlockVisible(uiBlocks, "business", "processes")
+  const showRules = visible("rules") && isBlockVisible(uiBlocks, "rules", "section")
   // Fresh catalog snapshot, fetched once per form mount. Used by both
   // the relationship Target Component picker and the interface target
   // typeahead — passed down as a prop so a single fetch feeds every
@@ -491,7 +527,11 @@ export function ComponentForm({
           body: JSON.stringify(component),
         })
       }
-      router.push(`/component/${component.id}`)
+      if (onSaveSuccess) {
+        onSaveSuccess()
+      } else {
+        router.push(`/component/${component.id}`)
+      }
     } catch (error) {
       console.error("Save failed:", error)
       alert("Failed to save component")
@@ -511,7 +551,9 @@ export function ComponentForm({
         outer LockBanner already explains why saves are blocked.
       */}
       <fieldset disabled={readOnly} className="space-y-6 contents">
-      {/* Basic Info */}
+      {/* Basic Info — hidden in focus mode (BlockEditDialog) since
+          identity-level fields are edited only via the full Edit page. */}
+      {showBasicInfo && (
       <Card>
         <CardHeader>
           <CardTitle>Basic Information</CardTitle>
@@ -644,6 +686,7 @@ export function ComponentForm({
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Description — single unified field. Legacy YAML with separate
           technical + business sections (and / or oneliner) is merged
