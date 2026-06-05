@@ -19,6 +19,7 @@ import { TypeModelDialog } from "@/components/TypeModelDialog"
 import { ImportComponentDialog } from "@/components/ImportComponentDialog"
 import { ConsistencyCheckDialog } from "@/components/ConsistencyCheckDialog"
 import { ArchitectureDiagramDialog } from "@/components/ArchitectureDiagramDialog"
+import { CatalogExportDialog } from "@/components/CatalogExportDialog"
 import { useStoredState } from "@/lib/use-stored-state"
 import Link from "next/link"
 
@@ -149,6 +150,7 @@ export default function CatalogPage() {
           </a>
           <ArchitectureDiagramDialog />
           <ConsistencyCheckDialog />
+          <CatalogExportDialog />
           <ImportComponentDialog />
           <Link href="/new">
             <Button>
