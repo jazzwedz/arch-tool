@@ -20,6 +20,7 @@ import { ImportComponentDialog } from "@/components/ImportComponentDialog"
 import { ConsistencyCheckDialog } from "@/components/ConsistencyCheckDialog"
 import { ArchitectureDiagramDialog } from "@/components/ArchitectureDiagramDialog"
 import { CatalogExportDialog } from "@/components/CatalogExportDialog"
+import { ExportYamlButton } from "@/components/ExportYamlButton"
 import { useStoredState } from "@/lib/use-stored-state"
 import Link from "next/link"
 
@@ -145,6 +146,7 @@ export default function CatalogPage() {
           <ArchitectureDiagramDialog />
           <ConsistencyCheckDialog />
           <CatalogExportDialog />
+          <ExportYamlButton />
           <ImportComponentDialog />
           <Link href="/new">
             <Button>

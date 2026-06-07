@@ -660,3 +660,26 @@ together with the model document:
 
 When asking an LLM to **migrate** existing YAML, point it at §16 —
 that table is the full set of read-time migrations.
+
+---
+
+## 19. Export / import round-trip
+
+The catalog round-trips through YAML in exactly the on-disk shape:
+
+- **Export single** — `GET /api/components/<id>/export` (or the
+  *Download YAML* button on the detail page) returns one component as
+  its canonical YAML document.
+- **Export all** — `GET /api/admin/export-yaml` (or the *Export YAML*
+  button in the catalog header) returns a **multi-document bundle**:
+  every component as a separate YAML document, `---` separated, with a
+  leading comment header. Parse with `yaml.loadAll`.
+- **Import** — paste or upload either a single document or a bundle in
+  the Import dialog (`POST /api/components/import`). The `onConflict`
+  mode decides what happens when an incoming `id` already exists:
+  `update` (default — overwrite the existing component), `create`
+  (append `-2`, keep both), or `skip`.
+
+Exported YAML is byte-identical to what is stored on disk (shared
+`src/lib/component-yaml.ts` serializer), so the edit-in-place workflow
+is: export → edit the YAML → import with `onConflict: update`.

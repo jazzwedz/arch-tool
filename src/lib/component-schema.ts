@@ -140,10 +140,9 @@ function isValidId(id: string): boolean {
 // ---------- main entrypoint ----------
 
 export function validateComponentYaml(text: string): ValidateResult {
-  const errors: ValidationIssue[] = []
-  const warnings: ValidationIssue[] = []
-
-  // Parse
+  // Parse a single document. Multi-doc / top-level arrays are refused
+  // here so the single-component import path stays strict; bundle
+  // imports go through validateComponentDocs instead.
   let raw: unknown
   try {
     raw = yaml.load(text, { schema: yaml.JSON_SCHEMA })
@@ -160,15 +159,6 @@ export function validateComponentYaml(text: string): ValidateResult {
     }
   }
 
-  if (raw === null || raw === undefined) {
-    return {
-      ok: false,
-      errors: [{ path: "", message: "Empty YAML." }],
-      warnings: [],
-    }
-  }
-
-  // Single component only — refuse multi-doc and top-level arrays.
   if (Array.isArray(raw)) {
     return {
       ok: false,
@@ -177,6 +167,68 @@ export function validateComponentYaml(text: string): ValidateResult {
           path: "",
           message:
             "Top level is a list. Import accepts a single component object only.",
+        },
+      ],
+      warnings: [],
+    }
+  }
+
+  return validateComponentObject(raw)
+}
+
+/**
+ * Validate one or more component documents from a multi-doc YAML bundle
+ * (`---` separated). Each non-empty document is validated independently;
+ * the returned array is positionally aligned with the input documents
+ * (empty / null docs — e.g. a trailing `---` — are skipped). On a parse
+ * error the whole bundle fails with a single error result.
+ */
+export function validateComponentDocs(text: string): ValidateResult[] {
+  let docs: unknown[]
+  try {
+    docs = yaml.loadAll(text, undefined, { schema: yaml.JSON_SCHEMA }) as unknown[]
+  } catch (err) {
+    return [
+      {
+        ok: false,
+        errors: [
+          { path: "", message: err instanceof Error ? err.message : "YAML parse error" },
+        ],
+        warnings: [],
+      },
+    ]
+  }
+
+  const meaningful = docs.filter((d) => d !== null && d !== undefined)
+  if (meaningful.length === 0) {
+    return [{ ok: false, errors: [{ path: "", message: "Empty YAML." }], warnings: [] }]
+  }
+  return meaningful.map((d) => validateComponentObject(d))
+}
+
+/**
+ * Validate a single already-parsed component object. Shared by
+ * validateComponentYaml (single doc) and validateComponentDocs (bundle).
+ */
+export function validateComponentObject(raw: unknown): ValidateResult {
+  const errors: ValidationIssue[] = []
+  const warnings: ValidationIssue[] = []
+
+  if (raw === null || raw === undefined) {
+    return {
+      ok: false,
+      errors: [{ path: "", message: "Empty YAML." }],
+      warnings: [],
+    }
+  }
+
+  if (Array.isArray(raw)) {
+    return {
+      ok: false,
+      errors: [
+        {
+          path: "",
+          message: "Document is a list. Each document must be a single component object.",
         },
       ],
       warnings: [],

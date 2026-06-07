@@ -80,6 +80,7 @@ import type { ComponentRule } from "@/lib/types"
 import { DataModelEntityCard } from "@/components/DataModelEntityCard"
 import { DrawioLibraryDialog } from "@/components/DrawioLibraryDialog"
 import { BlockEditDialog } from "@/components/BlockEditDialog"
+import { componentToYaml } from "@/lib/component-yaml"
 
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -615,6 +616,26 @@ export default function ComponentDetailPage() {
     }
   }
 
+  // Download this component as its canonical v2 YAML (re-importable via
+  // the catalog Import dialog). Strip the git sha — it is not part of the
+  // component model and would only produce an "unknown field" warning on
+  // re-import.
+  const handleDownloadYaml = () => {
+    if (!component) return
+    const { sha: _sha, ...rest } = component
+    void _sha
+    const text = componentToYaml(rest)
+    const blob = new Blob([text], { type: "application/x-yaml;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${component.id}.yaml`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   if (loading || !component) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -649,6 +670,10 @@ export default function ComponentDetailPage() {
               Edit
             </Button>
           </Link>
+          <Button variant="outline" onClick={handleDownloadYaml}>
+            <Download className="h-4 w-4 mr-2" />
+            Download YAML
+          </Button>
           <Button
             variant="outline"
             className="text-destructive hover:bg-destructive hover:text-destructive-foreground"

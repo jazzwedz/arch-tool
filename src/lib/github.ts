@@ -9,6 +9,7 @@
 
 import yaml from "js-yaml"
 import { getGit, GitNotFoundError } from "./git"
+import { componentToYaml } from "./component-yaml"
 import type {
   Component,
   ComponentWithSha,
@@ -310,33 +311,11 @@ export async function saveComponent(
   // fields), but consistency-check fixes and the import dialog can
   // emit either shape, so stripping here is the single chokepoint
   // that guarantees disk converges to v2 over time.
-  const normalised = normaliseForSave(component)
-  const content = yaml.dump(normalised, {
-    lineWidth: -1,
-    noRefs: true,
-    sortKeys: false,
-  })
+  const content = componentToYaml(component)
   const message = sha
     ? `feat: update component ${component.id}`
     : `feat: add component ${component.id}`
   await git.putFile(path, content, message, sha)
-}
-
-// Strip legacy fields and stamp the v2 schema_version. Idempotent.
-function normaliseForSave(component: Component): Component {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw = JSON.parse(JSON.stringify(component)) as Record<string, any>
-  // Drop legacy edge containers — links[] is authoritative on disk.
-  delete raw.interfaces
-  delete raw.relationships
-  // Drop legacy data{} — every input/output now lives as a link.
-  delete raw.data
-  // Drop legacy capability shape.
-  delete raw.business_capabilities
-  // Drop empty links to keep the YAML clean.
-  if (Array.isArray(raw.links) && raw.links.length === 0) delete raw.links
-  raw.schema_version = 2
-  return raw as Component
 }
 
 export async function deleteComponent(id: string, sha: string): Promise<void> {

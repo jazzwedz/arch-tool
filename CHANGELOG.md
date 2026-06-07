@@ -39,6 +39,23 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **YAML export — single component and whole catalog.** A
+  **Download YAML** button on the component detail page exports that
+  component as its canonical v2 YAML; an **Export YAML** button in the
+  catalog header exports the entire catalog as one round-trippable
+  multi-document bundle (`---` separated). Both are byte-identical to
+  what is written to disk (same `componentToYaml` serializer). Raw URLs
+  for curl / automation: `GET /api/components/<id>/export` and
+  `GET /api/admin/export-yaml`.
+- **Bundle import + upsert.** The Import dialog now accepts a
+  multi-document YAML bundle (and a `.yaml` file upload, alongside
+  paste), so the whole catalog can be re-imported in one go. Each
+  document is validated independently and shown with a per-document
+  preview; the result is a created / updated / copied / skipped /
+  errors report. New shared serializer module `src/lib/component-yaml.ts`
+  (`normaliseForSave`, `componentToYaml`, `catalogToYaml`) and validator
+  helpers `validateComponentObject` / `validateComponentDocs`.
+
 - **`table` protocol on links + connectors.** Joins the existing
   protocol set (`rest / grpc / async / db / file / human / info /
   link / data`) for cases where the data flow targets a specific
@@ -49,6 +66,19 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   the diagrams builder edge palette.
 
 ### Changed
+
+- **Import now updates existing components by default.** Previously the
+  importer was create-only: an incoming `id` that already existed was
+  auto-renamed to `-2`. The `/api/components/import` endpoint now takes
+  an `onConflict` mode — **`update`** (default, overwrite the existing
+  component with the same id, sha-aware), `create` (the old
+  rename-to-`-2` behaviour), or `skip` — selectable in the Import
+  dialog. This makes the YAML round-trip (export → edit → re-import) a
+  true edit of existing components, not a duplicate.
+- **Component serialization centralised.** `saveComponent` and every
+  export path now share `src/lib/component-yaml.ts`; the `normaliseForSave`
+  strip-and-stamp helper moved there out of `github.ts`. On-disk and
+  exported YAML are guaranteed identical.
 
 - **Technical + Business tabs collapse into one "Properties" tab.** The
   Technical (Links, NFR) and Business (Capabilities, Processes) tabs
