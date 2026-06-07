@@ -54,6 +54,14 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Processes overview page (`/processes`).** New top-nav entry next to
+  Catalog. Aggregates every business process declared anywhere in the
+  catalog (each component's `processes[]`) into one list, and shows
+  per process which components support it and in what role
+  (owner / participant / listener / trigger), with their activity.
+  Filter box matches by process or component name; rows link to the
+  component detail.
+
 - **Consistency check now flags duplicate links.** A new **Duplicate
   links** category detects the same link (same `target` + `role` +
   `protocol` + `name`) declared more than once on a component — the

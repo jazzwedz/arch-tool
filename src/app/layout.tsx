@@ -3,7 +3,7 @@ import localFont from "next/font/local"
 import "./globals.css"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
-import { Layers, FileText, FileImage, Settings, Shield } from "lucide-react"
+import { Layers, FileText, FileImage, Settings, Shield, Workflow } from "lucide-react"
 import { ClientErrorReporter } from "@/components/ClientErrorReporter"
 import { Providers } from "@/components/Providers"
 
@@ -49,6 +49,13 @@ export default function RootLayout({
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Catalog
+              </Link>
+              <Link
+                href="/processes"
+                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <Workflow className="h-3.5 w-3.5" />
+                Processes
               </Link>
               <Link
                 href="/diagrams"
