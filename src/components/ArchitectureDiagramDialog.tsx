@@ -2,9 +2,10 @@
 
 // Architecture overview — a full-catalog mermaid diagram in a modal.
 //
-// Opens on the catalog header. Four toggles let the analyst dial in
-// which edge sources to include (relationships / interfaces / data
-// flow) and whether to cluster nodes by type. The chart re-renders
+// Opens on the catalog header. Toggles let the analyst dial in which
+// edge sources to include (relationships / interfaces) and whether to
+// nest components inside their container's frame (Group by hierarchy —
+// Context ⊃ microservices ⊃ modules, etc.). The chart re-renders
 // instantly when a toggle flips — building it is pure
 // string-concatenation in src/lib/architecture-mermaid.ts.
 //
@@ -48,7 +49,10 @@ export function ArchitectureDiagramDialog() {
     "arch:showInterfaces",
     true
   )
-  const [groupByType, setGroupByType] = useStoredState("arch:groupByType", true)
+  const [groupByContainment, setGroupByContainment] = useStoredState(
+    "arch:groupByContainment",
+    true
+  )
 
   // Fetch fresh on every dialog open so an architecture change made in
   // another tab is reflected immediately. Closing the dialog throws the
@@ -83,9 +87,9 @@ export function ArchitectureDiagramDialog() {
       buildArchitectureMermaid(components, {
         showRelationships,
         showInterfaces,
-        groupByType,
+        groupByContainment,
       }),
-    [components, showRelationships, showInterfaces, groupByType]
+    [components, showRelationships, showInterfaces, groupByContainment]
   )
 
   const edgeCount = useMemo(() => {
@@ -137,9 +141,9 @@ export function ArchitectureDiagramDialog() {
             />
             <span className="h-4 w-px bg-border" />
             <Toggle
-              label="Group by type"
-              checked={groupByType}
-              onChange={setGroupByType}
+              label="Group by hierarchy"
+              checked={groupByContainment}
+              onChange={setGroupByContainment}
             />
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">

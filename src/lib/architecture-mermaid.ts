@@ -17,8 +17,14 @@
 //
 // Each node is styled by its component type using TYPE_COLORS (same
 // palette as the catalog cards and the drawio export). Optional
-// `groupByType` wraps each type's nodes in a labelled subgraph so the
-// chart reads as a clustered block diagram instead of a soup of nodes.
+// `groupByContainment` nests every component inside the frame of the
+// thing it is `part-of` (transitively): a Context becomes a labelled
+// frame holding its microservices, each of which holds its modules, and
+// so on (Boundary ⊃ Context ⊃ … ⊃ Module, Database ⊃ Schema ⊃ Table).
+// Containment is read from the part-of / contains link pair, so the
+// part-of / contains edges themselves are not drawn (the nesting *is*
+// the edge). Anything that participates in no containment falls back to
+// being clustered by type.
 //
 // Caller is responsible for the wrapping React component; this module
 // is a pure string producer.
@@ -31,7 +37,12 @@ export interface ArchitectureMermaidOptions {
   showInterfaces: boolean
   /** @deprecated v2 Phase 2: data flow is now part of links[]; toggle is a no-op. */
   showDataFlow?: boolean
-  groupByType: boolean
+  /**
+   * Nest components inside their container's frame (via part-of /
+   * contains), falling back to type clustering for anything outside a
+   * hierarchy. Replaces the old flat group-by-type behaviour.
+   */
+  groupByContainment: boolean
 }
 
 interface Edge {
@@ -70,34 +81,10 @@ export function buildArchitectureMermaid(
 
   // ----- nodes -----
 
-  const byType = new Map<string, Component[]>()
-  for (const c of components) {
-    const arr = byType.get(c.type) || []
-    arr.push(c)
-    byType.set(c.type, arr)
-  }
+  const byId = new Map(components.map((c) => [c.id, c]))
 
-  if (options.groupByType) {
-    // Render each populated type as a labelled subgraph so related
-    // components cluster visually. Subgraphs preserve insertion order;
-    // sort types alphabetically by label for a stable layout.
-    const types = Array.from(byType.keys()).sort((a, b) =>
-      (TYPE_LABELS[a as keyof typeof TYPE_LABELS] || a).localeCompare(
-        TYPE_LABELS[b as keyof typeof TYPE_LABELS] || b
-      )
-    )
-    for (const type of types) {
-      const group = byType.get(type) || []
-      const groupId = `grp_${typeClass(type)}`
-      const label = TYPE_LABELS[type as keyof typeof TYPE_LABELS] || type
-      lines.push(`  subgraph ${groupId} ["${escLabel(label)}"]`)
-      for (const c of group) {
-        lines.push(
-          `    ${safeId(c.id)}["${escLabel(c.name)}"]:::${typeClass(c.type)}`
-        )
-      }
-      lines.push(`  end`)
-    }
+  if (options.groupByContainment) {
+    renderContainmentTree(components, byId, lines)
   } else {
     for (const c of components) {
       lines.push(
@@ -108,7 +95,9 @@ export function buildArchitectureMermaid(
 
   // ----- edges -----
 
-  const edges = collectEdges(components, options)
+  // In containment mode the part-of / contains edges are represented by
+  // the nesting itself, so they are dropped from the arrow set.
+  const edges = collectEdges(components, options, options.groupByContainment)
   for (const e of edges) {
     const arrow =
       e.style === "relationship"
@@ -125,7 +114,7 @@ export function buildArchitectureMermaid(
 
   // One classDef per type that actually appears in the catalog. Limits
   // the chart preamble even on installs with all 20 types.
-  const seenTypes = new Set<string>(byType.keys())
+  const seenTypes = new Set<string>(components.map((c) => c.type))
   for (const t of seenTypes) {
     const colors = TYPE_COLORS[t as keyof typeof TYPE_COLORS]
     if (!colors) continue
@@ -137,9 +126,147 @@ export function buildArchitectureMermaid(
   return lines.join("\n")
 }
 
+// Render the catalog as nested containment frames.
+//
+// Containment is derived from the part-of / contains link pair:
+//   - C `part-of` P            → P is C's container
+//   - P `contains` C           → P is C's container (fills gaps)
+// A component with ≥1 child becomes a labelled subgraph holding its
+// children (recursively); a childless component is a styled node. The
+// root frames are the containers with no container of their own.
+// Everything that is neither contained nor a container falls back to
+// being clustered by type, the same as the old group-by-type view.
+function renderContainmentTree(
+  components: Component[],
+  byId: Map<string, Component>,
+  lines: string[]
+): void {
+  const idSet = new Set(byId.keys())
+
+  // child id → parent id
+  const parentOf = new Map<string, string>()
+  // part-of: the child names its parent (wins).
+  for (const c of components) {
+    for (const l of c.links || []) {
+      if (
+        l.role === "part-of" &&
+        l.target !== c.id &&
+        idSet.has(l.target) &&
+        !parentOf.has(c.id)
+      ) {
+        parentOf.set(c.id, l.target)
+      }
+    }
+  }
+  // contains: the parent names its child — only fills gaps.
+  for (const c of components) {
+    for (const l of c.links || []) {
+      if (
+        l.role === "contains" &&
+        l.target !== c.id &&
+        idSet.has(l.target) &&
+        !parentOf.has(l.target)
+      ) {
+        parentOf.set(l.target, c.id)
+      }
+    }
+  }
+
+  // Cycle guard: drop the parent edge of any node whose ancestry loops.
+  for (const id of Array.from(parentOf.keys())) {
+    const seen = new Set<string>([id])
+    let cur = parentOf.get(id)
+    while (cur) {
+      if (seen.has(cur)) {
+        parentOf.delete(id)
+        break
+      }
+      seen.add(cur)
+      cur = parentOf.get(cur)
+    }
+  }
+
+  // parent id → child ids
+  const childrenOf = new Map<string, string[]>()
+  for (const [child, parent] of parentOf) {
+    const arr = childrenOf.get(parent) || []
+    arr.push(child)
+    childrenOf.set(parent, arr)
+  }
+
+  const isContainer = (id: string) => (childrenOf.get(id)?.length ?? 0) > 0
+  const participates = (id: string) => parentOf.has(id) || isContainer(id)
+
+  const byName = (a: string, b: string) =>
+    (byId.get(a)?.name || a).localeCompare(byId.get(b)?.name || b)
+
+  // Subgraph `style` statements must live at the top level — emitting
+  // them inside a subgraph block trips the mermaid parser. Collected
+  // here and appended after the whole tree is rendered.
+  const styleLines: string[] = []
+
+  const renderNode = (id: string, indent: string) => {
+    const c = byId.get(id)
+    if (!c) return
+    if (isContainer(id)) {
+      lines.push(`${indent}subgraph ${safeId(id)} ["${escLabel(c.name)}"]`)
+      const kids = (childrenOf.get(id) || []).slice().sort(byName)
+      for (const k of kids) renderNode(k, indent + "  ")
+      lines.push(`${indent}end`)
+      const colors = TYPE_COLORS[c.type]
+      if (colors) {
+        styleLines.push(
+          `  style ${safeId(id)} fill:${colors.fill},stroke:${colors.border},color:${colors.text}`
+        )
+      }
+    } else {
+      lines.push(
+        `${indent}${safeId(id)}["${escLabel(c.name)}"]:::${typeClass(c.type)}`
+      )
+    }
+  }
+
+  // Root frames: participating components with no parent.
+  const roots = components
+    .filter((c) => participates(c.id) && !parentOf.has(c.id))
+    .map((c) => c.id)
+    .sort(byName)
+  for (const r of roots) renderNode(r, "  ")
+  lines.push(...styleLines)
+
+  // Fallback: anything outside a hierarchy clusters by type, as before.
+  const rest = components.filter((c) => !participates(c.id))
+  if (rest.length > 0) {
+    const byType = new Map<string, Component[]>()
+    for (const c of rest) {
+      const arr = byType.get(c.type) || []
+      arr.push(c)
+      byType.set(c.type, arr)
+    }
+    const types = Array.from(byType.keys()).sort((a, b) =>
+      (TYPE_LABELS[a as keyof typeof TYPE_LABELS] || a).localeCompare(
+        TYPE_LABELS[b as keyof typeof TYPE_LABELS] || b
+      )
+    )
+    for (const type of types) {
+      const group = (byType.get(type) || []).slice().sort((a, b) => byName(a.id, b.id))
+      const groupId = `grp_${typeClass(type)}`
+      const label = TYPE_LABELS[type as keyof typeof TYPE_LABELS] || type
+      lines.push(`  subgraph ${groupId} ["${escLabel(label)}"]`)
+      for (const c of group) {
+        lines.push(
+          `    ${safeId(c.id)}["${escLabel(c.name)}"]:::${typeClass(c.type)}`
+        )
+      }
+      lines.push(`  end`)
+    }
+  }
+}
+
 function collectEdges(
   components: Component[],
-  options: ArchitectureMermaidOptions
+  options: ArchitectureMermaidOptions,
+  suppressContainment: boolean
 ): Edge[] {
   // Map keyed on canonical edge identity so A:parent-of:B + B:child-of:A
   // collapse to one entry. The first declaration wins; second is
@@ -166,6 +293,10 @@ function collectEdges(
   for (const c of components) {
     for (const link of c.links || []) {
       if (!link.target) continue
+
+      // In containment mode the nesting represents these edges.
+      if (suppressContainment && (link.role === "part-of" || link.role === "contains"))
+        continue
 
       const isInterfaceRole = link.role === "calls" || link.role === "serves"
       const isRelationshipRole = !isInterfaceRole

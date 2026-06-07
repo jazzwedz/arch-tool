@@ -92,6 +92,17 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Architecture overview groups by containment hierarchy.** The
+  "Group by type" toggle (which dropped every `context` into one shared
+  "Context" frame, scattering each context's members across other
+  type frames) is replaced by **"Group by hierarchy"**: each component
+  now nests inside the frame of what it is `part-of`, transitively —
+  Boundary ⊃ Context ⊃ Application/Microservice/Service ⊃ Module (and
+  Database ⊃ Schema ⊃ Table). The part-of / contains edges are no longer
+  drawn — the nesting *is* the edge. Anything outside a hierarchy falls
+  back to type clustering. `buildArchitectureMermaid`'s `groupByType`
+  option became `groupByContainment`.
+
 - **`docs/COMPONENT_MODEL.md` rewritten for schema v2.** The canonical
   LLM-facing schema reference still described the v1 shape
   (`interfaces[]` + `relationships[]` + `data{}`) it predated. Rewritten
