@@ -19,6 +19,11 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Import redirect hit a 404.** After a single-component import the
+  dialog pushed to `/component/<id>/edit`, but the edit route lives at
+  `/edit/<id>` — the component saved fine yet the redirect 404'd (and
+  logged it). Fixed the redirect path.
+
 - **Settings toggles for Capabilities / Processes / NFR / Risks now
   actually show the card.** The four cards on the detail page were
   gated on both the Settings visibility flag AND data-presence
@@ -48,6 +53,16 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   dropdown opens.
 
 ### Added
+
+- **Partial / merge import (`onConflict: merge`).** A new **Merge
+  fields** mode in the Import dialog patches only the top-level fields a
+  YAML carries onto an existing component matched by `id` — e.g. paste
+  just `id` + `nfr` to replace the NFR block and leave everything else
+  intact. Implemented as merge-then-validate: the patch overrides the
+  existing component's fields (shallow), the merged result is run
+  through the full schema validator, then saved with the existing sha.
+  Requires an `id` of an existing component (errors otherwise). Works
+  per-document in a bundle too; the report lists the patched fields.
 
 - **YAML export — single component and whole catalog.** A
   **Download YAML** button on the component detail page exports that

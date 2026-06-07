@@ -634,9 +634,17 @@ The catalog round-trips through YAML in exactly the on-disk shape:
 - **Import** — paste or upload either a single document or a bundle in
   the Import dialog (`POST /api/components/import`). The `onConflict`
   mode decides what happens when an incoming `id` already exists:
-  `update` (default — overwrite the existing component), `create`
-  (append `-2`, keep both), or `skip`.
+  - `update` (default) — overwrite the existing component wholesale.
+  - `merge` — **partial import**: keep the existing component and
+    override only the top-level fields the patch provides (e.g. a YAML
+    with just `id` + `nfr` replaces the NFR block, everything else
+    stays). The merge is shallow per top-level field, the merged result
+    is validated in full, then saved. Requires an `id` of an existing
+    component.
+  - `create` — append `-2`, keep both.
+  - `skip` — leave the existing component untouched.
 
 Exported YAML is byte-identical to what is stored on disk (shared
 `src/lib/component-yaml.ts` serializer), so the edit-in-place workflow
-is: export → edit the YAML → import with `onConflict: update`.
+is: export → edit the YAML → import with `onConflict: update` (whole
+component) or `onConflict: merge` (just the fields you changed).

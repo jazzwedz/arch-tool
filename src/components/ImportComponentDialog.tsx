@@ -28,12 +28,21 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Upload, AlertCircle, CheckCircle2, Info, FileUp } from "lucide-react"
-import { validateComponentDocs, type ValidationIssue } from "@/lib/component-schema"
+import {
+  validateComponentDocs,
+  loadYamlDocs,
+  type ValidationIssue,
+} from "@/lib/component-schema"
 
-type ConflictMode = "update" | "create" | "skip"
+type ConflictMode = "update" | "merge" | "create" | "skip"
 
 const CONFLICT_OPTIONS: { value: ConflictMode; label: string; hint: string }[] = [
   { value: "update", label: "Update existing", hint: "Overwrite a component with the same id." },
+  {
+    value: "merge",
+    label: "Merge fields",
+    hint: "Partial import — patch only the fields you provide onto an existing component (by id); the rest stay as they are.",
+  },
   { value: "create", label: "Create copy", hint: "Keep both — append -2 to the incoming id." },
   { value: "skip", label: "Skip existing", hint: "Leave components with a matching id untouched." },
 ]
@@ -43,6 +52,8 @@ interface DocPreview {
   name?: string
   id?: string
   type?: string
+  /** Merge mode: the top-level fields this patch will override. */
+  patchFields?: string[]
   errors: ValidationIssue[]
   warnings: ValidationIssue[]
 }
@@ -57,7 +68,8 @@ interface ImportResultRow {
   id: string
   finalId?: string
   name?: string
-  action: "created" | "updated" | "renamed" | "skipped" | "error"
+  action: "created" | "updated" | "merged" | "renamed" | "skipped" | "error"
+  fields?: string[]
   error?: string
 }
 
@@ -65,6 +77,7 @@ interface ImportSummary {
   total: number
   created: number
   updated: number
+  merged: number
   renamed: number
   skipped: number
   errors: number
@@ -124,6 +137,36 @@ export function ImportComponentDialog() {
       })
       return
     }
+
+    // Merge mode patches are partial (often no `name`), so the full
+    // component validator does not apply — we only check that each doc
+    // is an object with an id and surface the fields it will override.
+    // The authoritative validation runs server-side on the MERGED object.
+    if (onConflict === "merge") {
+      const loaded = loadYamlDocs(yamlText)
+      if (!loaded.ok) {
+        setCheck({ status: "checked", docs: [{ ok: false, errors: [{ path: "", message: loaded.error }], warnings: [] }] })
+        return
+      }
+      const docs: DocPreview[] = loaded.docs.map((d) => {
+        if (typeof d !== "object" || d === null || Array.isArray(d)) {
+          return { ok: false, errors: [{ path: "", message: "Document must be a YAML object." }], warnings: [] }
+        }
+        const obj = d as Record<string, unknown>
+        const id = typeof obj.id === "string" ? obj.id.trim() : ""
+        if (!id) {
+          return { ok: false, errors: [{ path: "id", message: "Merge requires an `id` matching an existing component." }], warnings: [] }
+        }
+        const patchFields = Object.keys(obj).filter((k) => k !== "id" && k !== "schema_version")
+        if (patchFields.length === 0) {
+          return { ok: false, id, errors: [{ path: "", message: "No fields to merge (only `id` provided)." }], warnings: [] }
+        }
+        return { ok: true, id, patchFields, errors: [], warnings: [] }
+      })
+      setCheck({ status: "checked", docs })
+      return
+    }
+
     const results = validateComponentDocs(yamlText)
     const docs: DocPreview[] = results.map((r) =>
       r.ok
@@ -169,7 +212,7 @@ export function ImportComponentDialog() {
 
       // Single applied component → jump straight to its edit page.
       if (data?.success && typeof data.id === "string") {
-        router.push(`/component/${encodeURIComponent(data.id)}/edit`)
+        router.push(`/edit/${encodeURIComponent(data.id)}`)
         resetAndClose()
         return
       }
@@ -203,7 +246,10 @@ export function ImportComponentDialog() {
             Paste or upload a single component or a multi-document bundle
             (<code>---</code> separated, the catalog YAML export format). On id
             conflict the default is to <strong>update</strong> the existing
-            component. See{" "}
+            component; <strong>Merge fields</strong> does a partial import —
+            it patches only the fields you provide (e.g. just <code>nfr</code>)
+            onto an existing component by <code>id</code>, leaving the rest
+            untouched. See{" "}
             <a href="/architecture.html" className="underline" target="_blank" rel="noreferrer">
               the model sheet
             </a>{" "}
@@ -223,7 +269,11 @@ export function ImportComponentDialog() {
                       key={opt.value}
                       type="button"
                       title={opt.hint}
-                      onClick={() => setOnConflict(opt.value)}
+                      onClick={() => {
+                        setOnConflict(opt.value)
+                        // Preview differs between merge and full modes.
+                        clearDerived()
+                      }}
                       className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                         onConflict === opt.value
                           ? "bg-primary text-primary-foreground"
@@ -326,6 +376,7 @@ export function ImportComponentDialog() {
               <div className="text-green-900 pl-6 mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
                 <span>created: {report.summary.created}</span>
                 <span>updated: {report.summary.updated}</span>
+                <span>merged: {report.summary.merged}</span>
                 <span>copied: {report.summary.renamed}</span>
                 <span>skipped: {report.summary.skipped}</span>
                 {report.summary.errors > 0 && (
@@ -371,6 +422,21 @@ export function ImportComponentDialog() {
 
 function DocCard({ index, doc }: { index: number; doc: DocPreview }) {
   if (doc.ok) {
+    // Merge-mode preview: show the id being patched and which fields.
+    if (doc.patchFields) {
+      return (
+        <div className="rounded-md border border-blue-300 bg-blue-50 p-2.5 text-sm">
+          <div className="flex items-center gap-2 text-blue-900 flex-wrap">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span className="font-medium">Patch</span>
+            <code className="text-xs text-blue-700">{doc.id}</code>
+            <span className="text-xs text-blue-700">
+              · fields: {doc.patchFields.join(", ")}
+            </span>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="rounded-md border border-green-300 bg-green-50 p-2.5 text-sm">
         <div className="flex items-center gap-2 text-green-900">
@@ -399,6 +465,7 @@ function ResultRow({ row }: { row: ImportResultRow }) {
   const tone: Record<ImportResultRow["action"], string> = {
     created: "text-green-700",
     updated: "text-blue-700",
+    merged: "text-blue-700",
     renamed: "text-amber-700",
     skipped: "text-muted-foreground",
     error: "text-red-700",
@@ -408,6 +475,9 @@ function ResultRow({ row }: { row: ImportResultRow }) {
       <span className={`w-16 shrink-0 font-medium ${tone[row.action]}`}>{row.action}</span>
       <code className="text-xs">{row.finalId || row.id || `#${row.index + 1}`}</code>
       {row.name && <span className="text-muted-foreground truncate">— {row.name}</span>}
+      {row.action === "merged" && row.fields && row.fields.length > 0 && (
+        <span className="text-blue-700 text-xs truncate">· {row.fields.join(", ")}</span>
+      )}
       {row.error && <span className="text-red-700 text-xs truncate">· {row.error}</span>}
     </div>
   )

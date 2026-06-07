@@ -184,26 +184,32 @@ export function validateComponentYaml(text: string): ValidateResult {
  * error the whole bundle fails with a single error result.
  */
 export function validateComponentDocs(text: string): ValidateResult[] {
-  let docs: unknown[]
-  try {
-    docs = yaml.loadAll(text, undefined, { schema: yaml.JSON_SCHEMA }) as unknown[]
-  } catch (err) {
-    return [
-      {
-        ok: false,
-        errors: [
-          { path: "", message: err instanceof Error ? err.message : "YAML parse error" },
-        ],
-        warnings: [],
-      },
-    ]
+  const loaded = loadYamlDocs(text)
+  if (!loaded.ok) {
+    return [{ ok: false, errors: [{ path: "", message: loaded.error }], warnings: [] }]
   }
-
-  const meaningful = docs.filter((d) => d !== null && d !== undefined)
-  if (meaningful.length === 0) {
+  if (loaded.docs.length === 0) {
     return [{ ok: false, errors: [{ path: "", message: "Empty YAML." }], warnings: [] }]
   }
-  return meaningful.map((d) => validateComponentObject(d))
+  return loaded.docs.map((d) => validateComponentObject(d))
+}
+
+/**
+ * Parse a YAML string into its raw documents (multi-doc aware), with
+ * null / empty docs (e.g. a trailing `---`) stripped. No schema
+ * validation — used by the partial/merge import path, which validates
+ * the MERGED object rather than the patch in isolation, and by
+ * validateComponentDocs above. Client-safe (js-yaml only).
+ */
+export function loadYamlDocs(
+  text: string
+): { ok: true; docs: unknown[] } | { ok: false; error: string } {
+  try {
+    const docs = yaml.loadAll(text, undefined, { schema: yaml.JSON_SCHEMA }) as unknown[]
+    return { ok: true, docs: docs.filter((d) => d !== null && d !== undefined) }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "YAML parse error" }
+  }
 }
 
 /**
