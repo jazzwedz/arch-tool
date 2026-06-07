@@ -444,10 +444,10 @@
         <div><span class="field-key">owner</span>: <span class="field-type">string</span> <span class="field-opt">?</span></div>
         <div><span class="field-key">tags</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>
         <div><span class="field-key">description</span>: { description } <span class="field-opt">? // unified — legacy { oneliner · technical · business } auto-migrates on read</span></div>
-        <div><span class="field-key">interfaces</span>: <span class="field-type">ComponentInterface[]</span> <span class="field-opt">?</span></div>
-        <div style="padding-left:20px"><span class="field-opt">name? · direction (provides | consumes) · type (rest | grpc | async | db | file | human | info | link | data) · target? · description</span></div>
-        <div><span class="field-key">relationships</span>: <span class="field-type">ComponentRelationship[]</span> <span class="field-opt">?</span></div>
-        <div style="padding-left:20px"><span class="field-opt">7 types: parent-of · child-of · depends-on · communicates-with · reads-from · writes-to · fallback</span></div>
+        <div><span class="field-key">links</span>: <span class="field-type">ComponentLink[]</span> <span class="field-opt">? // every edge to another component (v2)</span></div>
+        <div style="padding-left:20px"><span class="field-opt">{ target · role · protocol? · name? · description? }</span></div>
+        <div style="padding-left:20px"><span class="field-opt">6 roles, 3 mirror pairs: calls↔serves · part-of↔contains · reads-from↔writes-to</span></div>
+        <div style="padding-left:20px"><span class="field-opt">10 protocols: rest · grpc · async · db · table · file · human · info · link · data</span></div>
         <div><span class="field-key">risks</span>: <span class="field-type">string[]</span> <span class="field-opt">?</span></div>
         <div><span class="field-key">nfr</span>: <span class="field-type">ComponentNFR</span> <span class="field-opt">?</span></div>
         <div style="padding-left:20px"><span class="field-opt">availability · rto · rpo · max_latency · throughput · data_classification (public/internal/confidential/restricted) · scaling (horizontal/vertical/none)</span></div>
@@ -463,11 +463,7 @@
         <div style="padding-left:20px"><span class="field-opt">{ name · role · description? }</span></div>
         <div style="padding-left:20px"><span class="field-opt">role: owner · contributor · consumer · indirect</span></div>
 
-        <div style="margin-top:8px"><span class="field-key">data</span>: <span class="field-type">ComponentData</span> <span class="field-opt">? // inputs[] · outputs[] · owns[]</span></div>
-        <div style="padding-left:20px"><span class="field-opt">DataItem: name · kind · source? · consumers? · purpose? · description?</span></div>
-        <div style="padding-left:20px"><span class="field-opt"><strong>Format</strong>: table · file · stream · message · form</span></div>
-        <div style="padding-left:20px"><span class="field-opt"><strong>Business</strong>: event · command · document · decision · signal</span></div>
-        <div style="padding-left:20px"><span class="field-opt"><strong>Technical</strong>: business · reference · cache · config · transient · logs</span></div>
+        <div style="margin-top:8px;color:#64748b;font-style:italic">data flow is modelled as <code>links[]</code> with role <code>reads-from</code> / <code>writes-to</code> (the legacy <code>data{}</code> block was removed in v2 — see migration note)</div>
 
         <div style="margin-top:8px"><span class="field-key">processes</span>: <span class="field-type">ComponentProcess[]</span> <span class="field-opt">?</span></div>
         <div style="padding-left:20px"><span class="field-opt">{ name · role · activity? · description? }</span></div>
@@ -478,7 +474,7 @@
       </div>
 
       <div style="margin-top:20px;padding:12px;background:#0c2340;border:1px solid #1d4ed8;border-radius:8px;font-size:11px;color:#93c5fd;line-height:1.6">
-        <strong>Storage:</strong> each component is one <code>{id}.yaml</code> file. Git history = audit log. Backward-compat: legacy <code>business_capabilities: string[]</code> auto-migrates to <code>capabilities: [{name, role: indirect}]</code> on read; legacy <code>data.consumes / produces</code> → <code>data.inputs / outputs</code>; legacy <code>description.{oneliner, technical, business}</code> → unified <code>description.description</code>.
+        <strong>Storage:</strong> each component is one <code>{id}.yaml</code> file (<code>schema_version: 2</code>). Git history = audit log. Read-migrate / clean-write: legacy <code>interfaces[] + relationships[] + data{}</code> collapse into <code>links[]</code> on read (<code>data.owns</code> and the DataKind ontology dropped); legacy <code>business_capabilities: string[]</code> → <code>capabilities: [{name, role: indirect}]</code>; legacy <code>description.{oneliner, technical, business}</code> → unified <code>description.description</code>. Saves drop every legacy field.
       </div>
     </div>
 
@@ -495,15 +491,11 @@
   <div class="tabs">
     <div class="tab">
       <div class="tab-name">Overview <span class="tab-tag t-all">All</span></div>
-      <div class="tab-desc">Hero Component Context diagram (mermaid: inputs · outputs · owned data · relationships in one), Details, Descriptions, Risks.</div>
+      <div class="tab-desc">Hero Component Context diagram (mermaid: links — calls/serves, part-of/contains, reads-from/writes-to — in one), Details, Descriptions, Risks.</div>
     </div>
     <div class="tab">
-      <div class="tab-name">Technical <span class="tab-tag t-dev">Dev</span></div>
-      <div class="tab-desc">Interfaces (with Visualize toggle), Relationships (with Visualize toggle), Non-Functional Requirements.</div>
-    </div>
-    <div class="tab">
-      <div class="tab-name">Business <span class="tab-tag t-ba">BA</span></div>
-      <div class="tab-desc">Capabilities (table with role badges, Visualize toggle), Inputs &amp; Outputs (3 sub-tables, Visualize toggle), Processes.</div>
+      <div class="tab-name">Properties <span class="tab-tag t-dev">Dev</span> <span class="tab-tag t-ba">BA</span></div>
+      <div class="tab-desc">Links (with Visualize toggle), Capabilities, Processes, Non-Functional Requirements. Each card has its own per-block Edit dialog. (Merges the former Technical + Business tabs.)</div>
     </div>
     <div class="tab">
       <div class="tab-name">Rules &amp; Calculations <span class="tab-tag t-ba">BA</span></div>
@@ -511,11 +503,11 @@
     </div>
     <div class="tab">
       <div class="tab-name">Blast Radius <span class="tab-tag t-ops">Ops</span></div>
-      <div class="tab-desc">Reverse-graph BFS over relationships. Severity HIGH (depends-on, child-of, reads-from, writes-to) / MEDIUM (others). Stat cards + mermaid graph + layered impact list + AI Impact Memo.</div>
+      <div class="tab-desc">Reverse-graph BFS over links. Severity HIGH (calls, part-of, reads-from, writes-to) / MEDIUM (others). Stat cards + mermaid graph + layered impact list + AI Impact Memo.</div>
     </div>
     <div class="tab">
       <div class="tab-name">Documentation <span class="tab-tag t-all">All</span></div>
-      <div class="tab-desc">Generate (audience or doctype), Confluence (Publish + Open + Pull), Export (Draw.io library, Copy ID / Tech / Business descriptions).</div>
+      <div class="tab-desc">Generate (audience or doctype), Confluence (Publish + Open + Pull). YAML round-trip lives in the detail header (Download YAML) and catalog header (Export YAML / Import).</div>
     </div>
     <div class="tab">
       <div class="tab-name">Diagrams <span class="tab-tag t-all">All</span></div>
@@ -550,7 +542,7 @@
         <div class="feature-tag">Reverse-graph BFS · NFR gap detection · AI Impact Memo</div></div>
       </div>
       <div class="feature-body">
-        Click component → walk reverse-relationship graph (max depth 3). Direct + transitive impactors, severity per relationship type, NFR gaps (production without RTO), confidential-data flags. Mermaid graph + layered list. One-click "Generate AI Impact Memo" → 1-page exec-style brief.
+        Click component → walk reverse-link graph (max depth 3). Direct + transitive impactors, severity per link role, NFR gaps (production without RTO), confidential-data flags. Mermaid graph + layered list. One-click "Generate AI Impact Memo" → 1-page exec-style brief.
       </div>
     </div>
 
@@ -561,7 +553,7 @@
         <div class="feature-tag">Storage XHTML · tables + panels · TOC macro</div></div>
       </div>
       <div class="feature-body">
-        Renders structured Component Reference (At a glance · Capabilities · Interfaces · Relationships · I/O · Processes · Rules · NFR · Risks) as native Confluence tables. Rules use info / tip / warning panel macros. AI narrative above. Mermaid blocks stripped (no plugin). Hierarchy mirrors first capability.
+        Renders structured Component Reference (At a glance · Capabilities · Links · Processes · Rules · NFR · Risks) as native Confluence tables. Rules use info / tip / warning panel macros. AI narrative above. Mermaid blocks stripped (no plugin). Hierarchy mirrors first capability.
       </div>
     </div>
 
@@ -580,10 +572,10 @@
       <div class="feature-head">
         <div class="feature-icon">📐</div>
         <div><div class="feature-name">WYSIWYG Diagram Builder</div>
-        <div class="feature-tag">drawio palette · 8 connector types · save to repo</div></div>
+        <div class="feature-tag">drawio palette · 10 protocol connectors · save to repo</div></div>
       </div>
       <div class="feature-body">
-        Drag pre-styled components (matching catalog types) onto canvas, click-to-connect with 8 typed connectors (rest · grpc · async · db · file · human · info · link). Save .drawio XML to <code>diagrams/</code> in arch-data. Each diagram is preview-able as mermaid (drawio → mermaid conversion).
+        Drag pre-styled components (matching catalog types) onto canvas, click-to-connect with 10 typed connectors (rest · grpc · async · db · table · file · human · info · link · data). Save .drawio XML to <code>diagrams/</code> in arch-data. Each diagram is preview-able as mermaid (drawio → mermaid conversion).
       </div>
     </div>
 
@@ -591,10 +583,10 @@
       <div class="feature-head">
         <div class="feature-icon">📊</div>
         <div><div class="feature-name">Hero Context Diagram</div>
-        <div class="feature-tag">Per-component mermaid · auto-rendered · 5 dimensions</div></div>
+        <div class="feature-tag">Per-component mermaid · auto-rendered · link roles</div></div>
       </div>
       <div class="feature-body">
-        On every component's Overview tab, an auto-rendered mermaid flowchart combines inputs (left, green) · outputs (right, pink) · owned data (bottom, purple cylinders) · relationships (top, gray dotted). The picture you see first.
+        On every component's Overview tab, an auto-rendered mermaid flowchart combines the component's <code>links[]</code> — calls/serves (APIs), part-of/contains (containment) and reads-from/writes-to (data flow) — in one picture. The view you see first.
       </div>
     </div>
 
@@ -639,7 +631,7 @@
     </div>
 
     <div style="background:#1a1d27;border:1px solid #2e3350;border-radius:8px;padding:14px 18px;font-size:11px;color:#94a3b8;line-height:1.65">
-      <strong style="color:#e2e8f0">Patch protocol limits today:</strong> scalar fields (name · status · owner · tags · description.* · nfr.*) and indexed rule fields (<code>rules[N].name · kind · summary · description · formula · given · when · then · enforced_in</code>). Out of scope: add/remove rules in Confluence; capabilities · data · processes · interfaces · relationships round-trip — edit those in arch-tool's editor.
+      <strong style="color:#e2e8f0">Patch protocol limits today:</strong> scalar fields (name · status · owner · tags · description.* · nfr.*) and indexed rule fields (<code>rules[N].name · kind · summary · description · formula · given · when · then · enforced_in</code>). Out of scope: add/remove rules in Confluence; capabilities · links · processes round-trip — edit those in arch-tool's editor.
     </div>
 
   </div>

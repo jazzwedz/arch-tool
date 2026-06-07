@@ -7,30 +7,19 @@
 // runs `findInconsistencies`, hands the list back to the UI, and
 // the apply endpoint reuses `applyFix` to mutate the target.
 //
-// Rules:
+// Rules (v2 — links[]):
 //
-//   Relationships
-//     - parent-of ↔ child-of   (clear inverse pair)
-//     - communicates-with      (self-symmetric)
-//     Other types (depends-on, reads-from, writes-to, fallback) are
-//     directional declarations with no required reverse — they stay
-//     out of the check on purpose.
-//
-//   Interfaces
-//     - provides ↔ consumes on the same `type` and `target`. When A
-//       provides REST to B, B should consume REST from A; the mirror
-//       inherits the original interface's name + description.
-//
-//   Data flow
-//     - inputs[].source = B  →  B must declare an output (or owned
-//       data item) with the same `name` AND include A in `consumers`.
-//       Two derived issues: missing output, or output exists but A is
-//       not in its consumers.
-//     - outputs[].consumers includes B  →  B must declare an input
-//       with the same `name` AND `source = A`. Two derived issues:
-//       missing input, or input exists but `source` is empty (we do
-//       NOT auto-fix when source points to a *different* component —
-//       that is a true data-flow conflict the analyst should resolve).
+//   For every link whose target is a known component, the target
+//   should declare the inverse role back (LINK_ROLE_INVERSE). All
+//   three role pairs are audited:
+//     - calls       ↔ serves      (API edge declared from both sides)
+//     - part-of     ↔ contains    (containment declared from both sides)
+//     - reads-from  ↔ writes-to   (data flow declared from both sides)
+//   A mirror matches when target + role + `protocol` + `name` all
+//   agree, so two APIs with different protocols, or two data items
+//   with different `name`s, on the same target stay as separate edges
+//   (each needing its own mirror). Links targeting an unknown id (a
+//   free-form external label) are skipped.
 //
 // Each issue carries a stable id encoding the source declaration so
 // the apply endpoint can re-find it from a fresh scan and refuse the
@@ -92,10 +81,10 @@ export function findInconsistencies(components: Component[]): ConsistencyIssue[]
 
 // --- v2 links: mirror pair check ---
 //
-// Only the mirror-pair roles (calls ↔ serves, part-of ↔ contains) are
-// audited. `reads-from` / `writes-to` are intentionally directional —
-// the target of a data read is passive (database, queue, storage) and
-// is not expected to declare the reciprocal direction.
+// Every role has an inverse (LINK_ROLE_INVERSE), so all three pairs are
+// audited: calls ↔ serves, part-of ↔ contains, and reads-from ↔
+// writes-to. For data-flow edges the `name` field is part of the match
+// key, so the suggested mirror carries the same data-item identity.
 
 function checkLinks(
   source: Component,

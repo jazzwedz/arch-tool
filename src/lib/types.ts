@@ -18,12 +18,14 @@
 //   writes-to   — this writes data to target
 //                 (was: relationships[writes-to])
 //
-// Mirror pairs (consistency check + UI dedup):
-//   calls    ↔ serves
-//   part-of  ↔ contains
-//
-// `reads-from` / `writes-to` are directional with no required reverse
-// (the target is passive — typically a database / storage / queue).
+// Mirror pairs (consistency check + UI dedup) — all three role pairs
+// are audited; the target should declare the inverse role pointing
+// back at the source (see LINK_ROLE_INVERSE in constants.ts):
+//   calls       ↔ serves
+//   part-of     ↔ contains
+//   reads-from  ↔ writes-to    (data flow; the mirror match also
+//                               requires the `name` field to agree so
+//                               the data-item identity carries through)
 
 export type LinkRole =
   | "calls"
