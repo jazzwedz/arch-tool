@@ -7,6 +7,16 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **All 4 dependabot moderate advisories cleared (`npm audit` → 0).**
+  `hono` and `qs` (transitive via the `shadcn` CLI) bumped to patched
+  patch releases; the nested `postcss` (`<8.5.10`, XSS in CSS stringify)
+  forced to `^8.5.10` via an npm `overrides: { postcss: "$postcss" }`
+  entry plus a direct-dep bump — avoiding the `npm audit fix --force`
+  path that would have downgraded Next to 9.3.3. Next picked up the
+  15.5.18 → 15.5.19 patch in the same install. Build + typecheck green.
+
 ### Fixed
 
 - **Settings toggles for Capabilities / Processes / NFR / Risks now
