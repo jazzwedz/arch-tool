@@ -29,9 +29,16 @@
 import type { Component, ComponentLink } from "./types"
 import { LINK_ROLE_INVERSE, LINK_ROLE_LABELS } from "./constants"
 
-export type ConsistencyFix = { kind: "addLink"; link: ComponentLink }
+export type ConsistencyFix =
+  | { kind: "addLink"; link: ComponentLink }
+  /**
+   * Remove duplicate links sharing the same identity
+   * (target + role + protocol + name) from a component, keeping the
+   * first occurrence. `link` carries that identity.
+   */
+  | { kind: "dedupeLink"; link: ComponentLink }
 
-export type IssueCategory = "links"
+export type IssueCategory = "duplicate-links" | "links"
 
 export interface ConsistencyIssue {
   /**
@@ -62,21 +69,81 @@ export function findInconsistencies(components: Component[]): ConsistencyIssue[]
   const byId = new Map<string, Component>(components.map((c) => [c.id, c]))
 
   for (const source of components) {
+    // Duplicate links first so the data is deduped before mirror checks
+    // act on it (a deduped component produces one mirror issue, not N).
+    checkDuplicateLinks(source, issues)
     checkLinks(source, byId, issues)
   }
+
+  // Dedupe issues by stable id. Duplicate links on a component would
+  // otherwise emit the same mirror issue more than once (the mirror id
+  // does not include the link `name`), making the list appear to
+  // "multiply" — keep the first of each id.
+  const byIssueId = new Map<string, ConsistencyIssue>()
+  for (const it of issues) if (!byIssueId.has(it.id)) byIssueId.set(it.id, it)
+  const deduped = Array.from(byIssueId.values())
 
   // Sort: by category, then by applyTo name so rows in the same
   // target component cluster visually in the UI.
   const categoryOrder: Record<IssueCategory, number> = {
-    links: 0,
+    "duplicate-links": 0,
+    links: 1,
   }
-  return issues.sort((a, b) => {
+  return deduped.sort((a, b) => {
     const c = categoryOrder[a.category] - categoryOrder[b.category]
     if (c !== 0) return c
     const t = a.applyToName.localeCompare(b.applyToName)
     if (t !== 0) return t
     return a.title.localeCompare(b.title)
   })
+}
+
+// --- v2 links: duplicate detection ---
+//
+// A component should carry each edge once. Re-imports, manual edits, or
+// a legacy migration that ran twice can leave several identical links
+// (same target + role + protocol + name). Each such group becomes one
+// issue whose fix keeps the first occurrence and drops the rest.
+
+function linkIdentity(link: ComponentLink): string {
+  return `${link.target}::${link.role}::${link.protocol ?? ""}::${link.name ?? ""}`
+}
+
+function checkDuplicateLinks(source: Component, out: ConsistencyIssue[]): void {
+  const counts = new Map<string, { link: ComponentLink; count: number }>()
+  for (const link of source.links || []) {
+    if (!link.target) continue
+    const key = linkIdentity(link)
+    const entry = counts.get(key)
+    if (entry) entry.count += 1
+    else counts.set(key, { link, count: 1 })
+  }
+
+  for (const { link, count } of counts.values()) {
+    if (count < 2) continue
+    const extra = count - 1
+    const proto = link.protocol ? ` over ${link.protocol}` : ""
+    const named = link.name ? ` (${link.name})` : ""
+    out.push({
+      id: `dup:${source.id}:${link.role}:${link.protocol ?? ""}:${link.name ?? ""}:${link.target}`,
+      category: "duplicate-links",
+      applyTo: source.id,
+      applyToName: source.name,
+      declaredOn: source.id,
+      declaredOnName: source.name,
+      title: `${source.name} has ${count} copies of "${LINK_ROLE_LABELS[link.role]}: ${link.target}"`,
+      details: `The link "${LINK_ROLE_LABELS[link.role]}: ${link.target}"${proto}${named} appears ${count} times. Keep one and remove the ${extra} duplicate${extra === 1 ? "" : "s"}.`,
+      fix: {
+        kind: "dedupeLink",
+        link: {
+          target: link.target,
+          role: link.role,
+          ...(link.protocol ? { protocol: link.protocol } : {}),
+          ...(link.name ? { name: link.name } : {}),
+        },
+      },
+    })
+  }
 }
 
 // --- v2 links: mirror pair check ---
@@ -160,6 +227,30 @@ export function applyFix(component: Component, fix: ConsistencyFix): Component {
   switch (fix.kind) {
     case "addLink": {
       next.links = [...(next.links || []), fix.link]
+      return next
+    }
+    case "dedupeLink": {
+      // Keep the first link matching the identity, drop the rest. Other
+      // links are untouched. Identity = target + role + protocol + name
+      // (descriptions may differ; the first occurrence's wins).
+      const target = fix.link.target
+      const role = fix.link.role
+      const proto = fix.link.protocol ?? ""
+      const nm = fix.link.name ?? ""
+      let kept = false
+      next.links = (next.links || []).filter((l) => {
+        const match =
+          l.target === target &&
+          l.role === role &&
+          (l.protocol ?? "") === proto &&
+          (l.name ?? "") === nm
+        if (!match) return true
+        if (!kept) {
+          kept = true
+          return true
+        }
+        return false
+      })
       return next
     }
   }

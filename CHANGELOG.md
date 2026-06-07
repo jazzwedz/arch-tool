@@ -54,6 +54,15 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Consistency check now flags duplicate links.** A new **Duplicate
+  links** category detects the same link (same `target` + `role` +
+  `protocol` + `name`) declared more than once on a component — the
+  one-click fix keeps the first occurrence and removes the rest
+  (`dedupeLink`). It also fixes the list appearing to *multiply*:
+  duplicate links used to emit the same mirror suggestion several times
+  (the mirror id ignores `name`); issues are now deduped by id, so each
+  gap shows once.
+
 - **Partial / merge import (`onConflict: merge`).** A new **Merge
   fields** mode in the Import dialog patches only the top-level fields a
   YAML carries onto an existing component matched by `id` — e.g. paste

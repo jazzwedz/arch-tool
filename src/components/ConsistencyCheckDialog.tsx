@@ -4,7 +4,7 @@
 //
 // One button on the catalog header opens this dialog. The dialog runs
 // the scan once on mount, groups the resulting issues by category
-// (Relationships / Interfaces / Data flow), and renders one row per
+// (Duplicate links / Links), and renders one row per
 // issue with a per-row Fix button. Each Fix call hits the apply API
 // independently: a successful response marks the row green and locks
 // the button; the rest of the list stays editable so the analyst can
@@ -37,7 +37,7 @@ import {
 
 interface Issue {
   id: string
-  category: "links"
+  category: "duplicate-links" | "links"
   applyTo: string
   applyToName: string
   declaredOn: string
@@ -58,10 +58,13 @@ type RowState =
   | { kind: "error"; message: string }
 
 const CATEGORY_HEADINGS: Record<Issue["category"], string> = {
+  "duplicate-links": "Duplicate links",
   links: "Links",
 }
 
 const CATEGORY_DESCRIPTIONS: Record<Issue["category"], string> = {
+  "duplicate-links":
+    "the same link (target + role + protocol + name) declared more than once on a component — the fix keeps one and removes the rest",
   links:
     "calls ↔ serves, part-of ↔ contains and reads-from ↔ writes-to mirror pairs (target + role + protocol + name)",
 }
@@ -160,6 +163,7 @@ export function ConsistencyCheckDialog() {
 
   // Group issues by category for the rendered list.
   const grouped: Record<Issue["category"], Issue[]> = {
+    "duplicate-links": [],
     links: [],
   }
   for (const it of issues || []) grouped[it.category].push(it)
@@ -190,9 +194,10 @@ export function ConsistencyCheckDialog() {
             Catalog consistency check
           </DialogTitle>
           <DialogDescription>
-            Deterministic scan for missing backlinks across the whole catalog.
-            Each row below is one specific gap and one specific patch — click
-            Fix to apply only that one, or use the bulk action at the bottom.
+            Deterministic scan for missing backlinks and duplicate links
+            across the whole catalog. Each row below is one specific issue and
+            one specific patch — click Fix to apply only that one, or use the
+            bulk action at the bottom.
           </DialogDescription>
         </DialogHeader>
 
@@ -250,7 +255,7 @@ export function ConsistencyCheckDialog() {
 
             {issues.length > 0 && (
               <div className="space-y-5">
-                {(["links"] as const).map((cat) => {
+                {(["duplicate-links", "links"] as const).map((cat) => {
                   const items = grouped[cat]
                   if (items.length === 0) return null
                   return (
