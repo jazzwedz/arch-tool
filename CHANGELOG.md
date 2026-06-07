@@ -67,6 +67,16 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **`docs/COMPONENT_MODEL.md` rewritten for schema v2.** The canonical
+  LLM-facing schema reference still described the v1 shape
+  (`interfaces[]` + `relationships[]` + `data{}`) it predated. Rewritten
+  around the `links[]` primitive: the 6 roles and 3 mirror pairs
+  (`calls`↔`serves`, `part-of`↔`contains`, `reads-from`↔`writes-to`),
+  the 10 protocols, inverse display labels, the consistency mirror rule,
+  a full v1→v2 migration table (including `data.owns` and the 16-value
+  `DataKind` ontology being dropped), and a `links[]`-based annotated
+  example + code-generator checklist. Backlinks section updated to the
+  single `inbound-links` endpoint.
 - **Import now updates existing components by default.** Previously the
   importer was create-only: an incoming `id` that already existed was
   auto-renamed to `-2`. The `/api/components/import` endpoint now takes

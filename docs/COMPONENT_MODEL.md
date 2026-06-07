@@ -10,10 +10,18 @@
 > `components/<id>.yaml` in the repository the tool is pointed at.
 > The repo is the source of truth; the UI is a read/write view on it.
 >
-> **Versioning.** The schema is permissive on read (legacy shapes
-> auto-migrate) and clean on write (new saves drop deprecated fields).
-> A component that has never been re-saved since a migration still
-> renders correctly thanks to the read-time migration layer.
+> **Schema version.** This document describes **schema v2**. Every
+> edge between components — API calls, containment, data flow — is a
+> single `links[]` primitive. The legacy v1 containers (`interfaces[]`,
+> `relationships[]`, `data{}`) still parse on read but are migrated to
+> `links[]` in memory and dropped from disk on the next save (see §11).
+> New YAML should write `links[]` only.
+>
+> **Versioning behaviour.** Permissive on read (legacy shapes
+> auto-migrate), clean on write (saves drop deprecated fields and stamp
+> `schema_version: 2`). A component that has never been re-saved since a
+> migration still renders correctly thanks to the read-time migration
+> layer.
 
 ---
 
@@ -21,39 +29,42 @@
 
 ```ts
 interface Component {
+  // On-disk schema version. Stamped to 2 on every save; the read-time
+  // migration sets it to 2 in memory whenever it populates links[].
+  schema_version?: number             // 2 for current; undefined/1 = legacy
+
   // Identity ----------------------------------------------------------
   id: string                          // kebab-case slug; required on disk
   name: string                        // human-readable; THE only required field on create
-  type: ComponentType                 // default "component"
-  status: ComponentStatus             // default "draft"
+  type: ComponentType                 // default "component" — see §3
+  status: ComponentStatus             // default "draft" — see §4
   owner: string                       // free-form (team / role)
   tags: string[]                      // free-form, kebab-case convention
 
   // Narrative --------------------------------------------------------
-  description: ComponentDescription   // unified prose; see §6
+  description: ComponentDescription   // unified prose; see §2
 
-  // Architectural shape ----------------------------------------------
-  interfaces: ComponentInterface[]    // API surface — see §7
-  relationships: ComponentRelationship[]  // ties to other components — see §8
+  // Architectural shape (v2) -----------------------------------------
+  links?: ComponentLink[]             // EVERY edge to another component — see §6
 
   // Business framing -------------------------------------------------
-  capabilities?: ComponentCapability[]    // see §9
-  processes?: ComponentProcess[]          // see §10
-  rules?: ComponentRule[]                 // formulas / rules / constraints — see §11
+  capabilities?: ComponentCapability[]    // see §7
+  processes?: ComponentProcess[]          // see §8
+  rules?: ComponentRule[]                 // formulas / rules / constraints — see §9
   risks?: string[]                        // free-form bullet list
 
-  // Runtime data flow ------------------------------------------------
-  data?: ComponentData                // inputs / outputs / owns — see §12
-
   // Non-functional & ops ---------------------------------------------
-  nfr?: ComponentNFR                  // see §13
-  diagram?: ComponentDiagram          // visual overrides — see §14
+  nfr?: ComponentNFR                  // see §10
+  diagram?: ComponentDiagram          // visual overrides — see §10.1
 
   // External registry link (type-restricted) -------------------------
-  data_model?: ComponentDataModelLink // only meaningful when type === "table" — see §15
+  data_model?: ComponentDataModelLink // only meaningful when type === "table" — see §5
 
-  // Legacy (read-only — see §16) -------------------------------------
-  business_capabilities?: string[]    // auto-migrates → capabilities[]
+  // Legacy (read-only — migrated to links[], see §11) ----------------
+  interfaces?: ComponentInterface[]   // → links[] (calls / serves)
+  relationships?: ComponentRelationship[] // → links[] (mapped roles)
+  data?: ComponentData                // → links[] (reads-from / writes-to)
+  business_capabilities?: string[]    // → capabilities[]
 }
 ```
 
@@ -68,20 +79,24 @@ interface Component {
 | `owner` | no | `""` | Free-form |
 | `tags` | no | `[]` | string[] |
 | `description.description` | no | `""` | Unified narrative |
-| `interfaces` | no | `[]` | |
-| `relationships` | no | `[]` | |
-| All others | no | `undefined` / `null` | Dropped from saved YAML when empty |
+| `links` | no | `[]` | Every edge — see §6 |
+| `schema_version` | no | `2` on save | You may omit it; the save stamps it |
+| All others | no | `undefined` | Dropped from saved YAML when empty |
 
 ### 1.2 Validation rules enforced by `src/lib/component-schema.ts`
 
-- `name` must be non-empty string.
+- `name` must be a non-empty string.
 - `id` must match `^[a-zA-Z0-9_\-. ]+$` and contain no `..`.
-- `type`, `status`, `relationship.type`, `interface.type`,
-  `interface.direction`, `data.*.kind`, `capabilities[].role`,
-  `processes[].role`, `rules[].kind`, `nfr.data_classification`,
-  `nfr.scaling` must match their enum (errors otherwise).
+- `type`, `status`, `links[].role`, `links[].protocol`,
+  `capabilities[].role`, `processes[].role`, `rules[].kind`,
+  `nfr.data_classification`, `nfr.scaling` must match their enum
+  (errors otherwise).
+- `links[].target` is required and non-empty; `links[].role` is required.
 - `data_model` on a `type !== "table"` component → **warning**, not error.
 - Unknown top-level or sub-keys → **warning**, ignored on save.
+- Legacy fields (`interfaces`, `relationships`, `data`,
+  `business_capabilities`) still validate but emit a warning that they
+  will migrate to the canonical shape on read/save.
 
 ---
 
@@ -92,15 +107,16 @@ interface ComponentDescription {
   description?: string                // unified long-form prose (THE one to write)
 
   // Legacy — auto-migrated at read time, dropped on next save
-  oneliner?: string                   // historic card subtitle
-  technical?: string                  // historic split
-  business?: string                   // historic split
+  oneliner?: string                   // historic card subtitle (still read)
+  technical?: string                  // historic split → merged into description
+  business?: string                   // historic split → merged into description
 }
 ```
 
-**Rule.** `description.description` is the canonical field. The
-legacy three split into the unified field on read; new YAML should
-only write `description.description`.
+**Rule.** `description.description` is the canonical field. The legacy
+`technical` + `business` split merges into the unified field on read
+(joined with a blank line when both differ); new YAML writes only
+`description.description`.
 
 ---
 
@@ -198,111 +214,113 @@ remains the source of truth.
 
 ---
 
-## 6–14 see below. Each shape lives in its own section.
+## 6. ComponentLink — the single edge primitive
 
----
-
-## 7. ComponentInterface
+`links[]` is how a component connects to everything else: APIs it
+exposes or consumes, the container it lives in, the data it reads and
+writes. One shape covers all of it.
 
 ```ts
-interface ComponentInterface {
-  name?: string                       // short human label ("Orders API", "Stock checker")
-  direction: "provides" | "consumes"
-  type:
-    | "rest" | "grpc" | "async" | "db" | "file"
-    | "human" | "info" | "link" | "data"
-  target?: string                     // component id OR free external label
-  description: string                 // required: what it does
+interface ComponentLink {
+  target: string                      // component id OR free-form external label
+  role: LinkRole                      // what KIND of edge — see §6.1
+  protocol?: LinkProtocol             // HOW it travels — see §6.2 (usually omitted for part-of/contains)
+  name?: string                       // short human label ("Orders API", "OrderCreated")
+  description?: string                // what happens on this edge
 }
 ```
 
-### 7.1 Connector types (9)
+### 6.1 LinkRole — 6 values, 3 mirror pairs
 
-| `type` | Visual cue (drawio) | Use case |
+```ts
+type LinkRole = "calls" | "serves" | "part-of" | "contains" | "reads-from" | "writes-to"
+```
+
+| `role` | Reads as | Mirror inverse | Typical protocol |
+|---|---|---|---|
+| `calls` | This actively calls / consumes from target | `serves` | `rest` / `grpc` / `async` |
+| `serves` | This exposes / provides to target | `calls` | `rest` / `grpc` / `async` |
+| `part-of` | This is contained in target | `contains` | usually omitted |
+| `contains` | This contains target | `part-of` | usually omitted |
+| `reads-from` | This reads data from target | `writes-to` | `db` / `table` / `async` |
+| `writes-to` | This writes data to target | `reads-from` | `db` / `table` / `async` |
+
+**Which side to declare.** Pick the natural direction and declare it
+once. For an API, the consumer declares `calls` (or the provider
+declares `serves`) — not both manually; the UI computes and shows the
+inverse on the other component's page (§6.4). For containment, the
+child declares `part-of: <parent>`. For data flow, the active party
+declares `reads-from` / `writes-to` toward the passive store / queue.
+
+### 6.2 LinkProtocol — 10 values
+
+```ts
+type LinkProtocol =
+  "rest" | "grpc" | "async" | "db" | "table" |
+  "file" | "human" | "info" | "link" | "data"
+```
+
+| `protocol` | Visual cue (drawio / diagrams) | Use case |
 |---|---|---|
 | `rest` | Solid blue arrow | HTTP REST API |
 | `grpc` | Solid purple arrow | gRPC |
 | `async` | Dashed red arrow | Async / event-driven (Kafka topic, queue) |
-| `db` | DB many-end | Direct DB connection |
+| `db` | DB many-end | Direct DB connection (engine level) |
+| `table` | ER-many arrow, orange | Flow targets a specific table rather than the whole engine |
 | `file` | Dashed grey arrow | File / batch handoff |
 | `human` | Dashed orange arrow | Manual / user action |
 | `info` | Solid thick blue | Informational edge (no automated flow) |
 | `link` | Plain line | Generic linkage |
 | `data` | Solid thick pink | Data-flow edge when `db` / `async` would mislead |
 
-### 7.2 Semantics
+`protocol` is optional. Containment links (`part-of` / `contains`)
+normally carry no protocol.
 
-- `direction: "provides"` → this component exposes the API; `target`
-  is the caller (consumer).
-- `direction: "consumes"` → this component calls the API; `target`
-  is the provider.
-- `target` is either a known component id (catalog will render it as
-  a clickable link with the type icon) OR free text (external system,
-  partner, future component).
+### 6.3 target
 
-### 7.3 Mirror rule (used by Consistency Check)
+`target` is either a known component id (the catalog renders it as a
+clickable link with the type icon) OR free text (external system,
+partner, a future component not yet in the catalog).
 
-If A declares `provides type=X target=B`, B should declare
-`consumes type=X target=A`. The two sides are deduped to a single
-edge on the global Architecture diagram.
+### 6.4 Inverse labels (display-only, computed on detail page)
 
----
-
-## 8. ComponentRelationship
-
-```ts
-interface ComponentRelationship {
-  target: string                      // component id (typically) or free label
-  type:
-    | "parent-of" | "child-of"
-    | "depends-on" | "communicates-with"
-    | "reads-from" | "writes-to"
-    | "fallback"
-  connector?:
-    | "rest" | "grpc" | "async" | "db" | "file"
-    | "human" | "info" | "link" | "data"
-  description?: string
-}
-```
-
-### 8.1 Relationship type semantics
-
-| `type` | Reads as | Has inverse? |
-|---|---|---|
-| `parent-of` | This is parent of target | **yes** → `child-of` |
-| `child-of` | This is child of target | **yes** → `parent-of` |
-| `depends-on` | This requires target to work | no (directional) |
-| `communicates-with` | This and target exchange data | **yes** (symmetric) |
-| `reads-from` | This reads data from target | no (directional) |
-| `writes-to` | This writes data to target | no (directional) |
-| `fallback` | This is fallback for target | no (directional) |
-
-### 8.2 Inverse labels (display-only, computed on detail page)
-
-When component A declares a relationship targeting B, B's detail
-page shows the **inverse** label (see `INVERSE_RELATIONSHIP_LABELS`
-in `src/lib/constants.ts`):
+When component A declares a link targeting B, **B's detail page shows
+the inverse** of the role (`INVERSE_LINK_ROLE_LABELS` in
+`src/lib/constants.ts`). The original side stays the source of truth on
+disk; this is presentation only.
 
 | Declared on source | Shown on target |
 |---|---|
-| `parent-of` | `Child of` |
-| `child-of` | `Parent of` |
-| `depends-on` | `Required by` |
-| `communicates-with` | `Communicates with` |
+| `calls` | `Called by` |
+| `serves` | `Served by` |
+| `part-of` | `Contains` |
+| `contains` | `Part of` |
 | `reads-from` | `Read by` |
 | `writes-to` | `Written to by` |
-| `fallback` | `Has fallback` |
 
-### 8.3 Mirror rule (used by Consistency Check)
+### 6.5 Mirror rule (used by Consistency Check)
 
-- `parent-of` ↔ `child-of` — both sides should declare the
-  reciprocal direction.
-- `communicates-with` — symmetric; both sides should declare.
-- All other types are directional by design — no required reverse.
+The Consistency Check audits every link whose target is a known
+component and flags a missing reciprocal declaration. For a link with
+role R on target B, B should declare the inverse role
+(`LINK_ROLE_INVERSE`) pointing back at the source:
+
+- `calls` ↔ `serves` — API edge declared from both sides.
+- `part-of` ↔ `contains` — containment declared from both sides.
+- `reads-from` ↔ `writes-to` — data-flow edge declared from both sides.
+
+A mirror **matches** when target + role + `protocol` + `name` all
+agree, so two distinct APIs (different protocols) or two distinct data
+items (different `name`) on the same target stay as separate edges.
+The one-click "Apply" fix adds the inverse link to the target.
+
+> Author guidance: **do not pre-declare both sides defensively.**
+> Declare on the natural side; the UI surfaces the reciprocal direction
+> and the Consistency Check can add the on-disk mirror when you want it.
 
 ---
 
-## 9. ComponentCapability
+## 7. ComponentCapability
 
 ```ts
 interface ComponentCapability {
@@ -326,7 +344,7 @@ form. Free text is accepted.
 
 ---
 
-## 10. ComponentProcess
+## 8. ComponentProcess
 
 ```ts
 interface ComponentProcess {
@@ -346,7 +364,7 @@ interface ComponentProcess {
 
 ---
 
-## 11. ComponentRule
+## 9. ComponentRule
 
 ```ts
 interface ComponentRule {
@@ -377,78 +395,7 @@ interface ComponentRule {
 
 ---
 
-## 12. ComponentData
-
-```ts
-interface ComponentData {
-  owns?: DataItem[]                   // source-of-truth for these data items
-  inputs?: DataItem[]                 // items this component receives
-  outputs?: DataItem[]                // items this component emits
-}
-
-interface DataItem {
-  name: string                        // free-form data name (e.g. "OrderEvent")
-  kind: DataKind
-  source?: string                     // component id where item originates (for inputs)
-  consumers?: string[]                // component ids that receive this item (for outputs)
-  purpose?: string
-  description?: string
-}
-```
-
-### 12.1 DataKind — 16 values in three groups
-
-**Format kinds** (physical / structural shape)
-
-| `kind` | Meaning |
-|---|---|
-| `table` | Tabular row in a store |
-| `file` | File / blob |
-| `stream` | Continuous data stream |
-| `message` | Discrete message on a queue / topic |
-| `form` | Form input from a user |
-
-**Business kinds** (semantic flow artefact)
-
-| `kind` | Meaning |
-|---|---|
-| `event` | Domain event (something happened) |
-| `command` | Command to do something |
-| `document` | Document artefact (PDF, contract, …) |
-| `decision` | Decision output from a rule / policy |
-| `signal` | Notification / signal |
-
-**Technical kinds** (state / runtime)
-
-| `kind` | Meaning |
-|---|---|
-| `business` | Business state (the "real" data this component manages) |
-| `reference` | Reference / lookup data |
-| `cache` | Cached state (derived) |
-| `config` | Configuration |
-| `transient` | Short-lived runtime state |
-| `logs` | Logs / telemetry |
-
-### 12.2 Mirror rule (used by Consistency Check)
-
-If A declares `inputs: [{ name: X, source: B }]`, then B should
-declare an output (or owned item) **with the same `name: X`** and
-include A in `consumers`. The catalog UI links source ↔ output and
-input ↔ consumer bidirectionally on the detail pages.
-
-If matching the other side's input/output names fails by mere
-whitespace ("OrderEvent" vs "Order Event"), the consistency
-checker treats them as different items.
-
-### 12.3 Legacy keys
-
-Older YAML used `data.consumes` and `data.produces`. They are
-read-migrated to `data.inputs` and `data.outputs` respectively;
-new saves write only the canonical names.
-
----
-
-## 13. ComponentNFR
+## 10. ComponentNFR
 
 ```ts
 interface ComponentNFR {
@@ -462,9 +409,7 @@ interface ComponentNFR {
 }
 ```
 
----
-
-## 14. ComponentDiagram
+### 10.1 ComponentDiagram
 
 ```ts
 interface ComponentDiagram {
@@ -479,51 +424,56 @@ drawio export. When absent, the type-derived defaults from
 
 ---
 
-## 15. Backlinks & inverse semantics (computed, not stored)
+## 11. Backward compatibility (read-only, never write)
 
-The catalog computes a few derived views by scanning all components
-at request time — **none of these are stored on disk**. Useful to
-know when generating components programmatically:
+The read-time migration runs in `src/lib/github.ts`
+(`migrateComponent` → `migrateToLinksV2`). New saves drop every legacy
+field, so disk converges to canonical v2 over time. Migration is
+idempotent: a component already at `schema_version: 2` gets a no-op pass.
 
-| Derived view | What it is | Endpoint |
-|---|---|---|
-| Inbound relationships | Inverse rows on the detail page | `/api/components/[id]/inbound-relationships` |
-| Inbound interfaces | "Referenced by interfaces from" backlinks | `/api/components/[id]/inbound-interfaces` |
-| Inbound data refs | Downstream consumers / upstream emitters | `/api/components/[id]/inbound-data` |
-| Combined relationships | Outbound + inverted inbound, deduped | computed in `/component/[id]/page.tsx` |
-
-LLMs producing components should **NOT add inverse declarations
-defensively** — declare on the natural side only, the UI surfaces
-the reciprocal direction automatically. Adding both sides
-duplicates the disk state and offers no extra information; the
-Consistency Check intentionally treats only the MISSING-mirror case
-as an issue, not the doubly-declared case.
-
----
-
-## 16. Backward compatibility (read-only, never write)
+### 11.1 Field-level renames
 
 | Legacy field | Migrates to | Notes |
 |---|---|---|
-| `description.oneliner` | kept as-is (rare use) | Card subtitle in old UI |
-| `description.technical` | `description.description` | Joined with `business` when both exist |
-| `description.business` | `description.description` | Joined with `technical` when both exist |
+| `dependencies[]` | `relationships[]` (`depends-on`) then → `links[]` | Very old shape |
+| `description.technical` | `description.description` | Joined with `business` when both differ |
+| `description.business` | `description.description` | Joined with `technical` when both differ |
 | `business_capabilities: string[]` | `capabilities: [{ name, role: "indirect" }]` | One entry per legacy string |
-| `data.consumes` | `data.inputs` | 1-to-1 rename |
-| `data.produces` | `data.outputs` | 1-to-1 rename |
+| `data.consumes` / `data.produces` | `data.inputs` / `data.outputs` | Pre-pass before the data → links migration |
 
-The migration happens at read time in `src/lib/github.ts`
-(`migrateComponent`). New saves drop the legacy fields entirely so
-the disk converges to canonical shape over time.
+### 11.2 v1 → v2 edge migration (into `links[]`)
+
+| Legacy edge | → `links[]` entry |
+|---|---|
+| `interfaces[direction: provides]` | `role: serves`, `protocol = interface.type`, name/description carried |
+| `interfaces[direction: consumes]` | `role: calls`, `protocol = interface.type`, name/description carried |
+| `relationships[parent-of]` | `role: contains` |
+| `relationships[child-of]` | `role: part-of` |
+| `relationships[depends-on]` | `role: calls` (description "Depends on" when none set) |
+| `relationships[communicates-with]` | `role: calls` (description "Communicates with (bidirectional)") |
+| `relationships[reads-from]` | `role: reads-from` |
+| `relationships[writes-to]` | `role: writes-to` |
+| `relationships[fallback]` | `role: calls` (description "Fallback / backup") |
+| `data.inputs[name: X, source: B, purpose: P]` | `role: reads-from`, `target: B`, `name: X`, `description: P` |
+| `data.outputs[name: X, consumers: [B, C], purpose: P]` | one `writes-to` link per consumer (`target: B` and `target: C`), `name: X`, `description: P` |
+| `data.owns` | **DROPPED** — "source of truth" is not an edge; express via tags / capabilities |
+| `DataKind` (16-value ontology) | **DROPPED** — not preserved; only `name` + `purpose` carry over |
+| `relationships[].connector` / `interfaces[].type` | `links[].protocol` |
+
+Edges are de-duped on `(target, role, protocol, name)`, so a link that
+a previous save already moved into `links[]` is not duplicated by a
+still-present legacy entry. Inputs with no `source` and outputs with no
+`consumers` are dropped (orphan edges).
 
 ---
 
-## 17. Annotated example
+## 12. Annotated example
 
 ```yaml
 # components/order-service.yaml
 
-id: order-service                  # required; usually slug of name
+schema_version: 2                  # stamped on save; you may omit it
+id: order-service                  # required on disk; usually slug of name
 name: Order Service                # the only mandatory field on create
 type: microservice                 # see §3
 status: production                 # draft | production | deprecated
@@ -537,47 +487,54 @@ description:
     Owns the order lifecycle from creation through fulfilment.
     Publishes domain events on every state transition.
 
-interfaces:                        # §7
-  - name: Orders API
-    direction: provides
-    type: rest
-    target: web-frontend           # consumer
+links:                             # §6 — every edge to another component
+  # API edges (calls / serves) — protocol set
+  - target: web-frontend
+    role: serves
+    protocol: rest
+    name: Orders API
     description: REST endpoint for placing and querying orders.
-  - name: Inventory lookup
-    direction: consumes
-    type: rest
-    target: inventory-service
-    description: Reads available stock when accepting a new order.
-  - name: Order events
-    direction: provides
-    type: async
-    target: analytics-pipeline
-    description: Emits OrderCreated / OrderShipped on Kafka.
-
-relationships:                     # §8
-  - target: payments-context
-    type: child-of                 # this lives inside payments-context
-    description: Owned by the Payments bounded context.
   - target: inventory-service
-    type: depends-on
-    connector: rest
-  - target: notification-service
-    type: communicates-with
-    connector: async
+    role: calls
+    protocol: rest
+    name: Inventory lookup
+    description: Reads available stock when accepting a new order.
 
-capabilities:                      # §9
+  # Containment (part-of / contains) — protocol omitted
+  - target: payments-context
+    role: part-of
+    description: Owned by the Payments bounded context.
+
+  # Data flow (reads-from / writes-to) — name carries the data item
+  - target: inventory-service
+    role: reads-from
+    protocol: db
+    name: StockLevel
+    description: Validate availability at order time.
+  - target: analytics-pipeline
+    role: writes-to
+    protocol: async
+    name: OrderCreated
+    description: Triggers downstream fulfilment and analytics.
+  - target: notification-service
+    role: writes-to
+    protocol: async
+    name: OrderCreated
+    description: Customer notification on new orders.
+
+capabilities:                      # §7
   - name: Order Management
     role: owner
     description: Source of truth for orders.
   - name: Payment Processing
     role: consumer
 
-processes:                         # §10
+processes:                         # §8
   - name: Order to Cash
     role: participant
     activity: Creates order, debits inventory, hands off to fulfilment.
 
-rules:                             # §11
+rules:                             # §9
   - name: Order total formula
     kind: formula
     formula: total = sum(line_items.price * line_items.qty) + shipping
@@ -594,30 +551,7 @@ rules:                             # §11
       - order-service
       - web-frontend
 
-data:                              # §12
-  owns:
-    - name: Order
-      kind: business
-      description: The order aggregate root.
-  inputs:
-    - name: StockLevel
-      kind: reference
-      source: inventory-service
-      purpose: Validate availability at order time.
-  outputs:
-    - name: OrderCreated
-      kind: event
-      consumers:
-        - analytics-pipeline
-        - notification-service
-      purpose: Triggers downstream fulfilment and customer notification.
-    - name: OrderShipped
-      kind: event
-      consumers:
-        - analytics-pipeline
-        - notification-service
-
-nfr:                               # §13
+nfr:                               # §10
   availability: "99.95%"
   rto: 15 minutes
   rpo: 1 minute
@@ -634,7 +568,25 @@ risks:
 
 ---
 
-## 18. Quick reference for code generators
+## 13. Backlinks & inverse semantics (computed, not stored)
+
+The catalog computes derived views by scanning all components at
+request time — **none of these are stored on disk**:
+
+| Derived view | What it is | Endpoint |
+|---|---|---|
+| Inbound links | Every link from another component that targets this one, shown with the inverse role label (§6.4) | `/api/components/[id]/inbound-links` |
+| Combined links | Outbound links + inverted inbound, deduped | computed in `/component/[id]/page.tsx` |
+
+LLMs producing components should **NOT add inverse declarations
+defensively** — declare on the natural side only (§6.1, §6.5). The UI
+surfaces the reciprocal direction automatically; the Consistency Check
+treats only the MISSING-mirror case as an issue, not the
+doubly-declared case.
+
+---
+
+## 14. Quick reference for code generators
 
 When asking an LLM to produce a new component, paste this checklist
 together with the model document:
@@ -645,31 +597,36 @@ together with the model document:
 - [ ] `type` is one of the 20 values in §3 (default `component`).
 - [ ] `status` is one of `draft` / `production` / `deprecated`
       (default `draft`).
-- [ ] Every `relationship.type` is in §8.1's enum.
-- [ ] Every `interface.direction` ∈ {`provides`, `consumes`} and
-      `interface.type` is in §7.1.
-- [ ] Every `data.{inputs,outputs,owns}[].kind` is in §12.1.
-- [ ] `nfr.data_classification` if set ∈ §13's enum.
-- [ ] `nfr.scaling` if set ∈ §13's enum.
+- [ ] Every `links[].role` is one of the 6 in §6.1.
+- [ ] Every `links[].protocol` (when set) is one of the 10 in §6.2.
+- [ ] API edges use `calls` (consumer side) or `serves` (provider
+      side) with a protocol — declared once, on the natural side.
+- [ ] Containment uses `part-of` on the child (parent omitted; the UI
+      shows "Contains").
+- [ ] Data flow uses `reads-from` / `writes-to`; `name` identifies the
+      data item, `protocol` is typically `db` / `table` / `async`.
+- [ ] `nfr.data_classification` if set ∈ §10's enum.
+- [ ] `nfr.scaling` if set ∈ §10's enum.
 - [ ] `data_model` only on `type: table` (warning otherwise).
-- [ ] No legacy fields (`description.oneliner`, `description.technical`,
-      `description.business`, `business_capabilities`, `data.consumes`,
-      `data.produces`) — write the canonical shape only.
-- [ ] Do not pre-declare inverse relationships on the target; the UI
-      computes those (§15).
+- [ ] No legacy fields (`interfaces`, `relationships`, `data`,
+      `business_capabilities`, `description.technical`,
+      `description.business`) — write the canonical v2 shape only.
+- [ ] Do not pre-declare inverse links on the target; the UI computes
+      those (§6.4, §13).
 
-When asking an LLM to **migrate** existing YAML, point it at §16 —
-that table is the full set of read-time migrations.
+When asking an LLM to **migrate** existing YAML, point it at §11 —
+that table is the full set of read-time migrations, including the
+v1 `interfaces` / `relationships` / `data` → `links[]` collapse.
 
 ---
 
-## 19. Export / import round-trip
+## 15. Export / import round-trip
 
 The catalog round-trips through YAML in exactly the on-disk shape:
 
 - **Export single** — `GET /api/components/<id>/export` (or the
   *Download YAML* button on the detail page) returns one component as
-  its canonical YAML document.
+  its canonical v2 YAML document.
 - **Export all** — `GET /api/admin/export-yaml` (or the *Export YAML*
   button in the catalog header) returns a **multi-document bundle**:
   every component as a separate YAML document, `---` separated, with a
