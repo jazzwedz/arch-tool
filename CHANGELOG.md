@@ -116,7 +116,7 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   (`/api/solutions`, `/api/solutions/[id]`), a Solutions list page and a
   read-only detail page (Overview with a member-scoped diagram, Members,
   Flows, Delivers, NFR & Risks), and the design doc `docs/SOLUTIONS.md`.
-  The deterministic composer wizard and BRD generation land in later
+  The deterministic composer wizard and DSD generation land in later
   phases.
 - **Solutions — click-first composer wizard (Phase 2).** `/solutions/new`:
   a 4-step wizard (Intent → Skeleton → Flows → Review) that needs almost
@@ -127,15 +127,15 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   way through; **Create** atomically creates approved gap components
   (`status: draft`, pre-filled to close the gap) then saves the solution.
   Same `Proposal` shape leaves the door open for an LLM proposer later.
-- **Solutions — BRD generation + promote flows (Phase 3).** The solution
-  detail page gains a **Documentation** tab that generates a Solution
-  Description / BRD via the existing Generate pipeline (new
-  `solution-brd` doc type; context = the solution YAML + its member
-  components' YAML) — exec summary, inventory, capability/process
-  mapping, NFR rollup, dependencies, risks, rules, roadmap. The Flows tab
-  gains **Promote proposed flows** (`POST /api/solutions/[id]/promote-flows`)
-  which writes the proposed flows into the member components' real
-  `links[]` and flips them to existing — the to-be becomes the as-is.
+- **Solutions — DSD generation + promote flows (Phase 3).** The solution
+  detail page gains a **Documentation** tab that generates a **Detailed
+  Solution Description (DSD)** by reusing the existing Generate pipeline's
+  `detailed-solution` doc type (the same nicely-formatted generator used
+  elsewhere); context = the solution YAML + its member components' YAML.
+  The Flows tab gains **Promote proposed flows**
+  (`POST /api/solutions/[id]/promote-flows`) which writes the proposed
+  flows into the member components' real `links[]` and flips them to
+  existing — the to-be becomes the as-is.
 
 - **Processes overview page (`/processes`).** New top-nav entry next to
   Catalog. Aggregates every business process declared anywhere in the

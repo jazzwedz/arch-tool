@@ -3,7 +3,7 @@
 > **What this is.** A *Solution* lets an analyst compose a new offering
 > out of **existing catalog components** — pick what to reuse, fill the
 > gaps with new ones, describe how they interact, and generate a
-> Solution Description / BRD. It is the "to-be" layer over the "as-is"
+> Detailed Solution Description (DSD). It is the "to-be" layer over the "as-is"
 > component catalog.
 
 ## 1. Why a separate entity (not containment, not a component type)
@@ -100,17 +100,18 @@ Minimal typing (only the name). Everything else is clicking.
 gap), then the solution is saved referencing all members. A per-item
 report shows created / skipped / errors (same shape as the YAML import).
 
-## 6. Generated output — Solution Description / BRD
+## 6. Generated output — Detailed Solution Description (DSD)
 
-Reuses the existing **Generate** pipeline with a new doc type
-`solution-brd`. Context fed to the model = the solution YAML + the YAML of
-every member component (via the existing `componentToYaml` export). The
-deterministic parts (inventory table, mapping matrix, diagram) can be
-assembled without the model; the model writes the prose.
+Reuses the existing **Generate** pipeline's **`detailed-solution`** doc
+type (the same nicely-formatted generator used for components/diagrams).
+Context fed to the model = the solution YAML + the YAML of every member
+component (via the existing `componentToYaml` export), passed as the
+diagram `componentsYaml` with the solution name as the title. No bespoke
+prompt — we route through what already produces the formatted document.
 
-### Target sections and where each comes from
+### Information the DSD draws on and where it comes from
 
-| BRD section | Source |
+| Section | Source |
 |---|---|
 | Executive summary | `name` / `goal` / `description` |
 | Business context & drivers | `delivers` |
@@ -144,7 +145,8 @@ components already hold — which is what validated the use case.
   nav entry, this doc.
 - **Phase 2** — deterministic proposer + 4-step wizard + atomic create
   (with gap auto-create).
-- **Phase 3** — Generate `solution-brd` + promote proposed flows.
+- **Phase 3** — Generate DSD (reuses the `detailed-solution` doc type) +
+  promote proposed flows.
 
 ## 9. Open (folded for MVP, structured later)
 

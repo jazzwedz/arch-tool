@@ -49,7 +49,7 @@ export default function SolutionDetailPage() {
   const [tab, setTab] = useState<TabId>("overview")
   const [reload, setReload] = useState(0)
 
-  // BRD generation + flow promotion state
+  // DSD generation + flow promotion state
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
@@ -92,14 +92,19 @@ export default function SolutionDetailPage() {
       const memberComps = (solution.members || [])
         .map((m) => byId.get(m.component))
         .filter(Boolean) as Component[]
-      const componentsYaml = memberComps.map((c) => componentToYaml(c)).join("---\n")
+      // Reuse the existing "Detailed Solution Description" generator (the
+      // nicely-formatted diagram doc type). Context = the solution YAML
+      // plus each member component's YAML.
+      const componentsYaml = [
+        solutionToYaml(solution),
+        ...memberComps.map((c) => componentToYaml(c)),
+      ].join("---\n")
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          documentType: "solution-brd",
-          solutionId: solution.id,
-          solutionYaml: solutionToYaml(solution),
+          documentType: "detailed-solution",
+          diagramName: solution.name,
           componentsYaml,
         }),
       })
@@ -448,7 +453,7 @@ export default function SolutionDetailPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
-              Generate a Solution Description / BRD from this solution and its members.
+              Generate a Detailed Solution Description (DSD) from this solution and its members.
             </p>
             <Button onClick={generateBrd} disabled={generating}>
               {generating ? (
@@ -457,7 +462,7 @@ export default function SolutionDetailPage() {
                   Generating…
                 </>
               ) : (
-                "Generate BRD"
+                "Generate DSD"
               )}
             </Button>
           </div>
