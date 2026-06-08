@@ -65,6 +65,15 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   Flows, Delivers, NFR & Risks), and the design doc `docs/SOLUTIONS.md`.
   The deterministic composer wizard and BRD generation land in later
   phases.
+- **Solutions — click-first composer wizard (Phase 2).** `/solutions/new`:
+  a 4-step wizard (Intent → Skeleton → Flows → Review) that needs almost
+  no typing. A deterministic proposer (`solution-proposer.ts`) matches the
+  delivered capabilities/processes against component metadata and proposes
+  members (ranked, with a reason), flags gaps as new draft components, and
+  seeds existing links between members. The analyst ticks/segments their
+  way through; **Create** atomically creates approved gap components
+  (`status: draft`, pre-filled to close the gap) then saves the solution.
+  Same `Proposal` shape leaves the door open for an LLM proposer later.
 
 - **Processes overview page (`/processes`).** New top-nav entry next to
   Catalog. Aggregates every business process declared anywhere in the

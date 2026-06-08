@@ -1,0 +1,471 @@
+"use client"
+
+// Solution composer — 4-step, click-first wizard.
+//   1. Intent     — name + pick delivered capabilities/processes (chips)
+//   2. Skeleton   — deterministic proposer; tick members, set disposition,
+//                   accept gap → new component
+//   3. Flows      — accept existing, add proposed (dropdowns)
+//   4. Review     — scoped diagram + Create
+// Nothing is written until Create (propose → approve → create).
+
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { ArrowLeft, Loader2, AlertCircle, Plus, X } from "lucide-react"
+import { MermaidPreview } from "@/components/mermaid-preview"
+import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
+import { proposeSolution, type SolutionProposal } from "@/lib/solution-proposer"
+import { slugifyId } from "@/lib/component-schema"
+import {
+  BUSINESS_CAPABILITIES,
+  MEMBER_DISPOSITIONS,
+  MEMBER_DISPOSITION_LABELS,
+  LINK_ROLES,
+  LINK_PROTOCOLS,
+} from "@/lib/constants"
+import type {
+  Component,
+  ComponentType,
+  MemberDisposition,
+  SolutionFlow,
+  SolutionMember,
+  Solution,
+  LinkRole,
+  LinkProtocol,
+} from "@/lib/types"
+
+interface MemberState {
+  include: boolean
+  disposition: MemberDisposition
+  role: string
+  reason?: string
+}
+interface GapState {
+  include: boolean
+  name: string
+  type: ComponentType
+  kind: "capability" | "process"
+  value: string
+}
+
+export default function NewSolutionPage() {
+  const router = useRouter()
+  const [components, setComponents] = useState<Component[]>([])
+  const [step, setStep] = useState(1)
+
+  const [name, setName] = useState("")
+  const [goal, setGoal] = useState("")
+  const [owner, setOwner] = useState("")
+  const [selCaps, setSelCaps] = useState<string[]>([])
+  const [selProcs, setSelProcs] = useState<string[]>([])
+
+  const [memberState, setMemberState] = useState<Record<string, MemberState>>({})
+  const [gapState, setGapState] = useState<Record<string, GapState>>({})
+  const [existingFlowOn, setExistingFlowOn] = useState<Record<string, boolean>>({})
+  const [addedFlows, setAddedFlows] = useState<SolutionFlow[]>([])
+  const [proposal, setProposal] = useState<SolutionProposal | null>(null)
+
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/components")
+      .then((r) => r.json())
+      .then((d) => setComponents(Array.isArray(d) ? d : []))
+      .catch(() => setComponents([]))
+  }, [])
+
+  const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
+
+  // Chip vocabularies — click, don't type.
+  const allCaps = useMemo(() => {
+    const s = new Set<string>(BUSINESS_CAPABILITIES as readonly string[])
+    for (const c of components) for (const cap of c.capabilities || []) if (cap.name) s.add(cap.name)
+    return Array.from(s).sort((a, b) => a.localeCompare(b))
+  }, [components])
+  const allProcs = useMemo(() => {
+    const s = new Set<string>()
+    for (const c of components) for (const p of c.processes || []) if (p.name) s.add(p.name)
+    return Array.from(s).sort((a, b) => a.localeCompare(b))
+  }, [components])
+
+  const toggle = (arr: string[], set: (v: string[]) => void, v: string) =>
+    set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+
+  // Run the deterministic proposer and seed selections.
+  const runProposer = () => {
+    const p = proposeSolution(
+      { name, capabilities: selCaps, processes: selProcs },
+      components
+    )
+    setProposal(p)
+    const ms: Record<string, MemberState> = {}
+    for (const m of p.members)
+      ms[m.component] = { include: true, disposition: m.disposition, role: m.role || "", reason: m.reason }
+    setMemberState(ms)
+    const gs: Record<string, GapState> = {}
+    for (const g of p.gaps)
+      gs[g.value] = { include: true, name: g.suggestedName, type: g.suggestedType, kind: g.kind, value: g.value }
+    setGapState(gs)
+    const ef: Record<string, boolean> = {}
+    for (const f of p.flows) ef[flowKey(f)] = true
+    setExistingFlowOn(ef)
+    setAddedFlows([])
+  }
+
+  const goStep2 = () => {
+    runProposer()
+    setStep(2)
+  }
+
+  // ---- assembled solution (for preview + create) ----
+  const assembled = useMemo(() => {
+    const members: SolutionMember[] = []
+    if (proposal) {
+      for (const m of proposal.members) {
+        const st = memberState[m.component]
+        if (st?.include) members.push({ component: m.component, disposition: st.disposition, role: st.role || undefined })
+      }
+    }
+    const newComponents: Component[] = []
+    for (const key of Object.keys(gapState)) {
+      const g = gapState[key]
+      if (!g.include) continue
+      const id = slugifyId(g.name)
+      if (!id) continue
+      members.push({ component: id, disposition: "new", role: `Covers ${g.kind} “${g.value}”` })
+      newComponents.push({
+        id,
+        name: g.name,
+        type: g.type,
+        status: "draft",
+        owner,
+        tags: [],
+        description: {},
+        capabilities: g.kind === "capability" ? [{ name: g.value, role: "owner" }] : [],
+        processes: g.kind === "process" ? [{ name: g.value, role: "owner" }] : [],
+      })
+    }
+    const flows: SolutionFlow[] = []
+    if (proposal) for (const f of proposal.flows) if (existingFlowOn[flowKey(f)]) flows.push(stripReason(f))
+    for (const f of addedFlows) flows.push(f)
+    return { members, newComponents, flows }
+  }, [proposal, memberState, gapState, existingFlowOn, addedFlows, owner])
+
+  const previewChart = useMemo(() => {
+    // Include gap "new" members as pseudo-components so the diagram labels them.
+    const pseudo: Component[] = assembled.newComponents.map((c) => c)
+    return buildSolutionMermaid(assembled.members, [...components, ...pseudo], assembled.flows)
+  }, [assembled, components])
+
+  const create = async () => {
+    setCreating(true)
+    setCreateError(null)
+    try {
+      const id = slugifyId(name)
+      const solution: Solution = {
+        id,
+        name,
+        status: "draft",
+        owner,
+        description: {},
+        goal: goal || undefined,
+        delivers: { capabilities: selCaps, processes: selProcs },
+        members: assembled.members,
+        flows: assembled.flows,
+      }
+      const r = await fetch("/api/solutions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ solution, newComponents: assembled.newComponents }),
+      })
+      const data = await r.json().catch(() => null)
+      if (!r.ok) throw new Error((data && data.error) || `Create failed (${r.status})`)
+      router.push(`/solutions/${encodeURIComponent(data.id)}`)
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Create failed")
+      setCreating(false)
+    }
+  }
+
+  const memberIdsForFlow = assembled.members.map((m) => m.component)
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div className="flex items-center gap-2">
+        <Link href="/solutions">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <h1 className="text-2xl font-bold">New solution</h1>
+        <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+          {["Intent", "Skeleton", "Flows", "Review"].map((label, i) => (
+            <span
+              key={label}
+              className={`px-2 py-1 rounded ${step === i + 1 ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+            >
+              {i + 1}. {label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* STEP 1 — intent */}
+      {step === 1 && (
+        <div className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1">
+              <span className="text-sm font-medium">Name *</span>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer Self-Service Portal" />
+            </label>
+            <label className="space-y-1">
+              <span className="text-sm font-medium">Owner</span>
+              <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="digital-team" />
+            </label>
+          </div>
+          <label className="space-y-1 block">
+            <span className="text-sm font-medium">Goal</span>
+            <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Reduce inbound support by 30%" />
+          </label>
+
+          <ChipPicker title="Delivers — capabilities" options={allCaps} selected={selCaps} onToggle={(v) => toggle(selCaps, setSelCaps, v)} />
+          <ChipPicker title="Delivers — processes" options={allProcs} selected={selProcs} onToggle={(v) => toggle(selProcs, setSelProcs, v)} empty="No processes declared in the catalog yet." />
+
+          <div className="flex justify-end">
+            <Button onClick={goStep2} disabled={name.trim() === "" || (selCaps.length === 0 && selProcs.length === 0)}>
+              Propose skeleton →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2 — skeleton */}
+      {step === 2 && proposal && (
+        <div className="space-y-5">
+          <section>
+            <h2 className="text-sm font-semibold mb-2">Proposed members ({proposal.members.length})</h2>
+            {proposal.members.length === 0 && <p className="text-sm text-muted-foreground">No existing component covers the selected targets — see gaps below.</p>}
+            <div className="space-y-2">
+              {proposal.members.map((m) => {
+                const st = memberState[m.component]
+                const c = byId.get(m.component)
+                return (
+                  <Card key={m.component}>
+                    <CardContent className="py-3">
+                      <div className="flex items-start gap-3">
+                        <input type="checkbox" className="mt-1 h-4 w-4" checked={st?.include ?? false}
+                          onChange={(e) => setMemberState((s) => ({ ...s, [m.component]: { ...st, include: e.target.checked } }))} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{c?.name || m.component}</span>
+                            <Seg value={st?.disposition} onChange={(d) => setMemberState((s) => ({ ...s, [m.component]: { ...st, disposition: d } }))} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{m.reason}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold mb-2">Gaps → new components ({proposal.gaps.length})</h2>
+            {proposal.gaps.length === 0 && <p className="text-sm text-muted-foreground">All targets are covered by existing components.</p>}
+            <div className="space-y-2">
+              {proposal.gaps.map((g) => {
+                const st = gapState[g.value]
+                return (
+                  <Card key={g.value}>
+                    <CardContent className="py-3 flex items-start gap-3">
+                      <input type="checkbox" className="mt-2 h-4 w-4" checked={st?.include ?? false}
+                        onChange={(e) => setGapState((s) => ({ ...s, [g.value]: { ...st, include: e.target.checked } }))} />
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="text-xs text-muted-foreground">
+                          gap: {g.kind} “{g.value}” not covered → new component
+                        </div>
+                        <div className="flex gap-2 flex-wrap items-center">
+                          <Input className="h-8 w-64" value={st?.name ?? ""} onChange={(e) => setGapState((s) => ({ ...s, [g.value]: { ...st, name: e.target.value } }))} />
+                          <select className="h-8 rounded-md border bg-background px-2 text-sm" value={st?.type}
+                            onChange={(e) => setGapState((s) => ({ ...s, [g.value]: { ...st, type: e.target.value as ComponentType } }))}>
+                            {["service", "microservice", "component", "frontend", "gateway", "database"].map((t) => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                          <Badge variant="outline" className="text-[10px]">id: {slugifyId(st?.name || "")}</Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </section>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
+            <Button onClick={() => setStep(3)}>Flows →</Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3 — flows */}
+      {step === 3 && proposal && (
+        <div className="space-y-5">
+          <section>
+            <h2 className="text-sm font-semibold mb-2">Existing links between members</h2>
+            {proposal.flows.length === 0 && <p className="text-sm text-muted-foreground">No existing links between the chosen members.</p>}
+            <div className="space-y-2">
+              {proposal.flows.map((f) => (
+                <label key={flowKey(f)} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" className="h-4 w-4" checked={existingFlowOn[flowKey(f)] ?? false}
+                    onChange={(e) => setExistingFlowOn((s) => ({ ...s, [flowKey(f)]: e.target.checked }))} />
+                  <span>{byId.get(f.from)?.name || f.from} → {byId.get(f.to)?.name || f.to}</span>
+                  <Badge variant="outline" className="text-[10px]">{f.role}{f.protocol ? ` · ${f.protocol}` : ""}</Badge>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <FlowAdder memberIds={memberIdsForFlow} byId={byId} newNames={assembled.newComponents} onAdd={(f) => setAddedFlows((a) => [...a, f])} />
+
+          {addedFlows.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold mb-2">Proposed flows ({addedFlows.length})</h2>
+              <div className="space-y-1">
+                {addedFlows.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <span>{labelFor(f.from, byId, assembled.newComponents)} ⇢ {labelFor(f.to, byId, assembled.newComponents)}</span>
+                    <Badge variant="outline" className="text-[10px]">{f.role}{f.protocol ? ` · ${f.protocol}` : ""}</Badge>
+                    <button onClick={() => setAddedFlows((a) => a.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-600">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
+            <Button onClick={() => setStep(4)}>Review →</Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 4 — review */}
+      {step === 4 && (
+        <div className="space-y-4">
+          <div className="text-sm text-muted-foreground">
+            <strong>{assembled.members.length}</strong> members ·{" "}
+            <strong>{assembled.newComponents.length}</strong> new component(s) to create ·{" "}
+            <strong>{assembled.flows.length}</strong> flows
+          </div>
+          <Card><CardContent className="pt-4"><MermaidPreview chart={previewChart} className="w-full" /></CardContent></Card>
+          {createError && (
+            <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{createError}
+            </div>
+          )}
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setStep(3)} disabled={creating}>← Back</Button>
+            <Button onClick={create} disabled={creating || name.trim() === ""}>
+              {creating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating…</> : "Create solution"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---- helpers / sub-components ----
+
+function flowKey(f: SolutionFlow): string {
+  return `${f.from}::${f.to}::${f.role}::${f.protocol ?? ""}`
+}
+function stripReason(f: SolutionFlow): SolutionFlow {
+  return { from: f.from, to: f.to, role: f.role, protocol: f.protocol, status: f.status, description: f.description }
+}
+function labelFor(id: string, byId: Map<string, Component>, news: Component[]): string {
+  return byId.get(id)?.name || news.find((n) => n.id === id)?.name || id
+}
+
+function ChipPicker({ title, options, selected, onToggle, empty }: {
+  title: string; options: string[]; selected: string[]; onToggle: (v: string) => void; empty?: string
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-medium mb-2">{title}</h3>
+      {options.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{empty || "Nothing available."}</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {options.map((o) => {
+            const on = selected.includes(o)
+            return (
+              <button key={o} type="button" onClick={() => onToggle(o)}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${on ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}>
+                {o}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Seg({ value, onChange }: { value?: MemberDisposition; onChange: (d: MemberDisposition) => void }) {
+  return (
+    <div className="flex gap-0.5 rounded-md border p-0.5">
+      {MEMBER_DISPOSITIONS.filter((d) => d !== "new").map((d) => (
+        <button key={d} type="button" onClick={() => onChange(d)}
+          className={`px-2 py-0.5 rounded text-[11px] font-medium ${value === d ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
+          {MEMBER_DISPOSITION_LABELS[d]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function FlowAdder({ memberIds, byId, newNames, onAdd }: {
+  memberIds: string[]; byId: Map<string, Component>; newNames: Component[]; onAdd: (f: SolutionFlow) => void
+}) {
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+  const [role, setRole] = useState<LinkRole>("calls")
+  const [protocol, setProtocol] = useState<LinkProtocol | "">("rest")
+  const label = (id: string) => byId.get(id)?.name || newNames.find((n) => n.id === id)?.name || id
+  return (
+    <section className="rounded-md border p-3 space-y-2 bg-muted/20">
+      <h3 className="text-sm font-medium flex items-center gap-1"><Plus className="h-3.5 w-3.5" /> Add proposed flow</h3>
+      <div className="flex flex-wrap gap-2 items-center text-sm">
+        <select className="h-8 rounded-md border bg-background px-2" value={from} onChange={(e) => setFrom(e.target.value)}>
+          <option value="">from…</option>
+          {memberIds.map((id) => <option key={id} value={id}>{label(id)}</option>)}
+        </select>
+        <span>→</span>
+        <select className="h-8 rounded-md border bg-background px-2" value={to} onChange={(e) => setTo(e.target.value)}>
+          <option value="">to…</option>
+          {memberIds.map((id) => <option key={id} value={id}>{label(id)}</option>)}
+        </select>
+        <select className="h-8 rounded-md border bg-background px-2" value={role} onChange={(e) => setRole(e.target.value as LinkRole)}>
+          {LINK_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select className="h-8 rounded-md border bg-background px-2" value={protocol} onChange={(e) => setProtocol(e.target.value as LinkProtocol | "")}>
+          <option value="">(no protocol)</option>
+          {LINK_PROTOCOLS.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <Button size="sm" variant="outline" disabled={!from || !to || from === to}
+          onClick={() => { onAdd({ from, to, role, protocol: protocol || undefined, status: "proposed" }); setFrom(""); setTo("") }}>
+          Add
+        </Button>
+      </div>
+    </section>
+  )
+}

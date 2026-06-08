@@ -9,7 +9,8 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Boxes, Loader2, AlertCircle, Search } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Boxes, Loader2, AlertCircle, Search, Plus } from "lucide-react"
 import { SOLUTION_STATUS_COLORS } from "@/lib/constants"
 import type { Solution } from "@/lib/types"
 
@@ -65,14 +66,22 @@ export default function SolutionsPage() {
               : `${solutions.length} solution${solutions.length === 1 ? "" : "s"} composed from catalog components`}
           </p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter solutions…"
-            className="pl-8"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter solutions…"
+              className="pl-8"
+            />
+          </div>
+          <Link href="/solutions/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New solution
+            </Button>
+          </Link>
         </div>
       </div>
 

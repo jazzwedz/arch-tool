@@ -5,12 +5,19 @@
 
 import { NextResponse } from "next/server"
 import { listSolutions, saveSolution } from "@/lib/solutions"
+import { listComponents, saveComponent } from "@/lib/github"
 import { isValidName } from "@/lib/validate"
 import { withRouteContext } from "@/lib/route-context"
 import { getLogger } from "@/lib/log"
-import type { Solution } from "@/lib/types"
+import type { Solution, Component } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
+
+interface CreateBody {
+  solution: Solution
+  /** Draft components to create first (gap fills from the wizard). */
+  newComponents?: Component[]
+}
 
 export async function GET(request: Request) {
   return withRouteContext(request, async () => {
@@ -28,23 +35,77 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return withRouteContext(request, async () => {
+    let raw: unknown
     try {
-      const solution = (await request.json()) as Solution
-      if (!solution.id || !isValidName(solution.id)) {
-        return NextResponse.json({ error: "Invalid solution id" }, { status: 400 })
+      raw = await request.json()
+    } catch {
+      return NextResponse.json({ error: "Body must be JSON." }, { status: 400 })
+    }
+
+    // Accept either a bare Solution (back-compat) or { solution, newComponents }.
+    const body: CreateBody =
+      raw && typeof raw === "object" && "solution" in (raw as object)
+        ? (raw as CreateBody)
+        : { solution: raw as Solution }
+
+    const solution = body.solution
+    if (!solution || !solution.id || !isValidName(solution.id)) {
+      return NextResponse.json({ error: "Invalid solution id" }, { status: 400 })
+    }
+    if (!solution.name) {
+      return NextResponse.json({ error: "Missing required field: name" }, { status: 400 })
+    }
+    if (!solution.status) solution.status = "draft"
+    if (!solution.description) solution.description = {}
+
+    const created: string[] = []
+    const skipped: string[] = []
+    try {
+      // Create gap draft components first (skip ids that already exist).
+      const newComponents = body.newComponents || []
+      if (newComponents.length > 0) {
+        const existing = new Set((await listComponents()).map((c) => c.id))
+        for (const comp of newComponents) {
+          if (!comp.id || !isValidName(comp.id) || !comp.name) {
+            skipped.push(comp.id || "(invalid)")
+            continue
+          }
+          if (existing.has(comp.id)) {
+            skipped.push(comp.id) // already in catalog — reference it as-is
+            continue
+          }
+          if (!comp.status) comp.status = "draft"
+          if (!comp.type) comp.type = "service"
+          await saveComponent(comp)
+          existing.add(comp.id)
+          created.push(comp.id)
+        }
       }
-      if (!solution.name) {
-        return NextResponse.json({ error: "Missing required field: name" }, { status: 400 })
-      }
-      if (!solution.status) solution.status = "draft"
-      if (!solution.description) solution.description = {}
+
       await saveSolution(solution)
-      return NextResponse.json({ success: true, id: solution.id })
+      getLogger().info("Solution created", {
+        id: solution.id,
+        componentsCreated: created.length,
+        componentsSkipped: skipped.length,
+      })
+      return NextResponse.json({
+        success: true,
+        id: solution.id,
+        componentsCreated: created,
+        componentsSkipped: skipped,
+      })
     } catch (error) {
-      getLogger().error("Failed to save solution", {
+      getLogger().error("Failed to create solution", {
+        id: solution.id,
         err: error instanceof Error ? error.message : "Unknown error",
       })
-      return NextResponse.json({ error: "Failed to save solution" }, { status: 500 })
+      return NextResponse.json(
+        {
+          error: `Failed to create solution: ${error instanceof Error ? error.message : "Unknown error"}`,
+          componentsCreated: created,
+        },
+        { status: 500 }
+      )
     }
   })
 }
