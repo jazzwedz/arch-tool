@@ -69,6 +69,11 @@ export default function NewSolutionPage() {
   const [addedFlows, setAddedFlows] = useState<SolutionFlow[]>([])
   const [proposal, setProposal] = useState<SolutionProposal | null>(null)
 
+  // Manually added brand-new components (beyond the proposer's gaps).
+  const [manualNew, setManualNew] = useState<{ name: string; type: ComponentType }[]>([])
+  const [mnName, setMnName] = useState("")
+  const [mnType, setMnType] = useState<ComponentType>("service")
+
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -150,11 +155,33 @@ export default function NewSolutionPage() {
         processes: g.kind === "process" ? [{ name: g.value, role: "owner" }] : [],
       })
     }
+    // Manually added new components.
+    for (const m of manualNew) {
+      const id = slugifyId(m.name)
+      if (!id) continue
+      members.push({ component: id, disposition: "new", role: undefined })
+      newComponents.push({
+        id,
+        name: m.name,
+        type: m.type,
+        status: "draft",
+        owner,
+        tags: [],
+        description: {},
+      })
+    }
+
+    // De-dupe by id (a manual add could collide with a gap or another).
+    const seenM = new Set<string>()
+    const uniqMembers = members.filter((m) => (seenM.has(m.component) ? false : (seenM.add(m.component), true)))
+    const seenC = new Set<string>()
+    const uniqNew = newComponents.filter((c) => (seenC.has(c.id) ? false : (seenC.add(c.id), true)))
+
     const flows: SolutionFlow[] = []
     if (proposal) for (const f of proposal.flows) if (existingFlowOn[flowKey(f)]) flows.push(stripReason(f))
     for (const f of addedFlows) flows.push(f)
-    return { members, newComponents, flows }
-  }, [proposal, memberState, gapState, existingFlowOn, addedFlows, owner])
+    return { members: uniqMembers, newComponents: uniqNew, flows }
+  }, [proposal, memberState, gapState, existingFlowOn, addedFlows, owner, manualNew])
 
   const previewChart = useMemo(() => {
     // Include gap "new" members as pseudo-components so the diagram labels them.
@@ -306,6 +333,58 @@ export default function NewSolutionPage() {
             </div>
           </section>
 
+          <section>
+            <h2 className="text-sm font-semibold mb-2">Add a new component ({manualNew.length})</h2>
+            <p className="text-xs text-muted-foreground mb-2">
+              Create a brand-new component for this solution. It will be added to the catalog as a draft on Create, and is then available everywhere — including the link editor.
+            </p>
+            <div className="flex flex-wrap gap-2 items-center">
+              <Input
+                className="h-8 w-64"
+                value={mnName}
+                onChange={(e) => setMnName(e.target.value)}
+                placeholder="Component name"
+              />
+              <select
+                className="h-8 rounded-md border bg-background px-2 text-sm"
+                value={mnType}
+                onChange={(e) => setMnType(e.target.value as ComponentType)}
+              >
+                {["service", "microservice", "component", "frontend", "gateway", "database", "queue", "library"].map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={mnName.trim() === ""}
+                onClick={() => {
+                  setManualNew((a) => [...a, { name: mnName.trim(), type: mnType }])
+                  setMnName("")
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add
+              </Button>
+            </div>
+            {manualNew.length > 0 && (
+              <div className="space-y-1 mt-2">
+                {manualNew.map((m, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <Badge variant="outline" className="text-[10px]">new</Badge>
+                    <span className="font-medium">{m.name}</span>
+                    <span className="text-xs text-muted-foreground">· {m.type}</span>
+                    <Badge variant="outline" className="text-[10px]">id: {slugifyId(m.name)}</Badge>
+                    <button onClick={() => setManualNew((a) => a.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-600">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
             <Button onClick={() => setStep(3)}>Flows →</Button>
@@ -398,24 +477,57 @@ function labelFor(id: string, byId: Map<string, Component>, news: Component[]): 
 function ChipPicker({ title, options, selected, onToggle, empty }: {
   title: string; options: string[]; selected: string[]; onToggle: (v: string) => void; empty?: string
 }) {
+  const [q, setQ] = useState("")
+  const term = q.trim()
+  const lc = term.toLowerCase()
+  const available = options
+    .filter((o) => !selected.includes(o))
+    .filter((o) => o.toLowerCase().includes(lc))
+  const exists = [...options, ...selected].some((o) => o.toLowerCase() === lc)
+  const canCreate = term !== "" && !exists
+
   return (
-    <div>
-      <h3 className="text-sm font-medium mb-2">{title}</h3>
-      {options.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{empty || "Nothing available."}</p>
-      ) : (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">{title}</h3>
+
+      {/* selected (top, removable) */}
+      {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {options.map((o) => {
-            const on = selected.includes(o)
-            return (
-              <button key={o} type="button" onClick={() => onToggle(o)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${on ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}>
-                {o}
-              </button>
-            )
-          })}
+          {selected.map((s) => (
+            <button key={s} type="button" onClick={() => onToggle(s)}
+              className="text-xs px-2.5 py-1 rounded-full border border-primary bg-primary text-primary-foreground inline-flex items-center gap-1">
+              {s}
+              <X className="h-3 w-3" />
+            </button>
+          ))}
         </div>
       )}
+
+      {/* search + create */}
+      <div className="flex gap-2 items-center">
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or type to add…" className="h-8 max-w-xs" />
+        {canCreate && (
+          <Button type="button" size="sm" variant="outline" onClick={() => { onToggle(term); setQ("") }}>
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Add “{term}”
+          </Button>
+        )}
+      </div>
+
+      {/* available (filtered) */}
+      <div className="flex flex-wrap gap-1.5 max-h-40 overflow-auto">
+        {available.slice(0, 80).map((o) => (
+          <button key={o} type="button" onClick={() => onToggle(o)}
+            className="text-xs px-2.5 py-1 rounded-full border hover:bg-muted transition-colors">
+            {o}
+          </button>
+        ))}
+        {available.length === 0 && !canCreate && (
+          <span className="text-xs text-muted-foreground">
+            {options.length === 0 ? empty || "Nothing available — type to add." : "Type to add a new one."}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

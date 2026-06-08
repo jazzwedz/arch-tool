@@ -70,6 +70,15 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Solutions wizard — tidier delivers picker + manual new components.**
+  Step 1's capability/process pickers now show selected chips on top
+  (one-click remove), a search box to filter the (otherwise long) list,
+  and a **+ Add “…”** action to create a capability/process that isn't in
+  the catalog yet. Step 2 gains **Add a new component** (name + type) —
+  a brand-new component declared straight in the composer; on Create it
+  is added to the catalog as a draft, so it is then usable everywhere,
+  including the component link editor.
+
 - **Solutions — compose offerings from existing components (Phase 1).**
   New top-nav entry (between Catalog and Processes) and a `Solution`
   entity stored separately at `solutions/<id>.yaml` (references catalog
