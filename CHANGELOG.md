@@ -80,6 +80,13 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Analyst quick-start guide (`/guide`).** A friendly one-pager (new
+  top-nav **Guide** entry) for the pilot kickoff: the ideal flow
+  (start a Solution → check components → create new ones if needed → put
+  the detail/rules on the component), a “golden rule” callout, a
+  what-and-why of each repo area (Components / Solutions / Processes /
+  Diagrams), and a “first 15 minutes” checklist with quick links.
+
 - **Solution DSD opens in the same rich doc modal as components.** The
   generated Detailed Solution Description now opens in a proper viewer
   (styled markdown + rendered mermaid) with **Copy Markdown** and **Save
