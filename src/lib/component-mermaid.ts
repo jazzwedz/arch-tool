@@ -134,10 +134,18 @@ export function buildHeroContextMermaid(
 
   lines.push(`  ${me}["${escLabel(component.name)}"]:::self`)
 
+  // One node per distinct peer — a component linked several times shows
+  // as a single box with multiple labelled edges, not a box per link.
+  const peerNode = new Map<string, string>()
   links.forEach((l, i) => {
-    const nid = `link_${i}_${safeId(l.target).slice(0, 18)}`
-    const otherLabel = displayTarget(l.target, nameLookup)
-    lines.push(`  ${nid}["${escLabel(otherLabel)}"]:::peer`)
+    const key = l.target || `__ext_${i}`
+    let nid = peerNode.get(key)
+    if (!nid) {
+      nid = `peer_${safeId(l.target) || `ext_${i}`}`
+      peerNode.set(key, nid)
+      const otherLabel = displayTarget(l.target, nameLookup)
+      lines.push(`  ${nid}["${escLabel(otherLabel)}"]:::peer`)
+    }
     lines.push(`  ${me} -.${escLabel(l.displayLabel)}.- ${nid}`)
   })
 

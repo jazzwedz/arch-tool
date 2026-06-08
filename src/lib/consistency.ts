@@ -105,8 +105,20 @@ export function findInconsistencies(components: Component[]): ConsistencyIssue[]
 // (same target + role + protocol + name). Each such group becomes one
 // issue whose fix keeps the first occurrence and drops the rest.
 
+// Containment is unique per target — a component is "part of" (or
+// "contains") another at most once, so two such links to the same target
+// are duplicates even if their name/description differ. Every other role
+// can legitimately repeat to the same target with a different name (e.g.
+// two `reads-from` for two different datasets), so those keep name +
+// protocol in the identity.
+function isContainmentRole(role: string): boolean {
+  return role === "part-of" || role === "contains"
+}
+
 function linkIdentity(link: ComponentLink): string {
-  return `${link.target}::${link.role}::${link.protocol ?? ""}::${link.name ?? ""}`
+  return isContainmentRole(link.role)
+    ? `${link.target}::${link.role}`
+    : `${link.target}::${link.role}::${link.protocol ?? ""}::${link.name ?? ""}`
 }
 
 function checkDuplicateLinks(source: Component, out: ConsistencyIssue[]): void {
@@ -231,19 +243,22 @@ export function applyFix(component: Component, fix: ConsistencyFix): Component {
     }
     case "dedupeLink": {
       // Keep the first link matching the identity, drop the rest. Other
-      // links are untouched. Identity = target + role + protocol + name
-      // (descriptions may differ; the first occurrence's wins).
+      // links are untouched. Identity matches the detection rule: for
+      // containment roles it is target + role (name/protocol ignored);
+      // for every other role it is target + role + protocol + name.
       const target = fix.link.target
       const role = fix.link.role
       const proto = fix.link.protocol ?? ""
       const nm = fix.link.name ?? ""
+      const containment = isContainmentRole(role)
       let kept = false
       next.links = (next.links || []).filter((l) => {
-        const match =
-          l.target === target &&
-          l.role === role &&
-          (l.protocol ?? "") === proto &&
-          (l.name ?? "") === nm
+        const match = containment
+          ? l.target === target && l.role === role
+          : l.target === target &&
+            l.role === role &&
+            (l.protocol ?? "") === proto &&
+            (l.name ?? "") === nm
         if (!match) return true
         if (!kept) {
           kept = true

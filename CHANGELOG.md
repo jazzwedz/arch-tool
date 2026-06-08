@@ -19,6 +19,22 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Duplicate / doubled links cleaned up.** Two separate causes made a
+  component's Links look multiplied: (1) the same logical edge declared
+  from both sides (this `reads-from` X + X `writes-to` this) was shown as
+  two rows/edges, and the hero diagram drew a fresh box per link so one
+  peer appeared several times; (2) genuinely redundant rows in the data
+  (e.g. `part-of` the same target twice with different labels). Fixes:
+  - The detail page now collapses mirror pairs correctly (via
+    `LINK_ROLE_INVERSE`, not label-string matching) so an interaction
+    shows **once** per component page, and de-dupes a component's own
+    links; the hero diagram draws **one box per peer**.
+  - The Consistency check's **Duplicate links** now treats containment
+    (`part-of` / `contains`) as unique-per-target — it flags a second
+    `part-of X` even when the name differs, and the fix keeps one.
+    Non-containment roles still keep `name`, so two `reads-from X` for
+    two different datasets are left intact.
+
 - **Import redirect hit a 404.** After a single-component import the
   dialog pushed to `/component/<id>/edit`, but the edit route lives at
   `/edit/<id>` — the component saved fine yet the redirect 404'd (and

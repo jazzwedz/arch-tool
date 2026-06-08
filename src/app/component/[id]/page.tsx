@@ -12,6 +12,7 @@ import {
   TYPE_LABELS,
   LINK_ROLE_LABELS,
   INVERSE_LINK_ROLE_LABELS,
+  LINK_ROLE_INVERSE,
   LINK_ROLE_COLORS,
   DATA_CLASSIFICATION_LABELS,
   CAPABILITY_ROLE_LABELS,
@@ -185,32 +186,56 @@ export default function ComponentDetailPage() {
     declaredOn?: string
   }
   const combinedLinks = useMemo<UnifiedLink[]>(() => {
-    const outbound: UnifiedLink[] = (component?.links || []).map((l) => ({
-      target: l.target,
-      role: l.role,
-      displayLabel: LINK_ROLE_LABELS[l.role] || l.role,
-      protocol: l.protocol,
-      name: l.name,
-      description: l.description,
-      isInverse: false,
-    }))
-    const outboundKeys = new Set(
-      outbound.map((r) => `${r.displayLabel}::${r.target}`)
-    )
-    const inverted: UnifiedLink[] = (inboundLinks || []).map((ref) => ({
-      target: ref.id,
-      role: ref.link.role,
-      displayLabel:
-        INVERSE_LINK_ROLE_LABELS[ref.link.role] || ref.link.role,
-      protocol: ref.link.protocol,
-      name: ref.link.name,
-      description: ref.link.description,
-      isInverse: true,
-      declaredOn: ref.name,
-    }))
-    const filteredInverse = inverted.filter(
-      (r) => !outboundKeys.has(`${r.displayLabel}::${r.target}`)
-    )
+    const isContain = (r: LinkRole) => r === "part-of" || r === "contains"
+    // Identity for de-duping our OWN links: containment is unique per
+    // target (name ignored); other roles keep protocol + name so two
+    // genuine edges (e.g. two `reads-from` for different datasets) stay.
+    const outKey = (r: LinkRole, target: string, protocol?: string, name?: string) =>
+      isContain(r) ? `${r}::${target}` : `${r}::${target}::${protocol ?? ""}::${name ?? ""}`
+
+    const seenOut = new Set<string>()
+    const outbound: UnifiedLink[] = []
+    for (const l of component?.links || []) {
+      const k = outKey(l.role, l.target, l.protocol, l.name)
+      if (seenOut.has(k)) continue // drop a duplicate link on this component
+      seenOut.add(k)
+      outbound.push({
+        target: l.target,
+        role: l.role,
+        displayLabel: LINK_ROLE_LABELS[l.role] || l.role,
+        protocol: l.protocol,
+        name: l.name,
+        description: l.description,
+        isInverse: false,
+      })
+    }
+
+    // Suppress an inbound edge when this component already declares its
+    // mirror outbound (calls↔serves, part-of↔contains, reads-from↔
+    // writes-to). The other side declared role R toward us; the mirror
+    // we'd hold is LINK_ROLE_INVERSE[R] to the same target. If we have
+    // it, the interaction is already on screen once — don't show it twice.
+    const outRoleTarget = new Set(outbound.map((r) => `${r.role}::${r.target}`))
+    const seenInv = new Set<string>()
+    const filteredInverse: UnifiedLink[] = []
+    for (const ref of inboundLinks || []) {
+      const mirrorRole = LINK_ROLE_INVERSE[ref.link.role]
+      if (mirrorRole && outRoleTarget.has(`${mirrorRole}::${ref.id}`)) continue
+      // de-dupe inbound among themselves too
+      const k = `${ref.link.role}::${ref.id}::${ref.link.protocol ?? ""}::${ref.link.name ?? ""}`
+      if (seenInv.has(k)) continue
+      seenInv.add(k)
+      filteredInverse.push({
+        target: ref.id,
+        role: ref.link.role,
+        displayLabel: INVERSE_LINK_ROLE_LABELS[ref.link.role] || ref.link.role,
+        protocol: ref.link.protocol,
+        name: ref.link.name,
+        description: ref.link.description,
+        isInverse: true,
+        declaredOn: ref.name,
+      })
+    }
     return [...outbound, ...filteredInverse]
   }, [component, inboundLinks])
   // Per-section visualization toggles
