@@ -89,6 +89,18 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **DSD generation is now an orchestrated, grounded flow.** Instead of a
+  single prompt, the Detailed Solution Description runs a small in-process
+  pipeline: the inventory, capability/process mapping, dependencies, NFR
+  rollup, flows and diagram are computed **deterministically from the
+  data** (so they can't be hallucinated) and handed to the model as
+  verified facts; then **draft → critic → revise** (the critic checks the
+  draft against those facts; up to 2 revise iterations). It runs as a
+  detached job (`POST/GET /api/solutions/[id]/dsd`) so the multi-call
+  flow survives the gateway request timeout, and the button shows live
+  progress (Reading… → Drafting… → Reviewing… → Revising…). Uses the same
+  corp LLM gateway. New `src/lib/solution-dsd.ts`.
+
 - **Analyst quick-start guide (`/guide`).** A friendly one-pager (new
   top-nav **Guide** entry) for the pilot kickoff: the ideal flow
   (start a Solution → check components → create new ones if needed → put

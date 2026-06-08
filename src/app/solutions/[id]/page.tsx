@@ -15,8 +15,6 @@ import { MermaidPreview } from "@/components/mermaid-preview"
 import { GeneratedDocModal } from "@/components/GeneratedDocModal"
 import { TypeIcon } from "@/components/TypeIcon"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
-import { solutionToYaml } from "@/lib/solution-yaml"
-import { componentToYaml } from "@/lib/component-yaml"
 import {
   SOLUTION_STATUS_COLORS,
   MEMBER_DISPOSITION_LABELS,
@@ -52,6 +50,7 @@ export default function SolutionDetailPage() {
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
+  const [genPhase, setGenPhase] = useState<string | null>(null)
   const [showDocModal, setShowDocModal] = useState(false)
   const [promoting, setPromoting] = useState(false)
   const [promoteMsg, setPromoteMsg] = useState<string | null>(null)
@@ -83,39 +82,46 @@ export default function SolutionDetailPage() {
 
   const hasProposed = (solution?.flows || []).some((f) => f.status === "proposed")
 
+  const PHASE_LABEL: Record<string, string> = {
+    grounding: "Reading the solution & components…",
+    drafting: "Drafting the document…",
+    reviewing: "Reviewing it against the data…",
+    revising: "Revising…",
+    done: "Done",
+  }
+
+  // Multi-step generation runs as a job (draft → critic → revise); we
+  // poll for phase + result so it survives the gateway request timeout.
   const generateBrd = async () => {
     if (!solution) return
     setGenerating(true)
     setGenError(null)
-    setGenerated(null)
+    setGenPhase("Starting…")
     try {
-      const memberComps = (solution.members || [])
-        .map((m) => byId.get(m.component))
-        .filter(Boolean) as Component[]
-      // Reuse the existing "Detailed Solution Description" generator (the
-      // nicely-formatted diagram doc type). Context = the solution YAML
-      // plus each member component's YAML.
-      const componentsYaml = [
-        solutionToYaml(solution),
-        ...memberComps.map((c) => componentToYaml(c)),
-      ].join("---\n")
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          documentType: "detailed-solution",
-          diagramName: solution.name,
-          componentsYaml,
-        }),
-      })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error((json && json.error) || `HTTP ${res.status}`)
-      setGenerated(json.generated || "")
-      setShowDocModal(true)
+      const start = await fetch(`/api/solutions/${encodeURIComponent(id)}/dsd`, { method: "POST" })
+      const sj = await start.json().catch(() => null)
+      if (!start.ok || !sj?.jobId) throw new Error((sj && sj.error) || `Failed to start (${start.status})`)
+      const jobId = sj.jobId as string
+
+      for (let i = 0; i < 160; i++) {
+        await new Promise((r) => setTimeout(r, 1500))
+        const r = await fetch(`/api/solutions/${encodeURIComponent(id)}/dsd?jobId=${encodeURIComponent(jobId)}`)
+        const j = await r.json().catch(() => null)
+        if (!r.ok || !j) throw new Error((j && j.error) || `Status check failed (${r.status})`)
+        setGenPhase(PHASE_LABEL[j.phase] || j.phase)
+        if (j.status === "done") {
+          setGenerated(j.markdown || "")
+          setShowDocModal(true)
+          return
+        }
+        if (j.status === "error") throw new Error(j.error || "Generation failed")
+      }
+      throw new Error("Generation timed out. Try again.")
     } catch (e) {
       setGenError(e instanceof Error ? e.message : "Generation failed")
     } finally {
       setGenerating(false)
+      setGenPhase(null)
     }
   }
 
@@ -466,7 +472,7 @@ export default function SolutionDetailPage() {
                 {generating ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating…
+                    {genPhase || "Generating…"}
                   </>
                 ) : generated ? (
                   "Regenerate DSD"
