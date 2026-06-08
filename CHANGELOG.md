@@ -70,6 +70,17 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Solutions composer — description field + AI assist.** Step 1 (Intent)
+  now has a **Description** textarea. With goal + description filled, a
+  **Pre-fill with AI** button opens a modal that calls the LLM (the same
+  client used elsewhere) with the intent plus the full catalog export
+  (reuses `buildCatalogMarkdown`) and proposes the rest of the solution —
+  delivered capabilities/processes, member components (chosen from real
+  catalog ids), new components for gaps, and flows. After review, **Apply**
+  pre-fills every wizard step (skeleton + flows) so the analyst only
+  tweaks and creates. New endpoint `POST /api/solutions/ai-compose`;
+  member/flow ids are validated against the catalog server-side.
+
 - **Solutions are now editable and deletable.** The detail page gets
   **Edit** and **Delete** (with confirm) buttons. New editor at
   `/solutions/[id]/edit` to change details (name / status / owner / goal

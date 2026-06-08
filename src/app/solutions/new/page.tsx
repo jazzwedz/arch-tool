@@ -13,9 +13,17 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Loader2, AlertCircle, Plus, X } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles } from "lucide-react"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { ChipPicker } from "@/components/ChipPicker"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
@@ -53,6 +61,13 @@ interface GapState {
   value: string
 }
 
+interface AiCompose {
+  delivers: { capabilities: string[]; processes: string[] }
+  members: { component: string; disposition: MemberDisposition; role?: string }[]
+  newComponents: { name: string; type: ComponentType; role?: string }[]
+  flows: SolutionFlow[]
+}
+
 export default function NewSolutionPage() {
   const router = useRouter()
   const [components, setComponents] = useState<Component[]>([])
@@ -61,8 +76,15 @@ export default function NewSolutionPage() {
   const [name, setName] = useState("")
   const [goal, setGoal] = useState("")
   const [owner, setOwner] = useState("")
+  const [desc, setDesc] = useState("")
   const [selCaps, setSelCaps] = useState<string[]>([])
   const [selProcs, setSelProcs] = useState<string[]>([])
+
+  // AI assist
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiResult, setAiResult] = useState<AiCompose | null>(null)
 
   const [memberState, setMemberState] = useState<Record<string, MemberState>>({})
   const [gapState, setGapState] = useState<Record<string, GapState>>({})
@@ -125,6 +147,67 @@ export default function NewSolutionPage() {
 
   const goStep2 = () => {
     runProposer()
+    setStep(2)
+  }
+
+  // AI assist — call the LLM compose endpoint with the intent; on open.
+  const runAi = async () => {
+    setAiOpen(true)
+    setAiLoading(true)
+    setAiError(null)
+    setAiResult(null)
+    try {
+      const r = await fetch("/api/solutions/ai-compose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, goal, description: desc }),
+      })
+      const data = await r.json().catch(() => null)
+      if (!r.ok) throw new Error((data && data.error) || `AI assist failed (${r.status})`)
+      setAiResult(data as AiCompose)
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "AI assist failed")
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  // Apply the AI result into the wizard state and jump to the skeleton
+  // step (bypassing the deterministic proposer).
+  const applyAi = (ai: AiCompose) => {
+    setSelCaps(ai.delivers.capabilities || [])
+    setSelProcs(ai.delivers.processes || [])
+
+    const members = (ai.members || []).map((m) => ({
+      component: m.component,
+      disposition: m.disposition,
+      role: m.role,
+      reason: "AI suggested",
+    }))
+    setProposal({ members, gaps: [], flows: [] })
+    const ms: Record<string, MemberState> = {}
+    for (const m of members)
+      ms[m.component] = { include: true, disposition: m.disposition, role: m.role || "", reason: "AI suggested" }
+    setMemberState(ms)
+    setGapState({})
+
+    setManualNew((ai.newComponents || []).map((n) => ({ name: n.name, type: n.type })))
+
+    // Resolve flow endpoints: a new component may be referenced by name.
+    const nameToId = new Map((ai.newComponents || []).map((n) => [n.name, slugifyId(n.name)]))
+    const resolve = (x: string) => nameToId.get(x) || x
+    setExistingFlowOn({})
+    setAddedFlows(
+      (ai.flows || []).map((f) => ({
+        from: resolve(f.from),
+        to: resolve(f.to),
+        role: f.role,
+        protocol: f.protocol,
+        status: f.status,
+      }))
+    )
+
+    setAiOpen(false)
     setStep(2)
   }
 
@@ -200,7 +283,7 @@ export default function NewSolutionPage() {
         name,
         status: "draft",
         owner,
-        description: {},
+        description: desc ? { description: desc } : {},
         goal: goal || undefined,
         delivers: { capabilities: selCaps, processes: selProcs },
         members: assembled.members,
@@ -260,6 +343,36 @@ export default function NewSolutionPage() {
             <span className="text-sm font-medium">Goal</span>
             <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Reduce inbound support by 30%" />
           </label>
+          <label className="space-y-1 block">
+            <span className="text-sm font-medium">Description</span>
+            <Textarea
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              rows={4}
+              placeholder="Describe what the solution should do, who uses it, and what it touches. The richer this is, the better AI assist can pre-fill the rest."
+            />
+          </label>
+
+          <div className="rounded-md border bg-muted/20 p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm">
+              <span className="font-medium flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-blue-600" />
+                AI assist
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Fill the goal + description, then let AI pre-fill delivers, members and flows from the catalog.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={runAi}
+              disabled={!goal.trim() || !desc.trim()}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Pre-fill with AI
+            </Button>
+          </div>
 
           <ChipPicker title="Delivers — capabilities" options={allCaps} selected={selCaps} onToggle={(v) => toggle(selCaps, setSelCaps, v)} />
           <ChipPicker title="Delivers — processes" options={allProcs} selected={selProcs} onToggle={(v) => toggle(selProcs, setSelProcs, v)} empty="No processes declared in the catalog yet." />
@@ -459,6 +572,62 @@ export default function NewSolutionPage() {
           </div>
         </div>
       )}
+
+      <Dialog open={aiOpen} onOpenChange={setAiOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-blue-600" />
+              AI assist
+            </DialogTitle>
+            <DialogDescription>
+              Reads your goal + description and the whole catalog, then proposes
+              the rest of the solution. Review the summary, then apply.
+            </DialogDescription>
+          </DialogHeader>
+
+          {aiLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Thinking… reading the catalog and composing.
+            </div>
+          )}
+          {!aiLoading && aiError && (
+            <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              {aiError}
+            </div>
+          )}
+          {!aiLoading && !aiError && aiResult && (
+            <div className="space-y-2 text-sm">
+              <p>AI proposes:</p>
+              <ul className="list-disc pl-5 space-y-0.5">
+                <li>{aiResult.delivers.capabilities.length} capabilities, {aiResult.delivers.processes.length} processes</li>
+                <li>{aiResult.members.length} existing component(s) to reuse/extend</li>
+                <li>{aiResult.newComponents.length} new component(s) to create</li>
+                <li>{aiResult.flows.length} flow(s)</li>
+              </ul>
+              {aiResult.members.length === 0 && aiResult.newComponents.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Nothing concrete matched — try a richer description.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setAiOpen(false)} disabled={aiLoading}>
+              Cancel
+            </Button>
+            {!aiLoading && !aiError && aiResult && (
+              <Button onClick={() => applyAi(aiResult)}>Apply</Button>
+            )}
+            {!aiLoading && aiError && (
+              <Button onClick={runAi}>Retry</Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
