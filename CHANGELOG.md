@@ -80,6 +80,14 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Solution DSD opens in the same rich doc modal as components.** The
+  generated Detailed Solution Description now opens in a proper viewer
+  (styled markdown + rendered mermaid) with **Copy Markdown** and **Save
+  as PDF** (clean print window), matching the component documentation
+  experience. Extracted into a reusable `components/GeneratedDocModal`
+  (an optional Publish action is built in for a later Confluence-for-
+  solutions hook). The Documentation tab now shows View / Regenerate.
+
 - **Solutions — reminder that detail lives on the component.** Info notes
   in the composer (Skeleton step), the solution detail Members tab and the
   editor make clear that a solution only wires components together — a

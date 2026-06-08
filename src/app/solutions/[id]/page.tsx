@@ -11,9 +11,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Boxes, Loader2, AlertCircle, Pencil, Trash2, Info } from "lucide-react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
 import { MermaidPreview } from "@/components/mermaid-preview"
+import { GeneratedDocModal } from "@/components/GeneratedDocModal"
 import { TypeIcon } from "@/components/TypeIcon"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
 import { solutionToYaml } from "@/lib/solution-yaml"
@@ -53,6 +52,7 @@ export default function SolutionDetailPage() {
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
+  const [showDocModal, setShowDocModal] = useState(false)
   const [promoting, setPromoting] = useState(false)
   const [promoteMsg, setPromoteMsg] = useState<string | null>(null)
 
@@ -111,6 +111,7 @@ export default function SolutionDetailPage() {
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error((json && json.error) || `HTTP ${res.status}`)
       setGenerated(json.generated || "")
+      setShowDocModal(true)
     } catch (e) {
       setGenError(e instanceof Error ? e.message : "Generation failed")
     } finally {
@@ -451,20 +452,29 @@ export default function SolutionDetailPage() {
 
       {tab === "documentation" && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-sm text-muted-foreground">
               Generate a Detailed Solution Description (DSD) from this solution and its members.
             </p>
-            <Button onClick={generateBrd} disabled={generating}>
-              {generating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating…
-                </>
-              ) : (
-                "Generate DSD"
+            <div className="flex gap-2">
+              {generated && (
+                <Button variant="outline" onClick={() => setShowDocModal(true)}>
+                  View document
+                </Button>
               )}
-            </Button>
+              <Button onClick={generateBrd} disabled={generating}>
+                {generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating…
+                  </>
+                ) : generated ? (
+                  "Regenerate DSD"
+                ) : (
+                  "Generate DSD"
+                )}
+              </Button>
+            </div>
           </div>
           {genError && (
             <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
@@ -472,15 +482,21 @@ export default function SolutionDetailPage() {
               {genError}
             </div>
           )}
-          {generated && (
-            <Card>
-              <CardContent className="pt-4 prose prose-sm max-w-none overflow-auto">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{generated}</ReactMarkdown>
-              </CardContent>
-            </Card>
+          {generated && !showDocModal && (
+            <p className="text-sm text-muted-foreground">
+              Document ready — click <span className="font-medium">View document</span> to open it (Copy Markdown · Save as PDF).
+            </p>
           )}
         </div>
       )}
+
+      <GeneratedDocModal
+        open={showDocModal}
+        onOpenChange={setShowDocModal}
+        title={solution.name}
+        badge="Detailed Solution Description"
+        markdown={generated || ""}
+      />
     </div>
   )
 }

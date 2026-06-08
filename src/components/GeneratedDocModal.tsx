@@ -1,0 +1,174 @@
+"use client"
+
+// Reusable viewer for a generated Markdown document (component docs,
+// solution DSD, …). Same styled rendering + mermaid support as the
+// component detail doc modal, plus Copy Markdown, Save as PDF (print)
+// and an optional Publish action.
+
+import { useRef, useState } from "react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { FileText, Copy, Check, Send, X, Printer } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import { MermaidPreview } from "@/components/mermaid-preview"
+
+interface Props {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  badge?: string
+  markdown: string
+  /** Optional publish action (e.g. to Confluence). Hidden when omitted. */
+  publish?: { onPublish: () => void | Promise<void>; label?: string; busy?: boolean }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"]/g, (c) =>
+    c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&quot;"
+  )
+}
+
+export function GeneratedDocModal({ open, onOpenChange, title, badge, markdown, publish }: Props) {
+  const [copied, setCopied] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const copy = () => {
+    if (!markdown) return
+    navigator.clipboard.writeText(markdown).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
+  }
+
+  // Save as PDF — open a clean print window with the already-rendered
+  // HTML (tables, mermaid SVG and all) and trigger the browser's print
+  // dialog, where the user picks "Save as PDF".
+  const saveAsPdf = () => {
+    const html = contentRef.current?.innerHTML
+    if (!html) return
+    const w = window.open("", "_blank", "width=900,height=1000")
+    if (!w) return
+    w.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>` +
+        `<style>` +
+        `body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;color:#1f2937;max-width:820px;margin:24px auto;padding:0 24px;line-height:1.55}` +
+        `h1{font-size:24px;border-bottom:2px solid #1f2937;padding-bottom:6px;margin-top:0}` +
+        `h2{font-size:20px;border-bottom:1px solid #d1d5db;padding-bottom:4px;margin-top:26px}` +
+        `h3{font-size:16px;margin-top:20px}` +
+        `p,li{font-size:13.5px}` +
+        `table{width:100%;border-collapse:collapse;margin:12px 0}` +
+        `th,td{border:1px solid #d1d5db;padding:6px 10px;font-size:12.5px;text-align:left}` +
+        `th{background:#f3f4f6}` +
+        `code{background:#f3f4f6;padding:2px 4px;border-radius:3px;font-size:12px}` +
+        `pre{background:#f3f4f6;padding:12px;border-radius:6px;overflow:auto}` +
+        `svg{max-width:100%;height:auto}` +
+        `</style></head><body>${html}</body></html>`
+    )
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 350)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 [&>button:last-child]:hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0 bg-gray-50">
+          <DialogHeader className="flex-1">
+            <DialogTitle className="flex items-center gap-3">
+              <FileText className="h-5 w-5" />
+              <span>{title}</span>
+              {badge && (
+                <span className="inline-flex items-center px-3 py-1 rounded text-xs font-semibold bg-gray-900 text-white uppercase tracking-wide">
+                  {badge}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={copy}>
+              {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+              {copied ? "Copied" : "Copy Markdown"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={saveAsPdf}>
+              <Printer className="h-4 w-4 mr-1" />
+              Save as PDF
+            </Button>
+            {publish && (
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={publish.onPublish}
+                disabled={publish.busy}
+              >
+                <Send className="h-4 w-4 mr-1" />
+                {publish.label || "Publish to Confluence"}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              <X className="h-4 w-4 mr-1" />
+              Close
+            </Button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-8 py-6 bg-white">
+          <div
+            ref={contentRef}
+            className="max-w-none
+              [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:border-b-2 [&_h1]:border-gray-800 [&_h1]:pb-2 [&_h1]:mb-4 [&_h1]:text-gray-900
+              [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3 [&_h2]:border-b [&_h2]:border-gray-300 [&_h2]:pb-1 [&_h2]:text-gray-800
+              [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:text-gray-700
+              [&_p]:text-sm [&_p]:leading-relaxed [&_p]:my-2 [&_p]:text-gray-700
+              [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:pl-6 [&_ol]:my-2
+              [&_li]:text-sm [&_li]:my-1 [&_li]:text-gray-700
+              [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:text-gray-800
+              [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_pre]:my-3
+              [&_pre_code]:bg-transparent [&_pre_code]:p-0
+              [&_table]:w-full [&_table]:border-collapse [&_table]:my-3
+              [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-100 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-sm [&_th]:font-semibold
+              [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2 [&_td]:text-sm
+              [&_strong]:font-semibold [&_strong]:text-gray-900
+              [&_hr]:my-4 [&_hr]:border-gray-200"
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code({ className, children, ...props }) {
+                  const isMermaid = /language-mermaid/.test(className || "")
+                  if (isMermaid) {
+                    return <MermaidPreview chart={String(children).trim()} />
+                  }
+                  const isInline = !className
+                  if (isInline) {
+                    return (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    )
+                  }
+                  return (
+                    <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto my-3">
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    </pre>
+                  )
+                },
+                pre({ children }) {
+                  return <>{children}</>
+                },
+              }}
+            >
+              {markdown || ""}
+            </ReactMarkdown>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
