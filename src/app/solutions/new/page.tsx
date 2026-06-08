@@ -8,7 +8,7 @@
 //   4. Review     — scoped diagram + Create
 // Nothing is written until Create (propose → approve → create).
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -106,6 +106,68 @@ export default function NewSolutionPage() {
       .then((d) => setComponents(Array.isArray(d) ? d : []))
       .catch(() => setComponents([]))
   }, [])
+
+  // ----- draft persistence (don't lose work if the save fails / page
+  // reloads / browser crashes). The whole wizard state is snapshotted to
+  // localStorage on every change and restored on open; cleared only after
+  // a successful create or an explicit "Start over". -----
+  const DRAFT_KEY = "arch:solution-wizard-draft"
+  const savedOnce = useRef(false)
+
+  function clearDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY)
+    } catch {
+      // ignore
+    }
+  }
+
+  // Restore once on mount.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (!raw) return
+      const d = JSON.parse(raw)
+      if (typeof d !== "object" || d === null) return
+      if (typeof d.name === "string") setName(d.name)
+      if (typeof d.goal === "string") setGoal(d.goal)
+      if (typeof d.owner === "string") setOwner(d.owner)
+      if (typeof d.desc === "string") setDesc(d.desc)
+      if (Array.isArray(d.selCaps)) setSelCaps(d.selCaps)
+      if (Array.isArray(d.selProcs)) setSelProcs(d.selProcs)
+      if (d.proposal) setProposal(d.proposal)
+      if (d.memberState) setMemberState(d.memberState)
+      if (d.gapState) setGapState(d.gapState)
+      if (Array.isArray(d.manualNew)) setManualNew(d.manualNew)
+      if (d.existingFlowOn) setExistingFlowOn(d.existingFlowOn)
+      if (Array.isArray(d.addedFlows)) setAddedFlows(d.addedFlows)
+      if (typeof d.step === "number") setStep(d.step)
+    } catch {
+      // corrupt draft — ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Save on every change (skip the very first run so we don't overwrite a
+  // restored draft with the initial empty state).
+  useEffect(() => {
+    if (!savedOnce.current) {
+      savedOnce.current = true
+      return
+    }
+    try {
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          step, name, goal, owner, desc, selCaps, selProcs,
+          proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows,
+        })
+      )
+    } catch {
+      // quota / serialization issue — non-fatal
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, name, goal, owner, desc, selCaps, selProcs, proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows])
 
   const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
 
@@ -278,6 +340,11 @@ export default function NewSolutionPage() {
     setCreateError(null)
     try {
       const id = slugifyId(name)
+      if (!id) {
+        throw new Error(
+          "Could not derive an id from the name — use letters or digits in the solution name."
+        )
+      }
       const solution: Solution = {
         id,
         name,
@@ -296,6 +363,10 @@ export default function NewSolutionPage() {
       })
       const data = await r.json().catch(() => null)
       if (!r.ok) throw new Error((data && data.error) || `Create failed (${r.status})`)
+      if (!data || typeof data.id !== "string") {
+        throw new Error("The server didn't confirm the save. Your work is kept here — try again.")
+      }
+      clearDraft()
       router.push(`/solutions/${encodeURIComponent(data.id)}`)
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Create failed")
@@ -314,6 +385,18 @@ export default function NewSolutionPage() {
           </Button>
         </Link>
         <h1 className="text-2xl font-bold">New solution</h1>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground"
+          onClick={() => {
+            clearDraft()
+            window.location.reload()
+          }}
+          title="Discard this draft and start a blank solution"
+        >
+          Start over
+        </Button>
         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
           {["Intent", "Skeleton", "Flows", "Review"].map((label, i) => (
             <span
@@ -568,6 +651,26 @@ export default function NewSolutionPage() {
             <strong>{assembled.flows.length}</strong> flows
           </div>
           <Card><CardContent className="pt-4"><MermaidPreview chart={previewChart} className="w-full" /></CardContent></Card>
+
+          {/* A name is required to save. The AI-assist path can reach this
+              step without one, so let the analyst fix it right here instead
+              of leaving the Create button mysteriously greyed out. */}
+          {name.trim() === "" && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+              <div className="text-sm text-amber-900 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                Your solution needs a <strong>name</strong> before it can be created.
+              </div>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Solution name"
+                className="max-w-sm bg-white"
+                autoFocus
+              />
+            </div>
+          )}
+
           {createError && (
             <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{createError}

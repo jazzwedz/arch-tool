@@ -19,6 +19,20 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Solution composer: “Create” greyed out with no reason + risk of
+  losing work.** The AI-assist path could reach the Review step without a
+  name (the “Pre-fill with AI” button only needs goal + description, and
+  Apply jumps past the name check), leaving Create disabled and the
+  analyst stuck. Now the Review step shows a clear “needs a name” notice
+  with an inline name field to fix it in place. Plus:
+  - The whole wizard is autosaved to `localStorage` and restored on
+    reopen — a failed save, reload or crash no longer loses the work
+    (cleared on successful create; a “Start over” button discards it).
+  - `create` guards an empty slug and an unconfirmed save, keeping the
+    work in the wizard with a readable message.
+  - The create API now returns a clear 409 (“a solution with this name
+    already exists…”) instead of a raw git error.
+
 - **Rules-import crashed the whole endpoint (`Object.defineProperty called
   on non-object`).** `pdf-parse` (v2 → `pdfjs-dist`) breaks when webpack
   bundles it on the server, which threw at module load — so *every*

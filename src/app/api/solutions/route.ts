@@ -58,6 +58,23 @@ export async function POST(request: Request) {
     if (!solution.status) solution.status = "draft"
     if (!solution.description) solution.description = {}
 
+    // Friendly id-collision check so the analyst gets a clear reason
+    // instead of a raw git "file already exists" error.
+    try {
+      const existingSolutions = await listSolutions()
+      if (existingSolutions.some((s) => s.id === solution.id)) {
+        return NextResponse.json(
+          {
+            error: `A solution named "${solution.name}" (id "${solution.id}") already exists. Choose a different name, or open and edit the existing one.`,
+          },
+          { status: 409 }
+        )
+      }
+    } catch {
+      // If the list fails we fall through and let the save attempt surface
+      // any real error — better than blocking on a transient read failure.
+    }
+
     const created: string[] = []
     const skipped: string[] = []
     try {
