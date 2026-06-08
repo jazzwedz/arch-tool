@@ -19,6 +19,16 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Rules-import (AI rule analysis) crashed with “Unexpected token '<'”.**
+  The import-rules-from-documents dialog called `res.json()` directly on
+  the analysis response. When the request hit a gateway timeout (long AI
+  run), an upload-too-large rejection, or an expired session — all of
+  which return an HTML page, not JSON — parsing threw the cryptic
+  `Unexpected token '<', "<!DOCTYPE"...`. The dialog now reads the body
+  defensively and shows a clear, status-aware message (timeout → try a
+  smaller/focused source; 413 → file too large; 401/403 → session
+  expired) instead of the raw parse error.
+
 - **Duplicate / doubled links cleaned up.** Two separate causes made a
   component's Links look multiplied: (1) the same logical edge declared
   from both sides (this `reads-from` X + X `writes-to` this) was shown as

@@ -227,7 +227,30 @@ export function RulesImportDialog({
           }),
         })
       }
-      const data = (await res.json()) as ApiResponse
+      // Read defensively: a gateway timeout, an upload-too-large rejection
+      // or an expired session returns an HTML error page, not JSON. Blindly
+      // calling res.json() on that throws "Unexpected token '<'".
+      const raw = await res.text()
+      let data: ApiResponse | null = null
+      try {
+        data = raw ? (JSON.parse(raw) as ApiResponse) : null
+      } catch {
+        data = null
+      }
+      if (!data) {
+        const hint =
+          res.status === 413
+            ? "The document is too large for the server to accept. Try a smaller file or split it."
+            : res.status === 504 || res.status === 502 || res.status === 408
+            ? "The analysis took too long and the server timed out. Try a smaller or more focused source (a single section, the relevant code file, or one Confluence page)."
+            : res.status === 401 || res.status === 403
+            ? "Your session may have expired. Reload the page, sign in again, and retry."
+            : `The server returned an unexpected response (HTTP ${res.status || "?"}). Please try again, or use a smaller source.`
+        setErrorKind("server")
+        setErrorMsg(hint)
+        setStep("error")
+        return
+      }
       if (!data.ok) {
         setErrorKind(data.error)
         setErrorMsg(data.message)
