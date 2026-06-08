@@ -70,6 +70,13 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Solutions — reminder that detail lives on the component.** Info notes
+  in the composer (Skeleton step), the solution detail Members tab and the
+  editor make clear that a solution only wires components together — a
+  component's detailed functionality (logic, rules, NFR, capabilities,
+  processes) is edited on the component itself; new components added in a
+  solution are created as empty drafts to flesh out afterwards.
+
 - **Solutions composer — description field + AI assist.** Step 1 (Intent)
   now has a **Description** textarea. With goal + description filled, a
   **Pre-fill with AI** button opens a modal that calls the LLM (the same

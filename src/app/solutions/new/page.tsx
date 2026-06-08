@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles, Info } from "lucide-react"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { ChipPicker } from "@/components/ChipPicker"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
@@ -388,6 +388,15 @@ export default function NewSolutionPage() {
       {/* STEP 2 — skeleton */}
       {step === 2 && proposal && (
         <div className="space-y-5">
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 flex items-start gap-2">
+            <Info className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              A solution only wires components together. To define a component&apos;s
+              detailed functionality — logic, rules, NFR, capabilities, processes —
+              open that component and edit it there. New components added here are
+              created as empty drafts for you to flesh out afterwards.
+            </span>
+          </div>
           <section>
             <h2 className="text-sm font-semibold mb-2">Proposed members ({proposal.members.length})</h2>
             {proposal.members.length === 0 && <p className="text-sm text-muted-foreground">No existing component covers the selected targets — see gaps below.</p>}

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Loader2, AlertCircle, Plus, X, Save } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Plus, X, Save, Info } from "lucide-react"
 import { ChipPicker } from "@/components/ChipPicker"
 import { slugifyId } from "@/lib/component-schema"
 import {
@@ -252,6 +252,14 @@ export default function EditSolutionPage() {
       {/* members */}
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">Members ({members.length})</h2>
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 flex items-start gap-2">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Here you only wire components into the solution. A component&apos;s
+            detailed functionality — logic, rules, NFR, capabilities, processes —
+            is edited on the component itself, not here.
+          </span>
+        </div>
         {members.map((m, i) => (
           <Card key={`${m.component}-${i}`}>
             <CardContent className="py-3 flex items-center gap-2 flex-wrap">

@@ -10,7 +10,7 @@ import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Boxes, Loader2, AlertCircle, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeft, Boxes, Loader2, AlertCircle, Pencil, Trash2, Info } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { MermaidPreview } from "@/components/mermaid-preview"
@@ -285,6 +285,14 @@ export default function SolutionDetailPage() {
 
       {tab === "members" && (
         <div className="space-y-2">
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 flex items-start gap-2">
+            <Info className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              These are references. To change a component&apos;s detailed
+              functionality — logic, rules, NFR, capabilities, processes — open
+              the component (click its name) and edit it there.
+            </span>
+          </div>
           {(solution.members || []).length === 0 && (
             <p className="text-sm text-muted-foreground">No members.</p>
           )}
