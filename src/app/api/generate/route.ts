@@ -37,7 +37,7 @@ async function doPost(request: Request) {
       )
     }
 
-    const validDocTypes = ["detailed-solution", "audit-report", "security-report"]
+    const validDocTypes = ["detailed-solution", "audit-report", "security-report", "solution-brd"]
     if (documentType && !validDocTypes.includes(documentType)) {
       return NextResponse.json(
         { error: "Invalid document type." },
@@ -50,7 +50,18 @@ async function doPost(request: Request) {
 
     let prompt: string
 
-    if (documentType === "detailed-solution") {
+    if (documentType === "solution-brd") {
+      // Solution Description / BRD — context is the solution YAML plus the
+      // YAML of its member components (sent by the client).
+      if (!body.solutionYaml) {
+        return NextResponse.json({ error: "No solution provided" }, { status: 400 })
+      }
+      prompt = buildSolutionBrdPrompt(
+        sanitizeForPrompt(body.solutionYaml),
+        sanitizeForPrompt(body.componentsYaml || ""),
+        attachmentContext
+      )
+    } else if (documentType === "detailed-solution") {
       // Detailed Solution Description — same as audience-based Technical but with custom title
       if (body.componentId) {
         prompt = buildComponentPrompt(sanitizeForPrompt(body.yamlContent), "Technical", attachmentContext, "Detailed Solution Description")
@@ -275,6 +286,75 @@ Mark this section clearly as an **informed estimate** based on available data, n
 Overall maturity, ownership, any known risks or limitations.
 
 Focus on accurately describing what is defined in the data. Use the interfaces, relationships, types, and descriptions to explain the system. Do not invent information that is not present. The Data Perspective chapter is the only exception — there you may reasonably extrapolate from interface names, types, and descriptions, but clearly label it as an estimate.`
+}
+
+function buildSolutionBrdPrompt(
+  solutionYaml: string,
+  componentsYaml: string,
+  attachmentContext: string
+): string {
+  return `You are a solution architect writing a Solution Description / Business Requirements Document. Your writing must sound human and natural — never like AI-generated content.
+
+${writingStyleRules()}
+
+A solution composes existing components into a new offering. Below is the solution definition followed by the YAML of each member component. Base the document strictly on this data — the members, their dispositions (reuse / extend / new / external), the flows, and each component's capabilities, processes, links, rules, NFR and risks.
+
+Solution definition (YAML):
+\`\`\`yaml
+${solutionYaml}
+\`\`\`
+
+Member components (YAML):
+\`\`\`yaml
+${componentsYaml}
+\`\`\`
+${attachmentContext}
+
+Generate a well-structured document in Markdown with these chapters in this exact order:
+
+# [Solution Name] — Solution Description
+
+## Table of Contents
+(numbered list of the chapters below)
+
+## 1. Version History
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.0 | [today's date] | Auto-generated | Initial version |
+
+## 2. Executive Summary
+What the solution does and the business goal. Two short paragraphs.
+
+## 3. Business Context & Drivers
+The capabilities and processes the solution delivers, and why they matter.
+
+## 4. Scope
+In scope: the member components. State that anything not listed is out of scope.
+
+## 5. Solution Architecture
+A component inventory table: Component | Type | Disposition | Role in solution | Status | Owner. Then 2-3 sentences on how the pieces fit.
+
+Include a mermaid flowchart of the members and their flows (proposed flows dashed). Use a \`\`\`mermaid block, short labels, only real flows from the data.
+
+## 6. Capability & Process Mapping
+A table mapping each delivered capability/process to the member that provides it (and its role). Flag any that map only to a "new" component as a gap to build.
+
+## 7. Non-Functional Requirements
+The solution's NFR targets, reconciled against the strictest member values. Note the highest data classification across members.
+
+## 8. Dependencies
+Members that link to components outside the solution — these are external dependencies. List them.
+
+## 9. Risks & Assumptions
+The solution's risks plus relevant risks rolled up from members. State key assumptions.
+
+## 10. Business Rules
+Relevant rules declared on the member components.
+
+## 11. Implementation Roadmap
+Break the work down by disposition: what is reused as-is, what needs extending, what is new to build. Note readiness (which members are still draft).
+
+Base everything on the data. Do not invent components, flows or values that are not present. Where you reason beyond the data (e.g. sequencing the roadmap), say so plainly.`
 }
 
 function writingStyleRules(): string {

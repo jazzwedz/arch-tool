@@ -11,9 +11,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Boxes, Loader2, AlertCircle } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { TypeIcon } from "@/components/TypeIcon"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
+import { solutionToYaml } from "@/lib/solution-yaml"
+import { componentToYaml } from "@/lib/component-yaml"
 import {
   SOLUTION_STATUS_COLORS,
   MEMBER_DISPOSITION_LABELS,
@@ -21,13 +25,14 @@ import {
 } from "@/lib/constants"
 import type { Component, Solution } from "@/lib/types"
 
-type TabId = "overview" | "members" | "flows" | "delivers" | "risks"
+type TabId = "overview" | "members" | "flows" | "delivers" | "risks" | "documentation"
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "members", label: "Members" },
   { id: "flows", label: "Flows" },
   { id: "delivers", label: "Delivers" },
   { id: "risks", label: "NFR & Risks" },
+  { id: "documentation", label: "Documentation" },
 ]
 
 export default function SolutionDetailPage() {
@@ -38,6 +43,14 @@ export default function SolutionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<TabId>("overview")
+  const [reload, setReload] = useState(0)
+
+  // BRD generation + flow promotion state
+  const [generating, setGenerating] = useState(false)
+  const [generated, setGenerated] = useState<string | null>(null)
+  const [genError, setGenError] = useState<string | null>(null)
+  const [promoting, setPromoting] = useState(false)
+  const [promoteMsg, setPromoteMsg] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -59,9 +72,60 @@ export default function SolutionDetailPage() {
       })
       .catch((err: Error) => setError(err.message || "Failed to load"))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, reload])
 
   const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
+
+  const hasProposed = (solution?.flows || []).some((f) => f.status === "proposed")
+
+  const generateBrd = async () => {
+    if (!solution) return
+    setGenerating(true)
+    setGenError(null)
+    setGenerated(null)
+    try {
+      const memberComps = (solution.members || [])
+        .map((m) => byId.get(m.component))
+        .filter(Boolean) as Component[]
+      const componentsYaml = memberComps.map((c) => componentToYaml(c)).join("---\n")
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentType: "solution-brd",
+          solutionId: solution.id,
+          solutionYaml: solutionToYaml(solution),
+          componentsYaml,
+        }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) throw new Error((json && json.error) || `HTTP ${res.status}`)
+      setGenerated(json.generated || "")
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : "Generation failed")
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const promoteFlows = async () => {
+    if (!solution) return
+    setPromoting(true)
+    setPromoteMsg(null)
+    try {
+      const res = await fetch(`/api/solutions/${encodeURIComponent(solution.id)}/promote-flows`, {
+        method: "POST",
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) throw new Error((json && json.error) || `HTTP ${res.status}`)
+      setPromoteMsg(`Promoted ${json.promoted} flow(s) into component links.`)
+      setReload((n) => n + 1)
+    } catch (e) {
+      setPromoteMsg(e instanceof Error ? e.message : "Promote failed")
+    } finally {
+      setPromoting(false)
+    }
+  }
   const chart = useMemo(
     () =>
       solution
@@ -200,6 +264,24 @@ export default function SolutionDetailPage() {
 
       {tab === "flows" && (
         <div className="space-y-2">
+          {hasProposed && (
+            <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2">
+              <span className="text-sm text-muted-foreground">
+                Proposed flows can be written into the members&apos; real links.
+              </span>
+              <Button size="sm" onClick={promoteFlows} disabled={promoting}>
+                {promoting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    Promoting…
+                  </>
+                ) : (
+                  "Promote proposed flows"
+                )}
+              </Button>
+            </div>
+          )}
+          {promoteMsg && <p className="text-xs text-emerald-700">{promoteMsg}</p>}
           {(solution.flows || []).length === 0 && (
             <p className="text-sm text-muted-foreground">No flows.</p>
           )}
@@ -286,6 +368,39 @@ export default function SolutionDetailPage() {
               )}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {tab === "documentation" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              Generate a Solution Description / BRD from this solution and its members.
+            </p>
+            <Button onClick={generateBrd} disabled={generating}>
+              {generating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                "Generate BRD"
+              )}
+            </Button>
+          </div>
+          {genError && (
+            <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              {genError}
+            </div>
+          )}
+          {generated && (
+            <Card>
+              <CardContent className="pt-4 prose prose-sm max-w-none overflow-auto">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{generated}</ReactMarkdown>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>
