@@ -29,7 +29,7 @@
 // Caller is responsible for the wrapping React component; this module
 // is a pure string producer.
 
-import type { Component } from "./types"
+import type { Component, SolutionMember, SolutionFlow } from "./types"
 import { TYPE_COLORS, TYPE_LABELS } from "./constants"
 
 export interface ArchitectureMermaidOptions {
@@ -116,6 +116,56 @@ export function buildArchitectureMermaid(
   // the chart preamble even on installs with all 20 types.
   const seenTypes = new Set<string>(components.map((c) => c.type))
   for (const t of seenTypes) {
+    const colors = TYPE_COLORS[t as keyof typeof TYPE_COLORS]
+    if (!colors) continue
+    lines.push(
+      `  classDef ${typeClass(t)} fill:${colors.fill},stroke:${colors.border},color:${colors.text},stroke-width:1.5px`
+    )
+  }
+
+  return lines.join("\n")
+}
+
+// Scoped diagram for a single solution: only its member components, with
+// the solution's flows as edges (existing = solid, proposed = dashed).
+// Reuses the same node styling as the catalog overview.
+export function buildSolutionMermaid(
+  members: SolutionMember[],
+  components: Component[],
+  flows: SolutionFlow[]
+): string {
+  const lines: string[] = ["flowchart LR"]
+
+  if (!members || members.length === 0) {
+    lines.push(`  noop["No members yet"]:::muted`)
+    lines.push(`  classDef muted fill:#f3f4f6,stroke:#9ca3af,color:#6b7280`)
+    return lines.join("\n")
+  }
+
+  const byId = new Map(components.map((c) => [c.id, c]))
+  const memberIds = new Set(members.map((m) => m.component))
+  const typesPresent = new Set<string>()
+
+  for (const m of members) {
+    const c = byId.get(m.component)
+    const type = c?.type || "component"
+    typesPresent.add(type)
+    const label = c?.name || m.component
+    const suffix = m.disposition === "new" ? " (new)" : m.disposition === "extend" ? " (extend)" : ""
+    lines.push(
+      `  ${safeId(m.component)}["${escLabel(label + suffix)}"]:::${typeClass(type)}`
+    )
+  }
+
+  for (const f of flows || []) {
+    if (!memberIds.has(f.from) || !memberIds.has(f.to)) continue
+    if (f.from === f.to) continue
+    const arrow = f.status === "proposed" ? "-.->" : "-->"
+    const label = f.protocol || f.role
+    lines.push(`  ${safeId(f.from)} ${arrow}|${escLabel(label)}| ${safeId(f.to)}`)
+  }
+
+  for (const t of typesPresent) {
     const colors = TYPE_COLORS[t as keyof typeof TYPE_COLORS]
     if (!colors) continue
     lines.push(

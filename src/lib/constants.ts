@@ -292,6 +292,47 @@ export const LINK_ROLE_COLORS: Record<LinkRole, string> = {
   "writes-to":  "bg-rose-100 text-rose-800 border-rose-300",
 }
 
+// -------------------------- Solutions --------------------------
+
+import type { SolutionStatus, MemberDisposition } from "./types"
+
+export const SOLUTION_STATUSES: SolutionStatus[] = [
+  "draft",
+  "proposed",
+  "approved",
+  "built",
+  "retired",
+]
+
+export const SOLUTION_STATUS_COLORS: Record<SolutionStatus, string> = {
+  draft: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  proposed: "bg-blue-100 text-blue-800 border-blue-300",
+  approved: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  built: "bg-green-100 text-green-800 border-green-300",
+  retired: "bg-gray-100 text-gray-500 border-gray-300",
+}
+
+export const MEMBER_DISPOSITIONS: MemberDisposition[] = [
+  "reuse",
+  "extend",
+  "new",
+  "external",
+]
+
+export const MEMBER_DISPOSITION_LABELS: Record<MemberDisposition, string> = {
+  reuse: "Reuse",
+  extend: "Extend",
+  new: "New",
+  external: "External",
+}
+
+export const MEMBER_DISPOSITION_COLORS: Record<MemberDisposition, string> = {
+  reuse: "bg-green-100 text-green-800 border-green-300",
+  extend: "bg-amber-100 text-amber-800 border-amber-300",
+  new: "bg-blue-100 text-blue-800 border-blue-300",
+  external: "bg-gray-100 text-gray-600 border-gray-300",
+}
+
 export const CAPABILITY_ROLES: CapabilityRole[] = [
   "owner",
   "contributor",

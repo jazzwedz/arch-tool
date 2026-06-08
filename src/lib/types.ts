@@ -323,3 +323,69 @@ export interface Diagram {
 export interface DiagramWithSha extends Diagram {
   sha: string
 }
+
+// -------------------------- Solutions --------------------------
+//
+// A Solution is a cross-cutting composition over existing components —
+// the analyst assembles a new offering by referencing catalog
+// components (many-to-many; a component can belong to many solutions),
+// marking how each is used, and describing the to-be interactions.
+// Stored separately from components (solutions/<id>.yaml) so the
+// component catalog stays clean.
+
+export type SolutionStatus =
+  | "draft"
+  | "proposed"
+  | "approved"
+  | "built"
+  | "retired"
+
+/** How a member component is used in the solution. */
+export type MemberDisposition = "reuse" | "extend" | "new" | "external"
+
+/** Whether a flow already exists between members or is proposed (to-be). */
+export type FlowStatus = "existing" | "proposed"
+
+export interface SolutionMember {
+  /** Component id referenced from the catalog. */
+  component: string
+  disposition: MemberDisposition
+  /** Free-text role this component plays in this solution. */
+  role?: string
+}
+
+export interface SolutionFlow {
+  /** Source component id (must be a member). */
+  from: string
+  /** Target component id (must be a member). */
+  to: string
+  role: LinkRole
+  protocol?: LinkProtocol
+  status: FlowStatus
+  description?: string
+}
+
+export interface SolutionDelivers {
+  capabilities?: string[]
+  processes?: string[]
+}
+
+export interface Solution {
+  schema_version?: number
+  id: string
+  name: string
+  status: SolutionStatus
+  owner: string
+  description: ComponentDescription
+  /** One-line business goal / success metric. */
+  goal?: string
+  delivers?: SolutionDelivers
+  members?: SolutionMember[]
+  flows?: SolutionFlow[]
+  nfr?: ComponentNFR
+  risks?: string[]
+}
+
+export interface SolutionWithSha extends Solution {
+  sha: string
+}

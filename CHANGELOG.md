@@ -54,6 +54,18 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Solutions — compose offerings from existing components (Phase 1).**
+  New top-nav entry (between Catalog and Processes) and a `Solution`
+  entity stored separately at `solutions/<id>.yaml` (references catalog
+  components by id — many-to-many, so the component catalog stays clean).
+  Phase 1 ships the foundation: types + enums, YAML serializer
+  (`solution-yaml.ts`), store (`solutions.ts`), CRUD API
+  (`/api/solutions`, `/api/solutions/[id]`), a Solutions list page and a
+  read-only detail page (Overview with a member-scoped diagram, Members,
+  Flows, Delivers, NFR & Risks), and the design doc `docs/SOLUTIONS.md`.
+  The deterministic composer wizard and BRD generation land in later
+  phases.
+
 - **Processes overview page (`/processes`).** New top-nav entry next to
   Catalog. Aggregates every business process declared anywhere in the
   catalog (each component's `processes[]`) into one list, and shows
