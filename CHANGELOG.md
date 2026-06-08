@@ -19,6 +19,15 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Rules-import crashed the whole endpoint (`Object.defineProperty called
+  on non-object`).** `pdf-parse` (v2 → `pdfjs-dist`) breaks when webpack
+  bundles it on the server, which threw at module load — so *every*
+  rules-import request (PDF, Confluence or code) 500'd. Fixed by marking
+  `pdf-parse` / `pdfjs-dist` as `serverExternalPackages` in
+  `next.config.mjs` (runtime require instead of bundling) and lazily
+  importing the PDF stack inside `extractPdf` so the Confluence/code
+  paths never load it.
+
 - **Rules-import (AI rule analysis) crashed with “Unexpected token '<'”.**
   The import-rules-from-documents dialog called `res.json()` directly on
   the analysis response. When the request hit a gateway timeout (long AI

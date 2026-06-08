@@ -3,13 +3,16 @@
 // pdfjs-dist and handles font dictionaries / layout heuristics; we
 // just normalise the text and surface the page count.
 
-import { PDFParse } from "pdf-parse"
 import { ExtractError, type ExtractedDoc } from "./types"
 
 export async function extractPdf(
   buffer: Buffer,
   filename: string
 ): Promise<ExtractedDoc> {
+  // Imported lazily so the heavy pdf-parse / pdfjs-dist stack is only
+  // loaded when a PDF is actually parsed — the Confluence and code
+  // import paths never touch it.
+  const { PDFParse } = await import("pdf-parse")
   const parser = new PDFParse({
     data: new Uint8Array(buffer),
   })

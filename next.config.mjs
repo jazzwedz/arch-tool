@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // pdf-parse (v2) pulls in pdfjs-dist, which breaks when bundled by
+  // webpack on the server ("Object.defineProperty called on non-object").
+  // Keep these as runtime node requires instead of bundling them.
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
   async headers() {
     return [
       {
