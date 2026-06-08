@@ -5,12 +5,12 @@
 // component names/types from the live catalog.
 
 import { useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Boxes, Loader2, AlertCircle } from "lucide-react"
+import { ArrowLeft, Boxes, Loader2, AlertCircle, Pencil, Trash2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { MermaidPreview } from "@/components/mermaid-preview"
@@ -23,7 +23,7 @@ import {
   MEMBER_DISPOSITION_LABELS,
   MEMBER_DISPOSITION_COLORS,
 } from "@/lib/constants"
-import type { Component, Solution } from "@/lib/types"
+import type { Component, Solution, SolutionWithSha } from "@/lib/types"
 
 type TabId = "overview" | "members" | "flows" | "delivers" | "risks" | "documentation"
 const TABS: { id: TabId; label: string }[] = [
@@ -37,7 +37,11 @@ const TABS: { id: TabId; label: string }[] = [
 
 export default function SolutionDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const id = decodeURIComponent(String(params.id))
+  const [sha, setSha] = useState<string>("")
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [solution, setSolution] = useState<Solution | null>(null)
   const [components, setComponents] = useState<Component[]>([])
   const [loading, setLoading] = useState(true)
@@ -68,6 +72,7 @@ export default function SolutionDetailPage() {
     ])
       .then(([sol, comps]) => {
         setSolution(sol)
+        setSha((sol as SolutionWithSha).sha || "")
         setComponents(comps)
       })
       .catch((err: Error) => setError(err.message || "Failed to load"))
@@ -124,6 +129,22 @@ export default function SolutionDetailPage() {
       setPromoteMsg(e instanceof Error ? e.message : "Promote failed")
     } finally {
       setPromoting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/solutions/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sha }),
+      })
+      if (!res.ok) throw new Error("Failed to delete")
+      router.push("/solutions")
+    } catch {
+      setDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
   const chart = useMemo(
@@ -183,7 +204,51 @@ export default function SolutionDetailPage() {
             <p className="text-xs text-muted-foreground mt-1">Owner: {solution.owner}</p>
           )}
         </div>
+        <div className="flex gap-2 shrink-0">
+          <Link href={`/solutions/${encodeURIComponent(id)}/edit`}>
+            <Button variant="outline">
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
+        </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div className="rounded-md border border-red-300 bg-red-50 p-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm text-red-900">
+            Delete solution <strong>{solution.name}</strong>? This removes the
+            solution file; member components are not touched.
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="border-b flex gap-1">
         {TABS.map((t) => (

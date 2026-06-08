@@ -70,6 +70,16 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Solutions are now editable and deletable.** The detail page gets
+  **Edit** and **Delete** (with confirm) buttons. New editor at
+  `/solutions/[id]/edit` to change details (name / status / owner / goal
+  / description), delivers (capability & process chips), members
+  (disposition, role, add existing or add brand-new, remove) and flows
+  (add / remove). Saves via PUT with the loaded sha; brand-new members
+  added in the editor are created as draft components on save. The
+  delivers ChipPicker was extracted to a shared `components/ChipPicker`
+  used by both the composer and the editor.
+
 - **Solutions wizard — tidier delivers picker + manual new components.**
   Step 1's capability/process pickers now show selected chips on top
   (one-click remove), a search box to filter the (otherwise long) list,
