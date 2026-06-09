@@ -103,6 +103,14 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Catalog: group by context.** The catalog's grouping is now a
+  selector — **No grouping / Group by context / Group by type**. “By
+  context” rolls each component up to its owning context (via the
+  `part-of` / `contains` hierarchy, same rule as the architecture
+  overview) and shows one section per context (with a link to it), plus a
+  “No context” section for everything outside a hierarchy. Helps as the
+  component count grows. (Replaces the old boolean group-by-type toggle.)
+
 - **DSD generation is now an orchestrated, grounded flow.** Instead of a
   single prompt, the Detailed Solution Description runs a small in-process
   pipeline: the inventory, capability/process mapping, dependencies, NFR

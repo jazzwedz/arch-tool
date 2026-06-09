@@ -25,6 +25,41 @@ import { useStoredState } from "@/lib/use-stored-state"
 import Link from "next/link"
 
 type ViewMode = "grid" | "list" | "compact"
+type GroupMode = "none" | "type" | "context"
+
+// Build child→parent map from the part-of / contains link pair (same
+// rule as the architecture overview). Used to roll a component up to its
+// owning context.
+function buildParentMap(components: Component[]): Map<string, string> {
+  const ids = new Set(components.map((c) => c.id))
+  const parentOf = new Map<string, string>()
+  for (const c of components)
+    for (const l of c.links || [])
+      if (l.role === "part-of" && l.target !== c.id && ids.has(l.target) && !parentOf.has(c.id))
+        parentOf.set(c.id, l.target)
+  for (const c of components)
+    for (const l of c.links || [])
+      if (l.role === "contains" && l.target !== c.id && ids.has(l.target) && !parentOf.has(l.target))
+        parentOf.set(l.target, c.id)
+  return parentOf
+}
+
+// Walk up the hierarchy to the nearest context-typed ancestor (or self).
+// Returns null when the component rolls up to no context.
+function contextIdOf(
+  id: string,
+  byId: Map<string, Component>,
+  parentOf: Map<string, string>
+): string | null {
+  let cur: string | undefined = id
+  const seen = new Set<string>()
+  while (cur && !seen.has(cur)) {
+    seen.add(cur)
+    if (byId.get(cur)?.type === "context") return cur
+    cur = parentOf.get(cur)
+  }
+  return null
+}
 
 export default function CatalogPage() {
   const [components, setComponents] = useState<Component[]>([])
@@ -39,7 +74,7 @@ export default function CatalogPage() {
   const [ownerFilter, setOwnerFilter] = useStoredState<string>("catalog:ownerFilter", "all")
   const [tagFilter, setTagFilter] = useStoredState<string>("catalog:tagFilter", "all")
   const [view, setView] = useStoredState<ViewMode>("catalog:view", "grid")
-  const [isGrouped, setIsGrouped] = useStoredState("catalog:isGrouped", false)
+  const [groupBy, setGroupBy] = useStoredState<GroupMode>("catalog:groupBy", "none")
 
   useEffect(() => {
     fetch("/api/components")
@@ -97,6 +132,34 @@ export default function CatalogPage() {
       .filter((t) => groups[t] && groups[t]!.length > 0)
       .map((t) => ({ type: t, components: groups[t]! }))
   }, [filtered])
+
+  // Group by owning context. Hierarchy is resolved from the FULL catalog
+  // (a parent context may itself be filtered out of the visible list).
+  const groupedByContext = useMemo(() => {
+    const byId = new Map(components.map((c) => [c.id, c]))
+    const parentOf = buildParentMap(components)
+    const groups = new Map<string, Component[]>()
+    const NONE = "__none"
+    for (const c of filtered) {
+      const ctx = contextIdOf(c.id, byId, parentOf) ?? NONE
+      const arr = groups.get(ctx)
+      if (arr) arr.push(c)
+      else groups.set(ctx, [c])
+    }
+    const out = Array.from(groups.entries()).map(([ctxId, comps]) => ({
+      contextId: ctxId,
+      contextName: ctxId === NONE ? "No context" : byId.get(ctxId)?.name || ctxId,
+      isNone: ctxId === NONE,
+      components: comps,
+    }))
+    // Real contexts first (by name), "No context" last.
+    out.sort((a, b) => {
+      if (a.isNone) return 1
+      if (b.isNone) return -1
+      return a.contextName.localeCompare(b.contextName)
+    })
+    return out
+  }, [filtered, components])
 
   const viewButtons: { mode: ViewMode; icon: typeof LayoutGrid; title: string }[] = [
     { mode: "grid", icon: LayoutGrid, title: "Cards" },
@@ -235,16 +298,18 @@ export default function CatalogPage() {
               <Icon className="h-4 w-4" />
             </Button>
           ))}
-          <div className="w-px bg-border mx-0.5" />
-          <Button
-            variant={isGrouped ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setIsGrouped(!isGrouped)}
-            title="Group by type"
-          >
-            <Group className="h-4 w-4" />
-          </Button>
         </div>
+        <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupMode)}>
+          <SelectTrigger className="w-[160px]">
+            <Group className="h-4 w-4 mr-1 text-muted-foreground" />
+            <SelectValue placeholder="Group" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No grouping</SelectItem>
+            <SelectItem value="context">Group by context</SelectItem>
+            <SelectItem value="type">Group by type</SelectItem>
+          </SelectContent>
+        </Select>
         <TypeModelDialog />
       </div>
 
@@ -266,7 +331,7 @@ export default function CatalogPage() {
             ? "No components yet. Create your first one!"
             : "No components match your filters."}
         </div>
-      ) : isGrouped ? (
+      ) : groupBy === "type" ? (
         <div className="space-y-8">
           {grouped.map(({ type, components: groupComponents }) => {
             const colors = TYPE_COLORS[type]
@@ -280,6 +345,37 @@ export default function CatalogPage() {
                   <h2 className="text-lg font-semibold" style={{ color: colors.text }}>
                     {TYPE_LABELS[type]}
                   </h2>
+                  <span className="text-sm text-muted-foreground ml-1">
+                    ({groupComponents.length})
+                  </span>
+                </div>
+                {renderComponents(groupComponents)}
+              </div>
+            )
+          })}
+        </div>
+      ) : groupBy === "context" ? (
+        <div className="space-y-8">
+          {groupedByContext.map(({ contextId, contextName, isNone, components: groupComponents }) => {
+            const colors = TYPE_COLORS.context
+            return (
+              <div key={contextId}>
+                <div
+                  className="flex items-center gap-2 mb-3 pb-2 border-b-2"
+                  style={{ borderBottomColor: isNone ? "#d1d5db" : colors.border }}
+                >
+                  {!isNone && <TypeIcon type="context" style={{ color: colors.text }} />}
+                  {isNone ? (
+                    <h2 className="text-lg font-semibold text-muted-foreground">No context</h2>
+                  ) : (
+                    <Link
+                      href={`/component/${contextId}`}
+                      className="text-lg font-semibold hover:underline"
+                      style={{ color: colors.text }}
+                    >
+                      {contextName}
+                    </Link>
+                  )}
                   <span className="text-sm text-muted-foreground ml-1">
                     ({groupComponents.length})
                   </span>
