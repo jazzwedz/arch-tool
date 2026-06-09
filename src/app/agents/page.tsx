@@ -1,0 +1,197 @@
+"use client"
+
+// Agents page — the DSD agent team (writer / critic / coach). View their
+// prompts + version, and run the coach: it proposes prompt/lesson
+// improvements from accumulated DSD feedback, which you approve to commit
+// (propose → approve → commit training loop).
+
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Bot, Sparkles, Loader2, AlertCircle, Check } from "lucide-react"
+import type { Agent } from "@/lib/agents"
+import type { CoachProposal, AgentDelta } from "@/lib/dsd-coach"
+
+export default function AgentsPage() {
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [proposing, setProposing] = useState(false)
+  const [proposal, setProposal] = useState<CoachProposal | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [appliedMsg, setAppliedMsg] = useState<string | null>(null)
+
+  const load = () => {
+    setLoading(true)
+    fetch("/api/agents")
+      .then((r) => r.json())
+      .then((d) => setAgents(Array.isArray(d) ? d : []))
+      .catch(() => setAgents([]))
+      .finally(() => setLoading(false))
+  }
+  useEffect(load, [])
+
+  const runCoach = async () => {
+    setProposing(true)
+    setError(null)
+    setProposal(null)
+    setAppliedMsg(null)
+    try {
+      const r = await fetch("/api/agents/coach/propose", { method: "POST" })
+      const d = await r.json().catch(() => null)
+      if (!r.ok) throw new Error((d && d.error) || `Failed (${r.status})`)
+      setProposal(d as CoachProposal)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Coaching failed")
+    } finally {
+      setProposing(false)
+    }
+  }
+
+  const apply = async (agentId: string, delta: AgentDelta) => {
+    setError(null)
+    try {
+      const r = await fetch("/api/agents/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId, ...delta }),
+      })
+      const d = await r.json().catch(() => null)
+      if (!r.ok) throw new Error((d && d.error) || `Failed (${r.status})`)
+      setAppliedMsg(`${agentId} updated to v${d.version}.`)
+      // Remove the approved delta from the proposal and refresh agents.
+      setProposal((p) =>
+        p ? { ...p, ...(agentId === "dsd-writer" ? { writer: undefined } : { critic: undefined }) } : p
+      )
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Apply failed")
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Bot className="h-7 w-7" />
+            Agents
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            The DSD writer, critic and coach. The coach turns analyst feedback into prompt
+            improvements you approve.
+          </p>
+        </div>
+        <Button onClick={runCoach} disabled={proposing}>
+          {proposing ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analysing feedback…</>
+          ) : (
+            <><Sparkles className="h-4 w-4 mr-2" />Suggest improvements</>
+          )}
+        </Button>
+      </div>
+
+      {error && (
+        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{error}
+        </div>
+      )}
+      {appliedMsg && (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 flex items-start gap-2">
+          <Check className="h-4 w-4 mt-0.5 shrink-0" />{appliedMsg}
+        </div>
+      )}
+
+      {proposal && (
+        <Card className="border-blue-300">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-blue-600" />
+              Coach proposal
+              <Badge variant="outline" className="text-[10px]">{proposal.feedbackConsidered} feedback considered</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {proposal.rationale && <p className="text-sm text-muted-foreground">{proposal.rationale}</p>}
+            {!proposal.writer && !proposal.critic && (
+              <p className="text-sm text-muted-foreground">No changes proposed.</p>
+            )}
+            {proposal.writer && (
+              <DeltaBlock title="Writer" agentId="dsd-writer" delta={proposal.writer} onApprove={apply} />
+            )}
+            {proposal.critic && (
+              <DeltaBlock title="Critic" agentId="dsd-critic" delta={proposal.critic} onApprove={apply} />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
+          <Loader2 className="h-4 w-4 animate-spin" />Loading agents…
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {agents.map((a) => (
+            <Card key={a.id}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  {a.name}
+                  <Badge variant="outline" className="text-[10px] uppercase">{a.role}</Badge>
+                  <Badge variant="outline" className="text-[10px]">v{a.version}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <details>
+                  <summary className="cursor-pointer text-sm text-muted-foreground">System prompt</summary>
+                  <pre className="mt-1 text-xs whitespace-pre-wrap bg-muted/40 rounded p-2">{a.system_prompt}</pre>
+                </details>
+                {a.lessons && (
+                  <details open>
+                    <summary className="cursor-pointer text-sm text-muted-foreground">Lessons (coach-trained)</summary>
+                    <pre className="mt-1 text-xs whitespace-pre-wrap bg-amber-50 rounded p-2">{a.lessons}</pre>
+                  </details>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DeltaBlock({
+  title,
+  agentId,
+  delta,
+  onApprove,
+}: {
+  title: string
+  agentId: string
+  delta: AgentDelta
+  onApprove: (agentId: string, delta: AgentDelta) => void
+}) {
+  return (
+    <div className="rounded-md border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-sm">{title}</span>
+        <Button size="sm" onClick={() => onApprove(agentId, delta)}>
+          <Check className="h-4 w-4 mr-1" />Approve &amp; commit
+        </Button>
+      </div>
+      {delta.lessons && (
+        <div>
+          <div className="text-xs text-muted-foreground">Proposed lessons</div>
+          <pre className="text-xs whitespace-pre-wrap bg-amber-50 rounded p-2">{delta.lessons}</pre>
+        </div>
+      )}
+      {delta.system_prompt && (
+        <div>
+          <div className="text-xs text-muted-foreground">Proposed system prompt</div>
+          <pre className="text-xs whitespace-pre-wrap bg-muted/40 rounded p-2">{delta.system_prompt}</pre>
+        </div>
+      )}
+    </div>
+  )
+}

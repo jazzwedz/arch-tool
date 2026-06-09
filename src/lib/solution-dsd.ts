@@ -17,14 +17,18 @@ import { getLLM } from "./llm"
 import { buildSolutionMermaid } from "./architecture-mermaid"
 import type { Component, Solution, SolutionMember } from "./types"
 import { getLogger } from "./log"
+import { saveDsd, newArtifactId, type DsdMode } from "./dsd-store"
+import { getAgent, agentInstruction } from "./agents"
 
 // ----------------------------- job store -----------------------------
 
-export type DsdPhase = "grounding" | "drafting" | "reviewing" | "revising" | "done" | "error"
+export type DsdPhase = "grounding" | "drafting" | "reviewing" | "revising" | "saving" | "done" | "error"
 
 export interface DsdJob {
   status: "running" | "done" | "error"
   phase: DsdPhase
+  /** Set when the run finished and the artifact was persisted. */
+  artifactId?: string
   markdown?: string
   error?: string
   iterations?: number
@@ -43,12 +47,16 @@ export function getDsdJob(id: string): DsdJob | undefined {
   return jobs.get(id)
 }
 
-export function startDsdJob(solution: Solution, components: Component[]): string {
+export function startDsdJob(
+  solution: Solution,
+  components: Component[],
+  mode: DsdMode = "quick"
+): string {
   prune()
   const id = randomUUID()
   jobs.set(id, { status: "running", phase: "grounding", updatedAt: Date.now() })
   // Detached — keeps running after the POST response returns.
-  runDsd(id, solution, components).catch((e) => {
+  runDsd(id, solution, components, mode).catch((e) => {
     getLogger().error("DSD job crashed", { id, err: e instanceof Error ? e.message : String(e) })
     jobs.set(id, {
       status: "error",
@@ -65,29 +73,88 @@ function setPhase(id: string, phase: DsdPhase, extra?: Partial<DsdJob>) {
   jobs.set(id, { ...cur, ...extra, status: "running", phase, updatedAt: Date.now() })
 }
 
-async function runDsd(id: string, solution: Solution, components: Component[]): Promise<void> {
+async function runDsd(
+  id: string,
+  solution: Solution,
+  components: Component[],
+  mode: DsdMode
+): Promise<void> {
   const facts = buildGroundedFacts(solution, components)
-  setPhase(id, "drafting")
   const llm = await getLLM()
 
-  let draft = await llm.complete({ prompt: draftPrompt(solution, facts), maxTokens: 4096 })
+  // Team mode swaps the hardcoded writer/critic guidance for the
+  // configurable agent prompts (+ their learned lessons). Quick mode
+  // leaves the instructions undefined → the built-in defaults are used,
+  // so its behaviour is unchanged.
+  let writerInstruction: string | undefined
+  let criticInstruction: string | undefined
+  const agentVersions: Record<string, number> = {}
+  if (mode === "team") {
+    const [writer, critic] = await Promise.all([getAgent("dsd-writer"), getAgent("dsd-critic")])
+    writerInstruction = agentInstruction(writer)
+    criticInstruction = agentInstruction(critic)
+    agentVersions.writer = writer.version
+    agentVersions.critic = critic.version
+  }
+
+  setPhase(id, "drafting")
+  let draft = await llm.complete({
+    prompt: draftPrompt(solution, facts, writerInstruction),
+    maxTokens: 4096,
+  })
 
   let iterations = 0
   for (let i = 0; i < 2; i++) {
     setPhase(id, "reviewing", { iterations })
-    const review = await llm.complete({ prompt: criticPrompt(facts, draft), maxTokens: 1500 })
+    const review = await llm.complete({
+      prompt: criticPrompt(facts, draft, criticInstruction),
+      maxTokens: 1500,
+    })
     const verdict = parseVerdict(review)
     if (verdict.ok || verdict.issues.length === 0) break
     iterations++
     setPhase(id, "revising", { iterations })
     draft = await llm.complete({
-      prompt: revisePrompt(facts, draft, verdict.issues),
+      prompt: revisePrompt(facts, draft, verdict.issues, writerInstruction),
       maxTokens: 4096,
     })
   }
 
-  jobs.set(id, { status: "done", phase: "done", markdown: draft, iterations, updatedAt: Date.now() })
-  getLogger().info("DSD job done", { id, iterations })
+  // Persist the artifact to the DSD library (best-effort: even if the
+  // save fails the markdown is still returned so the user sees it).
+  setPhase(id, "saving", { iterations })
+  const artifactId = newArtifactId()
+  try {
+    await saveDsd(
+      {
+        id: artifactId,
+        solutionId: solution.id,
+        title: solution.name,
+        mode,
+        model: llm.model,
+        createdAt: new Date().toISOString(),
+        ...(mode === "team" ? { agentVersions } : {}),
+        iterations,
+        feedback: [],
+      },
+      draft
+    )
+    jobs.set(id, {
+      status: "done",
+      phase: "done",
+      markdown: draft,
+      iterations,
+      artifactId,
+      updatedAt: Date.now(),
+    })
+  } catch (e) {
+    getLogger().error("Failed to persist DSD artifact", {
+      id,
+      err: e instanceof Error ? e.message : String(e),
+    })
+    jobs.set(id, { status: "done", phase: "done", markdown: draft, iterations, updatedAt: Date.now() })
+  }
+  getLogger().info("DSD job done", { id, mode, iterations })
 }
 
 // --------------------------- grounded facts ---------------------------
@@ -239,8 +306,11 @@ export function buildGroundedFacts(solution: Solution, components: Component[]):
 
 const STYLE = `Write like a knowledgeable colleague — clear, direct, no fluff. Short sentences. No marketing words (leverage, robust, seamless, synergy, holistic, empower, streamline). State facts plainly.`
 
-function draftPrompt(solution: Solution, facts: string): string {
-  return `You are a solution architect writing a Detailed Solution Description (DSD) in Markdown. ${STYLE}
+function draftPrompt(solution: Solution, facts: string, instruction?: string): string {
+  const lead =
+    instruction ||
+    `You are a solution architect writing a Detailed Solution Description (DSD) in Markdown. ${STYLE}`
+  return `${lead}
 
 Base the document STRICTLY on the verified facts below. Do not introduce components, flows, capabilities or values that are not in the facts. Where you reason beyond the data (e.g. sequencing the roadmap), say so plainly.
 
@@ -291,8 +361,11 @@ Group the work by disposition: reuse as-is, extend, new to build. Note readiness
 Output only the Markdown document.`
 }
 
-function criticPrompt(facts: string, draft: string): string {
-  return `You are reviewing a Detailed Solution Description draft against the verified facts it must be based on. Find ONLY real problems.
+function criticPrompt(facts: string, draft: string, instruction?: string): string {
+  const lead =
+    instruction ||
+    `You are reviewing a Detailed Solution Description draft against the verified facts it must be based on. Find ONLY real problems.`
+  return `${lead}
 
 Flag an issue when the draft:
 - mentions a component, flow, capability or value that is NOT in the facts (invention),
@@ -311,9 +384,15 @@ Return ONLY JSON, no prose:
 "ok" is true when there are no real problems. Be strict about inventions, lenient about style.`
 }
 
-function revisePrompt(facts: string, draft: string, issues: { section: string; problem: string }[]): string {
+function revisePrompt(
+  facts: string,
+  draft: string,
+  issues: { section: string; problem: string }[],
+  instruction?: string
+): string {
   const issueList = issues.map((i, n) => `${n + 1}. [${i.section}] ${i.problem}`).join("\n")
-  return `Revise the Detailed Solution Description below to fix the listed issues. Keep everything that is correct; change only what the issues require. Stay strictly within the verified facts. ${STYLE}
+  const lead = instruction ? `${instruction}\n\n` : ""
+  return `${lead}Revise the Detailed Solution Description below to fix the listed issues. Keep everything that is correct; change only what the issues require. Stay strictly within the verified facts. ${STYLE}
 
 VERIFIED FACTS:
 ${facts}

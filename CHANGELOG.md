@@ -103,6 +103,26 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **DSD agent team + library + feedback + coach training.** Big upgrade
+  to DSD generation, all in-process via the corp LLM gateway (no outbound):
+  - **Two modes** at generation: **Quick** (the existing draft → critic →
+    revise, unchanged) and **Agent team** (writer & critic driven by
+    configurable YAML agents — `agents/dsd-*.yaml`, with built-in
+    defaults so it works before any are committed).
+  - **DSD library** — every generated DSD is now persisted to the data
+    repo (`dsd/<solutionId>/<id>.md` with YAML front-matter) and listed
+    per solution in the Documentation tab: open (rich modal, Copy / Save
+    as PDF), delete.
+  - **Analyst feedback** — 👍/👎 + comment + optional suggested correction
+    on each DSD, stored with the artifact (the training signal).
+  - **Coach training (propose → approve → commit)** — a new **Agents**
+    page + coach that reads accumulated feedback and proposes targeted
+    improvements to the writer/critic prompts & "lessons"; you approve
+    and it commits to the agent YAML (version-bumped, auditable in git).
+  - New libs `agents.ts`, `dsd-store.ts`, `dsd-coach.ts`; extended
+    `solution-dsd.ts`; endpoints under `/api/solutions/[id]/dsd/artifacts`
+    and `/api/agents`. Reuses the existing job/progress + `GeneratedDocModal`.
+
 - **Catalog: group by context.** The catalog's grouping is now a
   selector — **No grouping / Group by context / Group by type**. “By
   context” rolls each component up to its owning context (via the

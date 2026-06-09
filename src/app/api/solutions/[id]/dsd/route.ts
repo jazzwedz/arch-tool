@@ -39,10 +39,17 @@ export async function POST(
         { status: 429 }
       )
     }
+    let mode: "quick" | "team" = "quick"
+    try {
+      const body = await request.json().catch(() => null)
+      if (body && body.mode === "team") mode = "team"
+    } catch {
+      // no body — default quick
+    }
     try {
       const solution = await getSolution(id)
       const components = await listComponents()
-      const jobId = startDsdJob(solution, components)
+      const jobId = startDsdJob(solution, components, mode)
       return NextResponse.json({ jobId })
     } catch (error) {
       getLogger().error("Failed to start DSD job", {
@@ -81,6 +88,7 @@ export async function GET(
       status: job.status,
       phase: job.phase,
       iterations: job.iterations,
+      artifactId: job.artifactId,
       markdown: job.status === "done" ? job.markdown : undefined,
       error: job.error,
     })

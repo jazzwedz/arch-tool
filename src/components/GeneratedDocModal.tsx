@@ -13,10 +13,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { FileText, Copy, Check, Send, X, Printer } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { FileText, Copy, Check, Send, X, Printer, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { MermaidPreview } from "@/components/mermaid-preview"
+
+export interface DocFeedback {
+  /** Submit analyst feedback. Returns an error string or void. */
+  onSubmit: (rating: "up" | "down", comment: string, correctedText: string) => Promise<string | void>
+  existingCount?: number
+}
 
 interface Props {
   open: boolean
@@ -26,6 +33,8 @@ interface Props {
   markdown: string
   /** Optional publish action (e.g. to Confluence). Hidden when omitted. */
   publish?: { onPublish: () => void | Promise<void>; label?: string; busy?: boolean }
+  /** Optional analyst feedback bar (training signal for the coach). */
+  feedback?: DocFeedback
 }
 
 function escapeHtml(s: string): string {
@@ -34,9 +43,38 @@ function escapeHtml(s: string): string {
   )
 }
 
-export function GeneratedDocModal({ open, onOpenChange, title, badge, markdown, publish }: Props) {
+export function GeneratedDocModal({ open, onOpenChange, title, badge, markdown, publish, feedback }: Props) {
   const [copied, setCopied] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
+
+  // feedback bar state
+  const [fbOpen, setFbOpen] = useState(false)
+  const [fbRating, setFbRating] = useState<"up" | "down" | null>(null)
+  const [fbComment, setFbComment] = useState("")
+  const [fbCorrection, setFbCorrection] = useState("")
+  const [fbBusy, setFbBusy] = useState(false)
+  const [fbDone, setFbDone] = useState(false)
+  const [fbError, setFbError] = useState<string | null>(null)
+
+  const submitFeedback = async (rating: "up" | "down") => {
+    if (!feedback) return
+    setFbRating(rating)
+    setFbBusy(true)
+    setFbError(null)
+    try {
+      const err = await feedback.onSubmit(rating, fbComment, fbCorrection)
+      if (err) {
+        setFbError(err)
+      } else {
+        setFbDone(true)
+        setFbComment("")
+        setFbCorrection("")
+        setFbOpen(false)
+      }
+    } finally {
+      setFbBusy(false)
+    }
+  }
 
   const copy = () => {
     if (!markdown) return
@@ -110,12 +148,55 @@ export function GeneratedDocModal({ open, onOpenChange, title, badge, markdown, 
                 {publish.label || "Publish to Confluence"}
               </Button>
             )}
+            {feedback && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFbOpen((o) => !o)}
+                title="Rate this document — trains the writer & critic"
+              >
+                {fbDone ? <Check className="h-4 w-4 mr-1 text-emerald-600" /> : <ThumbsUp className="h-4 w-4 mr-1" />}
+                Feedback
+                {feedback.existingCount ? ` (${feedback.existingCount})` : ""}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               <X className="h-4 w-4 mr-1" />
               Close
             </Button>
           </div>
         </div>
+
+        {feedback && fbOpen && (
+          <div className="px-6 py-3 border-b bg-amber-50/60 shrink-0 space-y-2">
+            <div className="text-sm font-medium">How is this document? Your feedback trains the writer &amp; critic.</div>
+            <Textarea
+              value={fbComment}
+              onChange={(e) => setFbComment(e.target.value)}
+              rows={2}
+              placeholder="What's good or wrong? (optional)"
+              className="bg-white text-sm"
+            />
+            <Textarea
+              value={fbCorrection}
+              onChange={(e) => setFbCorrection(e.target.value)}
+              rows={2}
+              placeholder="Suggested correction — how a section should read (optional, strongest signal)"
+              className="bg-white text-sm"
+            />
+            {fbError && <div className="text-xs text-red-700">{fbError}</div>}
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" disabled={fbBusy} onClick={() => submitFeedback("up")}>
+                {fbBusy && fbRating === "up" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ThumbsUp className="h-4 w-4 mr-1" />}
+                Good
+              </Button>
+              <Button size="sm" variant="outline" disabled={fbBusy} onClick={() => submitFeedback("down")}>
+                {fbBusy && fbRating === "down" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ThumbsDown className="h-4 w-4 mr-1" />}
+                Needs work
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto px-8 py-6 bg-white">
           <div
             ref={contentRef}

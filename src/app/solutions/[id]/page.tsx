@@ -21,6 +21,7 @@ import {
   MEMBER_DISPOSITION_COLORS,
 } from "@/lib/constants"
 import type { Component, Solution, SolutionWithSha } from "@/lib/types"
+import type { DsdArtifactMeta } from "@/lib/dsd-store"
 
 type TabId = "overview" | "members" | "flows" | "delivers" | "risks" | "documentation"
 const TABS: { id: TabId; label: string }[] = [
@@ -51,7 +52,10 @@ export default function SolutionDetailPage() {
   const [generated, setGenerated] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
   const [genPhase, setGenPhase] = useState<string | null>(null)
+  const [genMode, setGenMode] = useState<"quick" | "team">("quick")
   const [showDocModal, setShowDocModal] = useState(false)
+  const [currentArtifactId, setCurrentArtifactId] = useState<string | null>(null)
+  const [artifacts, setArtifacts] = useState<DsdArtifactMeta[]>([])
   const [promoting, setPromoting] = useState(false)
   const [promoteMsg, setPromoteMsg] = useState<string | null>(null)
 
@@ -98,7 +102,11 @@ export default function SolutionDetailPage() {
     setGenError(null)
     setGenPhase("Starting…")
     try {
-      const start = await fetch(`/api/solutions/${encodeURIComponent(id)}/dsd`, { method: "POST" })
+      const start = await fetch(`/api/solutions/${encodeURIComponent(id)}/dsd`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: genMode }),
+      })
       const sj = await start.json().catch(() => null)
       if (!start.ok || !sj?.jobId) throw new Error((sj && sj.error) || `Failed to start (${start.status})`)
       const jobId = sj.jobId as string
@@ -111,7 +119,9 @@ export default function SolutionDetailPage() {
         setGenPhase(PHASE_LABEL[j.phase] || j.phase)
         if (j.status === "done") {
           setGenerated(j.markdown || "")
+          setCurrentArtifactId(j.artifactId || null)
           setShowDocModal(true)
+          loadArtifacts()
           return
         }
         if (j.status === "error") throw new Error(j.error || "Generation failed")
@@ -124,6 +134,72 @@ export default function SolutionDetailPage() {
       setGenPhase(null)
     }
   }
+
+  const loadArtifacts = async () => {
+    try {
+      const r = await fetch(`/api/solutions/${encodeURIComponent(id)}/dsd/artifacts`)
+      const d = await r.json().catch(() => null)
+      setArtifacts(Array.isArray(d) ? d : [])
+    } catch {
+      setArtifacts([])
+    }
+  }
+
+  const openArtifact = async (artifactId: string) => {
+    try {
+      const r = await fetch(
+        `/api/solutions/${encodeURIComponent(id)}/dsd/artifacts/${encodeURIComponent(artifactId)}`
+      )
+      const d = await r.json().catch(() => null)
+      if (!r.ok || !d) throw new Error((d && d.error) || "Failed to open")
+      setGenerated(d.markdown || "")
+      setCurrentArtifactId(artifactId)
+      setShowDocModal(true)
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : "Failed to open DSD")
+    }
+  }
+
+  const deleteArtifact = async (artifactId: string) => {
+    if (!confirm("Delete this DSD? This cannot be undone.")) return
+    try {
+      const r = await fetch(
+        `/api/solutions/${encodeURIComponent(id)}/dsd/artifacts/${encodeURIComponent(artifactId)}`,
+        { method: "DELETE" }
+      )
+      if (!r.ok) throw new Error("Failed to delete")
+      loadArtifacts()
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : "Failed to delete DSD")
+    }
+  }
+
+  const submitDsdFeedback = async (
+    rating: "up" | "down",
+    comment: string,
+    correctedText: string
+  ): Promise<string | void> => {
+    if (!currentArtifactId) return "No saved document to rate."
+    try {
+      const r = await fetch(
+        `/api/solutions/${encodeURIComponent(id)}/dsd/artifacts/${encodeURIComponent(currentArtifactId)}/feedback`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating, comment, correctedText }),
+        }
+      )
+      const d = await r.json().catch(() => null)
+      if (!r.ok) return (d && d.error) || `Failed (${r.status})`
+      loadArtifacts()
+    } catch (e) {
+      return e instanceof Error ? e.message : "Failed to submit feedback"
+    }
+  }
+
+  // Load the DSD library when the solution loads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadArtifacts() }, [id])
 
   const promoteFlows = async () => {
     if (!solution) return
@@ -457,30 +533,37 @@ export default function SolutionDetailPage() {
       )}
 
       {tab === "documentation" && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <p className="text-sm text-muted-foreground">
-              Generate a Detailed Solution Description (DSD) from this solution and its members.
-            </p>
-            <div className="flex gap-2">
-              {generated && (
-                <Button variant="outline" onClick={() => setShowDocModal(true)}>
-                  View document
-                </Button>
-              )}
-              <Button onClick={generateBrd} disabled={generating}>
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {genPhase || "Generating…"}
-                  </>
-                ) : generated ? (
-                  "Regenerate DSD"
-                ) : (
-                  "Generate DSD"
-                )}
-              </Button>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm text-muted-foreground">
+              Generate a Detailed Solution Description (DSD).
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs">Mode:</span>
+                <div className="flex gap-1 rounded-md border p-0.5">
+                  {(["quick", "team"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setGenMode(m)}
+                      title={m === "quick" ? "Fast single draft → critic → revise" : "Writer & critic agents (configurable, trainable)"}
+                      className={`px-2.5 py-1 rounded text-xs font-medium ${genMode === m ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                    >
+                      {m === "quick" ? "Quick" : "Agent team"}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+            <Button onClick={generateBrd} disabled={generating}>
+              {generating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {genPhase || "Generating…"}
+                </>
+              ) : (
+                "Generate DSD"
+              )}
+            </Button>
           </div>
           {genError && (
             <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 flex items-start gap-2">
@@ -488,11 +571,36 @@ export default function SolutionDetailPage() {
               {genError}
             </div>
           )}
-          {generated && !showDocModal && (
-            <p className="text-sm text-muted-foreground">
-              Document ready — click <span className="font-medium">View document</span> to open it (Copy Markdown · Save as PDF).
-            </p>
-          )}
+
+          {/* DSD library */}
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Generated DSDs ({artifacts.length})</h3>
+            {artifacts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No DSDs yet — generate one above.</p>
+            ) : (
+              <div className="space-y-2">
+                {artifacts.map((a) => {
+                  const up = (a.feedback || []).filter((f) => f.rating === "up").length
+                  const down = (a.feedback || []).filter((f) => f.rating === "down").length
+                  return (
+                    <Card key={a.id}>
+                      <CardContent className="py-3 flex items-center gap-3 flex-wrap">
+                        <span className="text-sm">{new Date(a.createdAt).toLocaleString()}</span>
+                        <Badge variant="outline" className="text-[10px] uppercase">{a.mode}</Badge>
+                        {(up > 0 || down > 0) && (
+                          <span className="text-xs text-muted-foreground">👍 {up} · 👎 {down}</span>
+                        )}
+                        <div className="ml-auto flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => openArtifact(a.id)}>Open</Button>
+                          <Button size="sm" variant="outline" className="text-destructive" onClick={() => deleteArtifact(a.id)}>Delete</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -502,6 +610,14 @@ export default function SolutionDetailPage() {
         title={solution.name}
         badge="Detailed Solution Description"
         markdown={generated || ""}
+        feedback={
+          currentArtifactId
+            ? {
+                onSubmit: submitDsdFeedback,
+                existingCount: artifacts.find((a) => a.id === currentArtifactId)?.feedback?.length || 0,
+              }
+            : undefined
+        }
       />
     </div>
   )
