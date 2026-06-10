@@ -108,3 +108,37 @@ export function agentInstruction(a: Agent): string {
   const lessons = a.lessons?.trim()
   return lessons ? `${a.system_prompt}\n\nLessons learned (apply these):\n${lessons}` : a.system_prompt
 }
+
+// ----- coach watermark -----
+// A single timestamp: feedback at or before it has already been used by a
+// training round, so the coach only ever considers strictly newer
+// feedback. Robust (no per-feedback bookkeeping) and immune to legacy
+// feedback that predates the id field.
+
+const COACH_STATE_PATH = "agents/_coach-state.yaml"
+
+export async function getCoachWatermark(): Promise<string> {
+  try {
+    const file = await getGit().getFile(COACH_STATE_PATH)
+    const o = yaml.load(file.content, { schema: yaml.JSON_SCHEMA }) as { lastTrainedAt?: string } | null
+    return typeof o?.lastTrainedAt === "string" ? o.lastTrainedAt : ""
+  } catch {
+    return ""
+  }
+}
+
+export async function setCoachWatermark(at: string): Promise<void> {
+  const git = getGit()
+  let sha: string | undefined
+  try {
+    sha = (await git.getFile(COACH_STATE_PATH)).sha
+  } catch {
+    // file doesn't exist yet
+  }
+  await git.putFile(
+    COACH_STATE_PATH,
+    yaml.dump({ lastTrainedAt: at }, { lineWidth: -1 }),
+    "chore(agents): advance coach training watermark",
+    sha
+  )
+}

@@ -4,9 +4,9 @@
 // approve → commit). This is the across-run "training" loop.
 
 import { getLLM } from "./llm"
-import { getAgent, type Agent } from "./agents"
+import { getAgent, getCoachWatermark, setCoachWatermark, type Agent } from "./agents"
 import { listSolutions } from "./solutions"
-import { listDsd, resolveArtifactFeedback, type DsdFeedback } from "./dsd-store"
+import { listDsd, type DsdFeedback } from "./dsd-store"
 import { getLogger } from "./log"
 
 export interface AgentDelta {
@@ -28,7 +28,9 @@ interface FeedbackEntry extends DsdFeedback {
   mode: string
 }
 
-async function gatherRecentFeedback(limit: number): Promise<FeedbackEntry[]> {
+// Gather feedback newer than the coach watermark (already-trained-on
+// feedback is at or before it and is excluded).
+async function gatherRecentFeedback(limit: number, since: string): Promise<FeedbackEntry[]> {
   const out: FeedbackEntry[] = []
   let solutions
   try {
@@ -45,7 +47,8 @@ async function gatherRecentFeedback(limit: number): Promise<FeedbackEntry[]> {
     }
     for (const a of arts) {
       for (const f of a.feedback || []) {
-        if (f.resolved) continue // already incorporated or rejected — skip
+        if (!f.at) continue
+        if (since && f.at <= since) continue // already considered in a prior round
         out.push({ ...f, solutionId: s.id, mode: a.mode })
       }
     }
@@ -54,54 +57,17 @@ async function gatherRecentFeedback(limit: number): Promise<FeedbackEntry[]> {
   return out.slice(0, limit)
 }
 
-/**
- * Mark feedback ids resolved across all artifacts (called after a coach
- * proposal is approved or rejected) so they never drive a new proposal.
- */
-export async function resolveFeedback(ids: string[]): Promise<number> {
-  const idSet = new Set(ids.filter(Boolean))
-  if (idSet.size === 0) return 0
-  let solutions
-  try {
-    solutions = await listSolutions()
-  } catch {
-    return 0
-  }
-  let count = 0
-  for (const s of solutions) {
-    let arts
-    try {
-      arts = await listDsd(s.id)
-    } catch {
-      continue
-    }
-    for (const a of arts) {
-      const hasMatch = (a.feedback || []).some((f) => f.id && idSet.has(f.id) && !f.resolved)
-      if (!hasMatch) continue
-      try {
-        if (await resolveArtifactFeedback(s.id, a.id, idSet)) count++
-      } catch (err) {
-        getLogger().error("Failed to resolve feedback", {
-          solutionId: s.id,
-          artifactId: a.id,
-          err: err instanceof Error ? err.message : String(err),
-        })
-      }
-    }
-  }
-  return count
-}
-
 export async function proposeCoaching(): Promise<CoachProposal> {
   const [writer, critic, coach] = await Promise.all([
     getAgent("dsd-writer"),
     getAgent("dsd-critic"),
     getAgent("dsd-coach"),
   ])
-  const feedback = await gatherRecentFeedback(40)
+  const since = await getCoachWatermark()
+  const feedback = await gatherRecentFeedback(40, since)
   if (feedback.length === 0) {
     return {
-      rationale: "No new analyst feedback to learn from — rate some DSDs first (already-processed feedback won't reappear).",
+      rationale: "No new analyst feedback since the last training round — rate some DSDs first.",
       feedbackConsidered: 0,
       feedbackIds: [],
     }
@@ -113,19 +79,25 @@ export async function proposeCoaching(): Promise<CoachProposal> {
   })
   const proposal = parseProposal(raw)
   proposal.feedbackConsidered = feedback.length
-  const ids = feedback.map((f) => f.id).filter((x): x is string => !!x)
-  proposal.feedbackIds = ids
+  proposal.feedbackIds = feedback.map((f) => f.id).filter((x): x is string => !!x)
 
-  // Consume this training round's feedback now: a round uses up the
-  // feedback it considered, whether or not the analyst accepts the
-  // specific prompt edits. This guarantees the next round only sees NEW
-  // feedback and never re-surfaces an already-considered (or rejected)
-  // suggestion.
-  const resolved = await resolveFeedback(ids)
+  // Advance the watermark past everything this round considered, so the
+  // next round only sees strictly newer feedback — whether or not the
+  // analyst accepts the prompt edits. (A declined suggestion is built
+  // from now-consumed feedback, so it can't reappear.)
+  const newest = feedback.reduce((mx, f) => (f.at && f.at > mx ? f.at : mx), since)
+  try {
+    await setCoachWatermark(newest)
+  } catch (e) {
+    getLogger().error("Failed to advance coach watermark", {
+      err: e instanceof Error ? e.message : String(e),
+    })
+  }
 
   getLogger().info("Coach proposal", {
     feedback: feedback.length,
-    resolved,
+    since,
+    newWatermark: newest,
     writer: !!proposal.writer,
     critic: !!proposal.critic,
   })

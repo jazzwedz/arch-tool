@@ -19,15 +19,17 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **Coach suggestions no longer repeat; proposals can be rejected.** The
-  coach used to re-read all feedback every time, so already-applied (or
-  unwanted) suggestions kept coming back. Now each feedback entry has a
-  stable id + `resolved` flag, and a **retraining round consumes the
-  feedback it considered** — server-side, the moment it runs — so the
-  next round only ever sees NEW feedback and a declined suggestion never
-  reappears (regardless of whether you approve or reject the prompt
-  edit). The Agents action is renamed **Retrain agents**; each suggestion
-  has **Approve** / **Reject**; the progress modal sits higher on screen.
+- **Coach suggestions no longer repeat / accumulate.** The coach re-read
+  all feedback every round, so already-processed or rejected feedback
+  kept coming back and piling onto new feedback. Replaced the fragile
+  per-feedback bookkeeping with a simple **training watermark**
+  (`agents/_coach-state.yaml`): each round considers only feedback newer
+  than the last round, then advances the watermark past everything it
+  saw. So a round's feedback is used exactly once — a declined suggestion
+  can't reappear, and the next round sees only genuinely new feedback.
+  Immune to older feedback that predated the id field. The Agents action
+  is **Retrain agents** (Approve / Reject per suggestion); the progress
+  modal sits higher on screen.
 
 - **Solution composer: “Create” greyed out with no reason + risk of
   losing work.** The AI-assist path could reach the Review step without a
