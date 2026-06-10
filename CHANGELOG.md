@@ -33,11 +33,12 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 - **Source documentation as AI context.** The upload control moved to the
   Goal field and is renamed **"Upload source documentation"**. The
   extracted text is held as a separate, removable context (shown with a
-  "view text" toggle), seeds an empty description, extrapolates an empty
-  goal (`POST /api/solutions/extrapolate-goal`), and is passed to AI
-  pre-fill as grounding. It survives the draft but is **never written to
-  the saved solution** — raw requirement text can carry terms that must
-  not enter the repo.
+  "view text" toggle), extrapolates an empty goal
+  (`POST /api/solutions/extrapolate-goal`), and is passed to AI pre-fill
+  as grounding. The raw text is **not** poured into the description — that
+  field stays the analyst's to write (AI pre-fill can still draft it). It
+  survives the draft but is **never written to the saved solution** — raw
+  requirement text can carry terms that must not enter the repo.
 
 ### Security
 

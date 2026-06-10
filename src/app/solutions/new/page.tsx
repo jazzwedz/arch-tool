@@ -248,10 +248,10 @@ export default function NewSolutionPage() {
   }
 
   // Upload source documentation → extract its text and keep it as a
-  // separate AI context (not folded into the description). When the
-  // description is still empty we also seed it from the document; an
-  // existing description is left untouched. The goal is extrapolated from
-  // the document only when empty.
+  // separate AI context. The raw text is deliberately NOT written into the
+  // description (that field stays the analyst's to write); it is used only
+  // as grounding for AI pre-fill and goal extrapolation. The goal is
+  // extrapolated from the document only when empty.
   const uploadBrd = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -278,8 +278,6 @@ export default function NewSolutionPage() {
       // Keep the document as standalone context; show it collapsed.
       setSourceDoc({ name: file.name, text: docText })
       setShowSource(false)
-      // Seed the description only if the analyst hasn't written one.
-      setDesc((prev) => (prev.trim() ? prev : docText))
       // Extrapolate the goal ONLY when empty — never overwrite a typed goal.
       let goalIsEmpty = false
       setGoal((g) => {
@@ -625,7 +623,7 @@ export default function NewSolutionPage() {
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               rows={4}
-              placeholder="Describe what the solution should do, who uses it, and what it touches — or upload source documentation to seed it. The richer this is, the better AI assist can pre-fill the rest."
+              placeholder="Describe what the solution should do, who uses it, and what it touches. The richer this is, the better AI assist can pre-fill the rest — or let AI draft this for you."
             />
           </label>
 
