@@ -12,20 +12,32 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 - **Live solution diagram in every composer step.** The `/solutions/new`
   wizard previously only rendered the scoped mermaid diagram on the final
   Review step, so analysts adjusting the auto-proposed flow had to advance
-  to Review and back to see the effect. A persistent "Live preview" panel
-  now sits below every step and updates as members and flows change
-  (pilot feedback, Gareth Evans).
+  to Review and back to see the effect. The diagram now lives in a
+  **sticky side panel** beside the wizard (two-column on wide screens,
+  stacks below on narrow), visible and updating in every step (pilot
+  feedback, Gareth Evans).
 
 - **Flow ordering in the solution composer.** The Step 3 "Proposed flows"
   list gained the same controls as the solution editor — one-click
   **Sort A–Z** and per-row **↑/↓** reorder — so duplicates are easy to
   spot and the sequence carries into the saved flows and the diagram.
 
-- **Goal pre-fill from an uploaded requirement.** Uploading a BRD /
-  document on the composer now also fills the **Goal** field when it is
-  empty, via a new `POST /api/solutions/extrapolate-goal` (one concise,
-  outcome-focused sentence through the LLM gateway). A goal the analyst
-  has already typed is never overwritten.
+- **Name-seeded AI pre-fill that fills the empty fields.** "Pre-fill with
+  AI" now needs only a **name** (was gated on goal + description). It
+  fills the **goal and description** when they are empty — never
+  overwriting what the analyst typed — alongside delivers/members/flows,
+  and now **stays on the Intent step** so the result can be reviewed
+  before continuing (the proposed skeleton is carried through instead of
+  being re-derived).
+
+- **Source documentation as AI context.** The upload control moved to the
+  Goal field and is renamed **"Upload source documentation"**. The
+  extracted text is held as a separate, removable context (shown with a
+  "view text" toggle), seeds an empty description, extrapolates an empty
+  goal (`POST /api/solutions/extrapolate-goal`), and is passed to AI
+  pre-fill as grounding. It survives the draft but is **never written to
+  the saved solution** — raw requirement text can carry terms that must
+  not enter the repo.
 
 ### Security
 

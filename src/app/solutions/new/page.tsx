@@ -62,6 +62,10 @@ interface GapState {
 }
 
 interface AiCompose {
+  // Suggested goal/description derived from the name (+ any source doc).
+  // Applied only when the corresponding field is still empty.
+  goal?: string
+  description?: string
   delivers: { capabilities: string[]; processes: string[] }
   members: { component: string; disposition: MemberDisposition; role?: string }[]
   newComponents: { name: string; type: ComponentType; role?: string }[]
@@ -87,6 +91,18 @@ export default function NewSolutionPage() {
   // AI is extrapolating the goal from an uploaded document (only when the
   // goal field was empty at upload time).
   const [goalBusy, setGoalBusy] = useState(false)
+  // Uploaded source documentation, kept as EXTRACTED TEXT (we never store
+  // the binary) and used purely as AI context during composition. It
+  // survives reload via the draft, but is deliberately NOT written to the
+  // saved solution — raw requirement text can carry vendor terms that must
+  // not land in the repo, and it isn't part of the solution model.
+  const [sourceDoc, setSourceDoc] = useState<{ name: string; text: string } | null>(null)
+  const [showSource, setShowSource] = useState(false)
+  // True once an AI pre-fill has been applied. Keeps the analyst on the
+  // Intent step and lets the "next" action carry the AI-proposed skeleton
+  // straight through instead of re-running the deterministic proposer
+  // (which would clobber it). Reset when the delivers selection changes.
+  const [aiApplied, setAiApplied] = useState(false)
 
   // AI assist
   const [aiOpen, setAiOpen] = useState(false)
@@ -149,6 +165,8 @@ export default function NewSolutionPage() {
       if (Array.isArray(d.manualNew)) setManualNew(d.manualNew)
       if (d.existingFlowOn) setExistingFlowOn(d.existingFlowOn)
       if (Array.isArray(d.addedFlows)) setAddedFlows(d.addedFlows)
+      if (d.sourceDoc && typeof d.sourceDoc.text === "string") setSourceDoc(d.sourceDoc)
+      if (typeof d.aiApplied === "boolean") setAiApplied(d.aiApplied)
       if (typeof d.step === "number") setStep(d.step)
     } catch {
       // corrupt draft — ignore
@@ -169,13 +187,14 @@ export default function NewSolutionPage() {
         JSON.stringify({
           step, name, goal, owner, desc, selCaps, selProcs,
           proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows,
+          sourceDoc, aiApplied,
         })
       )
     } catch {
       // quota / serialization issue — non-fatal
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, name, goal, owner, desc, selCaps, selProcs, proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows])
+  }, [step, name, goal, owner, desc, selCaps, selProcs, proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows, sourceDoc, aiApplied])
 
   const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
 
@@ -191,8 +210,13 @@ export default function NewSolutionPage() {
     return Array.from(s).sort((a, b) => a.localeCompare(b))
   }, [components])
 
-  const toggle = (arr: string[], set: (v: string[]) => void, v: string) =>
+  const toggle = (arr: string[], set: (v: string[]) => void, v: string) => {
+    // Changing the delivers selection invalidates an AI-proposed skeleton:
+    // the next "Propose skeleton" should re-run the deterministic proposer
+    // from the new selection rather than carry the stale AI proposal.
+    setAiApplied(false)
     set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+  }
 
   // Run the deterministic proposer and seed selections.
   const runProposer = () => {
@@ -216,11 +240,18 @@ export default function NewSolutionPage() {
   }
 
   const goStep2 = () => {
-    runProposer()
+    // After an AI pre-fill the proposal/members are already populated;
+    // re-running the deterministic proposer would discard them. Only
+    // propose deterministically when no AI skeleton is in play.
+    if (!aiApplied) runProposer()
     setStep(2)
   }
 
-  // Upload a BRD / document → extract its text into the description.
+  // Upload source documentation → extract its text and keep it as a
+  // separate AI context (not folded into the description). When the
+  // description is still empty we also seed it from the document; an
+  // existing description is left untouched. The goal is extrapolated from
+  // the document only when empty.
   const uploadBrd = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -244,10 +275,12 @@ export default function NewSolutionPage() {
         )
       }
       const docText = d.text
-      setDesc((prev) => (prev.trim() ? `${prev.trim()}\n\n${docText}` : docText))
-      // Pre-fill the goal from the requirement ONLY when the analyst hasn't
-      // written one — never overwrite a goal they've already typed. Uses the
-      // freshest goal via the state updater so a concurrent edit still wins.
+      // Keep the document as standalone context; show it collapsed.
+      setSourceDoc({ name: file.name, text: docText })
+      setShowSource(false)
+      // Seed the description only if the analyst hasn't written one.
+      setDesc((prev) => (prev.trim() ? prev : docText))
+      // Extrapolate the goal ONLY when empty — never overwrite a typed goal.
       let goalIsEmpty = false
       setGoal((g) => {
         goalIsEmpty = g.trim() === ""
@@ -289,7 +322,12 @@ export default function NewSolutionPage() {
       const r = await fetch("/api/solutions/ai-compose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, goal, description: desc }),
+        body: JSON.stringify({
+          name,
+          goal,
+          description: desc,
+          sourceDoc: sourceDoc?.text || undefined,
+        }),
       })
       const data = await r.json().catch(() => null)
       if (!r.ok) throw new Error((data && data.error) || `AI assist failed (${r.status})`)
@@ -301,9 +339,17 @@ export default function NewSolutionPage() {
     }
   }
 
-  // Apply the AI result into the wizard state and jump to the skeleton
-  // step (bypassing the deterministic proposer).
+  // Apply the AI result into the wizard state. Stays on the Intent step
+  // (no auto-jump) so the analyst can review the filled goal/description
+  // and skeleton; `aiApplied` then carries the AI proposal through to
+  // step 2 without re-running the deterministic proposer.
   const applyAi = (ai: AiCompose) => {
+    // Non-destructive: only fill goal/description when still empty.
+    if (typeof ai.goal === "string" && ai.goal.trim())
+      setGoal((g) => (g.trim() ? g : ai.goal!.trim()))
+    if (typeof ai.description === "string" && ai.description.trim())
+      setDesc((dd) => (dd.trim() ? dd : ai.description!.trim()))
+
     setSelCaps(ai.delivers.capabilities || [])
     setSelProcs(ai.delivers.processes || [])
 
@@ -337,7 +383,7 @@ export default function NewSolutionPage() {
     )
 
     setAiOpen(false)
-    setStep(2)
+    setAiApplied(true)
   }
 
   // ---- assembled solution (for preview + create) ----
@@ -461,7 +507,7 @@ export default function NewSolutionPage() {
     })
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       <div className="flex items-center gap-2">
         <Link href="/solutions">
           <Button variant="ghost" size="icon">
@@ -493,6 +539,11 @@ export default function NewSolutionPage() {
         </div>
       </div>
 
+      {/* Two-column: the wizard on the left, an always-visible live preview
+          on the right that sticks while scrolling. Stacks on narrow screens
+          (preview drops below). */}
+      <div className="grid gap-6 items-start lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+        <div className="space-y-6 min-w-0">
       {/* STEP 1 — intent */}
       {step === 1 && (
         <div className="space-y-5">
@@ -506,20 +557,16 @@ export default function NewSolutionPage() {
               <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="digital-team" />
             </label>
           </div>
-          <label className="space-y-1 block">
-            <span className="text-sm font-medium flex items-center gap-1.5">
-              Goal
-              {goalBusy && (
-                <span className="text-xs font-normal text-muted-foreground flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" /> extrapolating from document…
-                </span>
-              )}
-            </span>
-            <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Reduce inbound support by 30%" />
-          </label>
-          <label className="space-y-1 block">
+          <div className="space-y-1">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-sm font-medium">Description</span>
+              <span className="text-sm font-medium flex items-center gap-1.5">
+                Goal
+                {goalBusy && (
+                  <span className="text-xs font-normal text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> extrapolating from document…
+                  </span>
+                )}
+              </span>
               <div className="flex items-center gap-2">
                 <input
                   ref={brdInputRef}
@@ -536,17 +583,50 @@ export default function NewSolutionPage() {
                   disabled={brdBusy}
                 >
                   {brdBusy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5 mr-1.5" />}
-                  Upload BRD / document
+                  Upload source documentation
                 </Button>
               </div>
             </div>
+            <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Reduce inbound support by 30%" />
+            {brdError && <p className="text-xs text-red-700">{brdError}</p>}
+          </div>
+
+          {/* Uploaded source documentation — kept only as AI context, never
+              written to the saved solution. Collapsible, removable. */}
+          {sourceDoc && (
+            <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm flex items-center gap-1.5 min-w-0">
+                  <FileUp className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+                  <span className="font-medium truncate">{sourceDoc.name}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">· used as AI context</span>
+                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowSource((v) => !v)}>
+                    {showSource ? "Hide" : "View text"}
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-600" title="Remove" onClick={() => { setSourceDoc(null); setShowSource(false) }}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Stays with this draft and feeds AI pre-fill — it is not saved into the solution.
+              </p>
+              {showSource && (
+                <pre className="max-h-48 overflow-auto rounded bg-background border p-2 text-xs whitespace-pre-wrap">{sourceDoc.text}</pre>
+              )}
+            </div>
+          )}
+
+          <label className="space-y-1 block">
+            <span className="text-sm font-medium">Description</span>
             <Textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               rows={4}
-              placeholder="Describe what the solution should do, who uses it, and what it touches — or upload a BRD to fill this in. The richer this is, the better AI assist can pre-fill the rest."
+              placeholder="Describe what the solution should do, who uses it, and what it touches — or upload source documentation to seed it. The richer this is, the better AI assist can pre-fill the rest."
             />
-            {brdError && <p className="text-xs text-red-700">{brdError}</p>}
           </label>
 
           <div className="rounded-md border bg-muted/20 p-3 flex items-center justify-between gap-3 flex-wrap">
@@ -556,26 +636,39 @@ export default function NewSolutionPage() {
                 AI assist
               </span>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Fill the goal + description, then let AI pre-fill delivers, members and flows from the catalog.
+                Give it a name (and optionally a goal, description or source document), then let AI
+                pre-fill the goal, description, delivers, members and flows from the catalog. Anything
+                you&apos;ve already filled is kept.
               </p>
             </div>
             <Button
               type="button"
               variant="outline"
               onClick={runAi}
-              disabled={!goal.trim() || !desc.trim()}
+              disabled={!name.trim()}
+              title={!name.trim() ? "Enter a name first" : undefined}
             >
               <Sparkles className="h-4 w-4 mr-2" />
               Pre-fill with AI
             </Button>
           </div>
 
+          {aiApplied && (
+            <div className="rounded-md border border-green-300 bg-green-50 p-2.5 text-xs text-green-900 flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 shrink-0" />
+              AI pre-fill applied — review the goal, description and delivers, then continue.
+            </div>
+          )}
+
           <ChipPicker title="Delivers — capabilities" options={allCaps} selected={selCaps} onToggle={(v) => toggle(selCaps, setSelCaps, v)} />
           <ChipPicker title="Delivers — processes" options={allProcs} selected={selProcs} onToggle={(v) => toggle(selProcs, setSelProcs, v)} empty="No processes declared in the catalog yet." />
 
           <div className="flex justify-end">
-            <Button onClick={goStep2} disabled={name.trim() === "" || (selCaps.length === 0 && selProcs.length === 0)}>
-              Propose skeleton →
+            <Button
+              onClick={goStep2}
+              disabled={name.trim() === "" || (!aiApplied && selCaps.length === 0 && selProcs.length === 0)}
+            >
+              {aiApplied ? "Continue to skeleton →" : "Propose skeleton →"}
             </Button>
           </div>
         </div>
@@ -805,22 +898,27 @@ export default function NewSolutionPage() {
           </div>
         </div>
       )}
+        </div>
 
-      {/* Persistent live preview — visible in every step so the analyst
-          sees the solution diagram update as they pick members and wire
-          flows, instead of only at the final review. Empty until members
-          exist (the builder renders a "No members yet" placeholder). */}
-      <Card>
-        <CardContent className="pt-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">Live preview</span>
-            <span className="text-xs text-muted-foreground">
-              {assembled.members.length} members · {assembled.flows.length} flows
-            </span>
-          </div>
-          <MermaidPreview chart={previewChart} className="w-full" />
-        </CardContent>
-      </Card>
+        {/* Persistent live preview — visible in every step so the analyst
+            sees the solution diagram update as they pick members and wire
+            flows, instead of only at the final review. Sticky so it stays
+            on screen. Empty until members exist (the builder renders a
+            "No members yet" placeholder). */}
+        <div className="min-w-0">
+          <Card className="lg:sticky lg:top-4">
+            <CardContent className="pt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Live preview</span>
+                <span className="text-xs text-muted-foreground">
+                  {assembled.members.length} members · {assembled.flows.length} flows
+                </span>
+              </div>
+              <MermaidPreview chart={previewChart} className="w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <Dialog open={aiOpen} onOpenChange={setAiOpen}>
         <DialogContent className="max-w-lg">
@@ -830,8 +928,9 @@ export default function NewSolutionPage() {
               AI assist
             </DialogTitle>
             <DialogDescription>
-              Reads your goal + description and the whole catalog, then proposes
-              the rest of the solution. Review the summary, then apply.
+              Reads your name, any goal/description/source document and the whole
+              catalog, then proposes the rest of the solution (filling an empty
+              goal/description too). Review the summary, then apply.
             </DialogDescription>
           </DialogHeader>
 

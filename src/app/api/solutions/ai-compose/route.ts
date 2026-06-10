@@ -27,6 +27,9 @@ interface Body {
   name?: string
   goal?: string
   description?: string
+  // Extracted text of an uploaded source document, used as extra grounding
+  // context. Never persisted — passed through for this one composition.
+  sourceDoc?: string
 }
 
 interface AiMember {
@@ -66,9 +69,11 @@ export async function POST(request: Request) {
     } catch {
       return NextResponse.json({ error: "Body must be JSON." }, { status: 400 })
     }
-    if (!body.description || body.description.trim() === "") {
+    // The name is the mandatory seed (goal/description can be empty and are
+    // filled by this call). Require at least a name to reason from.
+    if (!body.name || body.name.trim() === "") {
       return NextResponse.json(
-        { error: "A description is required for AI assist." },
+        { error: "A name is required for AI assist." },
         { status: 400 }
       )
     }
@@ -84,7 +89,8 @@ export async function POST(request: Request) {
       const prompt = buildPrompt(
         sanitizeForPrompt(body.name || ""),
         sanitizeForPrompt(body.goal || ""),
-        sanitizeForPrompt(body.description),
+        sanitizeForPrompt(body.description || ""),
+        sanitizeForPrompt((body.sourceDoc || "").slice(0, 12000)),
         catalog
       )
       const raw = await llm.complete({ prompt, maxTokens: 4096 })
@@ -137,13 +143,19 @@ export async function POST(request: Request) {
         processes: toStringArray(parsed?.delivers?.processes),
       }
 
+      // Suggested goal/description — the composer applies these only when
+      // its fields are still empty, so it's safe to always return them.
+      const goal = typeof parsed.goal === "string" ? parsed.goal.trim().slice(0, 240) : ""
+      const description =
+        typeof parsed.description === "string" ? parsed.description.trim().slice(0, 4000) : ""
+
       getLogger().info("AI solution compose", {
         members: members.length,
         newComponents: newComponents.length,
         flows: flows.length,
       })
 
-      return NextResponse.json({ delivers, members, newComponents, flows })
+      return NextResponse.json({ goal, description, delivers, members, newComponents, flows })
     } catch (error) {
       getLogger().error("AI solution compose failed", {
         err: error instanceof Error ? error.message : "Unknown error",
@@ -174,20 +186,27 @@ function parseJsonObject(text: string): Record<string, any> {
   return JSON.parse(body.slice(start, end + 1))
 }
 
-function buildPrompt(name: string, goal: string, description: string, catalog: string): string {
-  return `You are a solution architect. An analyst is composing a new solution by reusing components from an existing catalog. From their intent and the catalog below, propose the solution skeleton.
+function buildPrompt(
+  name: string,
+  goal: string,
+  description: string,
+  sourceDoc: string,
+  catalog: string
+): string {
+  return `You are a solution architect. An analyst is composing a new solution by reusing components from an existing catalog. From their intent and the catalog below, propose the solution skeleton. The name is always given; the goal and description may be missing — when so, write them yourself from the name and the source document.
 
 Analyst intent:
 - Name: ${name || "(none)"}
-- Goal: ${goal || "(none)"}
-- Description:
-${description}
-
+- Goal: ${goal || "(none — propose one)"}
+- Description: ${description || "(none — propose one)"}
+${sourceDoc ? `\nSource document (uploaded requirement — use as grounding, do not quote verbatim):\n${sourceDoc}\n` : ""}
 The component catalog (reuse these — pick members by their exact id):
 ${catalog}
 
 Return ONLY a JSON object, no prose, no code fence, with this exact shape:
 {
+  "goal": "one concise, outcome-focused sentence (max ~20 words)",
+  "description": "2-4 sentences describing what the solution does, who uses it, and what it touches",
   "delivers": { "capabilities": ["..."], "processes": ["..."] },
   "members": [ { "component": "<existing component id>", "disposition": "reuse|extend|external", "role": "what it does in this solution" } ],
   "newComponents": [ { "name": "Human Name", "type": "service|microservice|component|frontend|gateway|database|queue|library", "role": "what it does" } ],
@@ -195,10 +214,11 @@ Return ONLY a JSON object, no prose, no code fence, with this exact shape:
 }
 
 Rules:
+- Always include "goal" and "description" (write them when the analyst left them blank; otherwise restate theirs faithfully).
 - members[].component MUST be an exact id from the catalog. Do not invent ids.
 - Put anything that does not exist yet in newComponents (not members).
 - Prefer reuse; mark a component "extend" only if it needs changes.
 - delivers should be the business capabilities/processes this solution provides.
 - flows describe how the parts interact; use "proposed" for to-be edges.
-- Keep it focused: only what the description implies. Output valid JSON only.`
+- Keep it focused: only what the intent implies. Output valid JSON only.`
 }
