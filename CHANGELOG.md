@@ -19,6 +19,13 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **AI calls failed on broken characters (“invalid high surrogate”).**
+  Catalog/component data containing an unpaired UTF-16 surrogate (half an
+  emoji, a truncated paste) made the LLM request body invalid JSON, so
+  AI assist / DSD / coach returned a 400. The prompt is now normalised to
+  well-formed Unicode (lone surrogates → U+FFFD) centrally in the LLM
+  wrapper, protecting every AI feature. Valid emoji are preserved.
+
 - **Coach suggestions no longer repeat / accumulate.** The coach re-read
   all feedback every round, so already-processed or rejected feedback
   kept coming back and piling onto new feedback. Replaced the fragile
