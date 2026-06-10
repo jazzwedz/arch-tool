@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Boxes, Loader2, AlertCircle, Pencil, Trash2, Info } from "lucide-react"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { GeneratedDocModal } from "@/components/GeneratedDocModal"
+import { DsdProgressModal } from "@/components/DsdProgressModal"
 import { TypeIcon } from "@/components/TypeIcon"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
 import {
@@ -52,6 +53,8 @@ export default function SolutionDetailPage() {
   const [generated, setGenerated] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
   const [genPhase, setGenPhase] = useState<string | null>(null)
+  const [genPhaseKey, setGenPhaseKey] = useState<string>("grounding")
+  const [genIterations, setGenIterations] = useState<number>(0)
   const [genMode, setGenMode] = useState<"quick" | "team">("quick")
   const [showDocModal, setShowDocModal] = useState(false)
   const [currentArtifactId, setCurrentArtifactId] = useState<string | null>(null)
@@ -101,6 +104,8 @@ export default function SolutionDetailPage() {
     setGenerating(true)
     setGenError(null)
     setGenPhase("Starting…")
+    setGenPhaseKey("grounding")
+    setGenIterations(0)
     try {
       const start = await fetch(`/api/solutions/${encodeURIComponent(id)}/dsd`, {
         method: "POST",
@@ -117,6 +122,8 @@ export default function SolutionDetailPage() {
         const j = await r.json().catch(() => null)
         if (!r.ok || !j) throw new Error((j && j.error) || `Status check failed (${r.status})`)
         setGenPhase(PHASE_LABEL[j.phase] || j.phase)
+        setGenPhaseKey(j.phase || "grounding")
+        if (typeof j.iterations === "number") setGenIterations(j.iterations)
         if (j.status === "done") {
           setGenerated(j.markdown || "")
           setCurrentArtifactId(j.artifactId || null)
@@ -618,6 +625,12 @@ export default function SolutionDetailPage() {
               }
             : undefined
         }
+      />
+
+      <DsdProgressModal
+        open={generating && genMode === "team"}
+        phase={genPhaseKey}
+        iterations={genIterations}
       />
     </div>
   )

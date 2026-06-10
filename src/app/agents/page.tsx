@@ -9,7 +9,8 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Bot, Sparkles, Loader2, AlertCircle, Check } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Bot, Sparkles, Loader2, AlertCircle, Check, Pencil, X } from "lucide-react"
 import type { Agent } from "@/lib/agents"
 import type { CoachProposal, AgentDelta } from "@/lib/dsd-coach"
 
@@ -20,6 +21,30 @@ export default function AgentsPage() {
   const [proposal, setProposal] = useState<CoachProposal | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [appliedMsg, setAppliedMsg] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [savingName, setSavingName] = useState(false)
+
+  const saveName = async (agentId: string) => {
+    if (!editName.trim()) return
+    setSavingName(true)
+    setError(null)
+    try {
+      const r = await fetch("/api/agents/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId, name: editName.trim() }),
+      })
+      const d = await r.json().catch(() => null)
+      if (!r.ok) throw new Error((d && d.error) || `Failed (${r.status})`)
+      setEditingId(null)
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rename failed")
+    } finally {
+      setSavingName(false)
+    }
+  }
 
   const load = () => {
     setLoading(true)
@@ -135,8 +160,40 @@ export default function AgentsPage() {
           {agents.map((a) => (
             <Card key={a.id}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  {a.name}
+                <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                  {editingId === a.id ? (
+                    <span className="flex items-center gap-1">
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="h-8 w-56"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveName(a.id)
+                          if (e.key === "Escape") setEditingId(null)
+                        }}
+                      />
+                      <Button size="icon" variant="ghost" className="h-8 w-8" disabled={savingName} onClick={() => saveName(a.id)}>
+                        {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingId(null)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 group">
+                      {a.name}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 opacity-50 hover:opacity-100"
+                        title="Rename"
+                        onClick={() => { setEditingId(a.id); setEditName(a.name) }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </span>
+                  )}
                   <Badge variant="outline" className="text-[10px] uppercase">{a.role}</Badge>
                   <Badge variant="outline" className="text-[10px]">v{a.version}</Badge>
                 </CardTitle>

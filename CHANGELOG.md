@@ -103,6 +103,13 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Agent rename + animated team progress.** Agents can be renamed inline
+  on the Agents page (committed, version-bumped). And the **Agent team**
+  DSD generation now shows a fancy progress modal — animated Writer &
+  Critic avatars highlighting who is working, a phase stepper (Gathering
+  facts → Writer drafting → Critic reviewing → Writer revising → Saving)
+  and flowing connectors — so the analyst can see the AI team at work.
+
 - **DSD agent team + library + feedback + coach training.** Big upgrade
   to DSD generation, all in-process via the corp LLM gateway (no outbound):
   - **Two modes** at generation: **Quick** (the existing draft → critic →

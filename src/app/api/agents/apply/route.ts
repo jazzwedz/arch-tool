@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   return withRouteContext(request, async () => {
-    let body: { agentId?: string; system_prompt?: string; lessons?: string }
+    let body: { agentId?: string; name?: string; system_prompt?: string; lessons?: string }
     try {
       body = await request.json()
     } catch {
@@ -20,9 +20,13 @@ export async function POST(request: Request) {
     if (!body.agentId || !AGENT_IDS.includes(body.agentId as AgentId)) {
       return NextResponse.json({ error: "Invalid agentId" }, { status: 400 })
     }
+    if (body.name !== undefined && (typeof body.name !== "string" || body.name.trim() === "")) {
+      return NextResponse.json({ error: "name must be a non-empty string." }, { status: 400 })
+    }
     try {
       const current = await getAgentWithSha(body.agentId as AgentId)
       const { sha, ...agent } = current
+      if (typeof body.name === "string" && body.name.trim()) agent.name = body.name.trim()
       if (typeof body.system_prompt === "string" && body.system_prompt.trim())
         agent.system_prompt = body.system_prompt.trim()
       if (typeof body.lessons === "string") agent.lessons = body.lessons.trim()
