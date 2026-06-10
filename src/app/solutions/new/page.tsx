@@ -912,7 +912,14 @@ export default function NewSolutionPage() {
                   {assembled.members.length} members · {assembled.flows.length} flows
                 </span>
               </div>
-              <MermaidPreview chart={previewChart} className="w-full" />
+              <MermaidPreview
+                chart={previewChart}
+                className="w-full"
+                zoomable
+                expandable
+                expandTitle="Solution preview"
+                height={340}
+              />
             </CardContent>
           </Card>
         </div>

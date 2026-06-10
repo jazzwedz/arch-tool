@@ -9,6 +9,20 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Readable live preview at scale — zoom, pan, expand.** The solution
+  composer's live diagram was fit-to-width, so labels shrank as components
+  were added. It now renders at natural size inside a pan/zoom viewport
+  (drag to pan, wheel or +/− to zoom, Fit, Reset) so text stays crisp, plus
+  an **Expand** button that opens the diagram in a near-fullscreen modal.
+  Gated behind a `zoomable`/`expandable` prop on `MermaidPreview`, so every
+  other diagram keeps its previous fit-to-width behaviour.
+
+- **Edit agent prompts directly.** The Agents page now lets you edit an
+  agent's raw **system prompt and lessons** in place (Edit prompt → Save &
+  commit), independent of the coach's propose → approve loop. Saves through
+  the existing `/api/agents/apply`, committing a new version. Applies to
+  the writer, critic and coach.
+
 - **Live solution diagram in every composer step.** The `/solutions/new`
   wizard previously only rendered the scoped mermaid diagram on the final
   Review step, so analysts adjusting the auto-proposed flow had to advance

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Bot, Sparkles, Loader2, AlertCircle, Check, Pencil, X } from "lucide-react"
 import type { Agent } from "@/lib/agents"
 import type { CoachProposal, AgentDelta } from "@/lib/dsd-coach"
@@ -24,6 +25,50 @@ export default function AgentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
   const [savingName, setSavingName] = useState(false)
+
+  // Direct (manual) editing of an agent's raw system prompt + lessons,
+  // independent of the coach's propose → approve loop. Saving commits a new
+  // version via the same /api/agents/apply endpoint.
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null)
+  const [draftPrompt, setDraftPrompt] = useState("")
+  const [draftLessons, setDraftLessons] = useState("")
+  const [savingPrompt, setSavingPrompt] = useState(false)
+
+  const startEditPrompt = (a: Agent) => {
+    setEditingPromptId(a.id)
+    setDraftPrompt(a.system_prompt)
+    setDraftLessons(a.lessons || "")
+    setError(null)
+  }
+
+  const savePrompt = async (agentId: string) => {
+    if (!draftPrompt.trim()) {
+      setError("System prompt cannot be empty.")
+      return
+    }
+    setSavingPrompt(true)
+    setError(null)
+    try {
+      const r = await fetch("/api/agents/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentId,
+          system_prompt: draftPrompt.trim(),
+          lessons: draftLessons.trim(),
+        }),
+      })
+      const d = await r.json().catch(() => null)
+      if (!r.ok) throw new Error((d && d.error) || `Failed (${r.status})`)
+      setAppliedMsg(`${agentId} updated to v${d.version}.`)
+      setEditingPromptId(null)
+      load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed")
+    } finally {
+      setSavingPrompt(false)
+    }
+  }
 
   const saveName = async (agentId: string) => {
     if (!editName.trim()) return
@@ -114,8 +159,8 @@ export default function AgentsPage() {
             Agents
           </h1>
           <p className="text-muted-foreground mt-1">
-            The DSD writer, critic and coach. The coach turns analyst feedback into prompt
-            improvements you approve.
+            The DSD writer, critic and coach. Edit a prompt directly, or let the coach turn
+            analyst feedback into prompt improvements you approve. Every change is a new version.
           </p>
         </div>
         <Button onClick={runCoach} disabled={proposing}>
@@ -215,15 +260,57 @@ export default function AgentsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <details>
-                  <summary className="cursor-pointer text-sm text-muted-foreground">System prompt</summary>
-                  <pre className="mt-1 text-xs whitespace-pre-wrap bg-muted/40 rounded p-2">{a.system_prompt}</pre>
-                </details>
-                {a.lessons && (
-                  <details open>
-                    <summary className="cursor-pointer text-sm text-muted-foreground">Lessons (coach-trained)</summary>
-                    <pre className="mt-1 text-xs whitespace-pre-wrap bg-amber-50 rounded p-2">{a.lessons}</pre>
-                  </details>
+                {editingPromptId === a.id ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-sm text-muted-foreground">System prompt</label>
+                      <Textarea
+                        value={draftPrompt}
+                        onChange={(e) => setDraftPrompt(e.target.value)}
+                        rows={8}
+                        className="text-xs font-mono"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm text-muted-foreground">Lessons (applied after the prompt)</label>
+                      <Textarea
+                        value={draftLessons}
+                        onChange={(e) => setDraftLessons(e.target.value)}
+                        rows={4}
+                        className="text-xs font-mono"
+                        placeholder="Optional — extra rules appended to the prompt at run time. Leave empty to clear."
+                      />
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button size="sm" variant="outline" disabled={savingPrompt} onClick={() => setEditingPromptId(null)}>
+                        <X className="h-4 w-4 mr-1" />Cancel
+                      </Button>
+                      <Button size="sm" disabled={savingPrompt || !draftPrompt.trim()} onClick={() => savePrompt(a.id)}>
+                        {savingPrompt ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+                        Save &amp; commit
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm text-muted-foreground">System prompt</span>
+                      <Button size="sm" variant="outline" className="h-7" onClick={() => startEditPrompt(a)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" />Edit prompt
+                      </Button>
+                    </div>
+                    <details>
+                      <summary className="cursor-pointer text-sm text-muted-foreground">Show prompt</summary>
+                      <pre className="mt-1 text-xs whitespace-pre-wrap bg-muted/40 rounded p-2">{a.system_prompt}</pre>
+                    </details>
+                    {a.lessons && (
+                      <details open>
+                        <summary className="cursor-pointer text-sm text-muted-foreground">Lessons (coach-trained)</summary>
+                        <pre className="mt-1 text-xs whitespace-pre-wrap bg-amber-50 rounded p-2">{a.lessons}</pre>
+                      </details>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
