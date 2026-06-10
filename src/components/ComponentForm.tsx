@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,7 +45,9 @@ import type {
   ComponentRule,
   RuleKind,
 } from "@/lib/types"
-import { Plus, Trash2, Info, ChevronUp, ChevronDown, AlertTriangle, X } from "lucide-react"
+import { Plus, Trash2, Info, ChevronUp, ChevronDown, AlertTriangle, X, ArrowDownAZ, Eye, EyeOff } from "lucide-react"
+import { MermaidPreview } from "@/components/mermaid-preview"
+import { buildRelationshipsMermaid } from "@/lib/component-mermaid"
 import { Badge } from "@/components/ui/badge"
 import { TypeIcon } from "@/components/TypeIcon"
 import {
@@ -288,6 +290,38 @@ export function ComponentForm({
       ),
     }))
   }
+
+  // --- link ordering + live preview helpers ---
+  const [showLinkViz, setShowLinkViz] = useState(false)
+  const linkNameLookup = useMemo(
+    () => new Map(existingComponents.map((c) => [c.id, c.name])),
+    [existingComponents]
+  )
+  const linkLabel = (l: ComponentLink) =>
+    (linkNameLookup.get(l.target) || l.target || "").toLowerCase()
+
+  const sortLinksAZ = () => {
+    updateField(
+      "links",
+      [...(form.links ?? [])].sort((a, b) => linkLabel(a).localeCompare(linkLabel(b)))
+    )
+  }
+  const moveLink = (index: number, dir: -1 | 1) => {
+    const arr = [...(form.links ?? [])]
+    const j = index + dir
+    if (j < 0 || j >= arr.length) return
+    ;[arr[index], arr[j]] = [arr[j], arr[index]]
+    updateField("links", arr)
+  }
+  const linksViz = useMemo(() => {
+    const rels = (form.links ?? [])
+      .filter((l) => l.target)
+      .map((l) => ({
+        target: l.target,
+        displayLabel: `${LINK_ROLE_LABELS[l.role] || l.role}${l.name ? ` (${l.name})` : ""}`,
+      }))
+    return buildRelationshipsMermaid(form, linkNameLookup, rels)
+  }, [form, linkNameLookup])
 
   const updateNFR = (field: keyof ComponentNFR, value: string) => {
     setForm((prev) => ({
@@ -771,20 +805,34 @@ export function ComponentForm({
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                updateField("links", [
-                  ...(form.links ?? []),
-                  { ...emptyLink },
-                ])
-              }
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add link
-            </Button>
+            <div className="flex items-center gap-2">
+              {(form.links ?? []).length > 1 && (
+                <Button type="button" variant="outline" size="sm" onClick={sortLinksAZ} title="Sort links A–Z by target">
+                  <ArrowDownAZ className="h-4 w-4 mr-1" />
+                  Sort A–Z
+                </Button>
+              )}
+              {(form.links ?? []).length > 0 && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowLinkViz((v) => !v)}>
+                  {showLinkViz ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+                  {showLinkViz ? "Hide" : "Preview"}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  updateField("links", [
+                    ...(form.links ?? []),
+                    { ...emptyLink },
+                  ])
+                }
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add link
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {(form.links ?? []).length === 0 && (
@@ -797,7 +845,7 @@ export function ComponentForm({
                 key={i}
                 className="space-y-2 border-l-2 border-muted pl-3 py-2"
               >
-                <div className="grid grid-cols-[1fr_140px_120px_40px] gap-2 items-end">
+                <div className="grid grid-cols-[1fr_140px_110px_auto] gap-2 items-end">
                   <div>
                     <Label className="text-xs">Target</Label>
                     <ComponentTargetPicker
@@ -857,20 +905,45 @@ export function ComponentForm({
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={() =>
-                      updateField(
-                        "links",
-                        (form.links ?? []).filter((_, idx) => idx !== i)
-                      )
-                    }
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex items-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-7"
+                      disabled={i === 0}
+                      title="Move up"
+                      onClick={() => moveLink(i, -1)}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-7"
+                      disabled={i === (form.links ?? []).length - 1}
+                      title="Move down"
+                      onClick={() => moveLink(i, 1)}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      title="Remove link"
+                      onClick={() =>
+                        updateField(
+                          "links",
+                          (form.links ?? []).filter((_, idx) => idx !== i)
+                        )
+                      }
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-[1fr_2fr] gap-2">
                   <div>
@@ -898,6 +971,14 @@ export function ComponentForm({
                 </div>
               </div>
             ))}
+            {showLinkViz && (form.links ?? []).length > 0 && (
+              <div className="border-t pt-3 mt-2">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Live preview — updates as you edit (no save needed).
+                </p>
+                <MermaidPreview chart={linksViz} className="w-full" />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

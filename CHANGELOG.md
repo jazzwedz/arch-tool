@@ -115,6 +115,19 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Pilot feedback (Gareth) — composer & editor improvements.**
+  - **Upload a BRD / document** in the Solution composer to pre-fill the
+    description (PDF / text), reusing the rules-import extractors via a
+    new `POST /api/extract-doc`; AI assist then works off the richer text.
+  - **Order links** in the component editor and solution flows: **Sort
+    A–Z** by target + manual **↑/↓ reorder** (makes duplicates obvious;
+    order is preserved on save).
+  - **Live flow preview in the editor** — the link/flow diagram updates
+    as you edit, no save-and-go-back needed (component Links card +
+    solution editor flows).
+  (The composer already autosaves its draft, so a description isn't lost
+  on navigating away.)
+
 - **Agent rename + animated team progress.** Agents can be renamed inline
   on the Agents page (committed, version-bumped). And the **Agent team**
   DSD generation now shows a fancy progress modal — animated Writer &

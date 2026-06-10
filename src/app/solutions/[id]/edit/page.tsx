@@ -13,8 +13,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Loader2, AlertCircle, Plus, X, Save, Info } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Plus, X, Save, Info, ArrowDownAZ, Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-react"
 import { ChipPicker } from "@/components/ChipPicker"
+import { MermaidPreview } from "@/components/mermaid-preview"
+import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
 import { slugifyId } from "@/lib/component-schema"
 import {
   BUSINESS_CAPABILITIES,
@@ -116,6 +118,16 @@ export default function EditSolutionPage() {
 
   const toggle = (arr: string[], set: (v: string[]) => void, v: string) =>
     set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
+
+  const [showFlowViz, setShowFlowViz] = useState(false)
+  const moveFlow = (index: number, dir: -1 | 1) =>
+    setFlows((fl) => {
+      const arr = [...fl]
+      const j = index + dir
+      if (j < 0 || j >= arr.length) return fl
+      ;[arr[index], arr[j]] = [arr[j], arr[index]]
+      return arr
+    })
 
   const updateMember = (i: number, patch: Partial<SolutionMember>) =>
     setMembers((ms) => ms.map((m, j) => (j === i ? { ...m, ...patch } : m)))
@@ -310,15 +322,48 @@ export default function EditSolutionPage() {
 
       {/* flows */}
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold">Flows ({flows.length})</h2>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-sm font-semibold">Flows ({flows.length})</h2>
+          <div className="flex gap-2">
+            {flows.length > 1 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setFlows((fl) =>
+                    [...fl].sort((a, b) =>
+                      `${label(a.from)}→${label(a.to)}`.localeCompare(`${label(b.from)}→${label(b.to)}`)
+                    )
+                  )
+                }
+              >
+                <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />Sort A–Z
+              </Button>
+            )}
+            {flows.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setShowFlowViz((v) => !v)}>
+                {showFlowViz ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+                {showFlowViz ? "Hide" : "Preview"}
+              </Button>
+            )}
+          </div>
+        </div>
         {flows.map((f, i) => (
           <div key={i} className="flex items-center gap-2 text-sm">
+            <button disabled={i === 0} onClick={() => moveFlow(i, -1)} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Move up"><ChevronUp className="h-3.5 w-3.5" /></button>
+            <button disabled={i === flows.length - 1} onClick={() => moveFlow(i, 1)} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Move down"><ChevronDown className="h-3.5 w-3.5" /></button>
             <span>{label(f.from)} {f.status === "proposed" ? "⇢" : "→"} {label(f.to)}</span>
             <Badge variant="outline" className="text-[10px]">{f.role}{f.protocol ? ` · ${f.protocol}` : ""}</Badge>
             <Badge variant="outline" className={`text-[10px] ${f.status === "proposed" ? "text-blue-700 border-blue-300" : "text-muted-foreground"}`}>{f.status}</Badge>
             <button onClick={() => setFlows((fl) => fl.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
           </div>
         ))}
+        {showFlowViz && flows.length > 0 && (
+          <div className="border rounded-md p-2 mt-2">
+            <p className="text-xs text-muted-foreground mb-1">Live preview — updates as you edit.</p>
+            <MermaidPreview chart={buildSolutionMermaid(members, components, flows)} className="w-full" />
+          </div>
+        )}
         <FlowAdder memberIds={memberIds} label={label} onAdd={(f) => setFlows((fl) => [...fl, f])} />
       </section>
     </div>

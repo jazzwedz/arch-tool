@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles, Info } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles, Info, FileUp } from "lucide-react"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { ChipPicker } from "@/components/ChipPicker"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
@@ -79,6 +79,11 @@ export default function NewSolutionPage() {
   const [desc, setDesc] = useState("")
   const [selCaps, setSelCaps] = useState<string[]>([])
   const [selProcs, setSelProcs] = useState<string[]>([])
+
+  // BRD / document upload → prefill description
+  const brdInputRef = useRef<HTMLInputElement>(null)
+  const [brdBusy, setBrdBusy] = useState(false)
+  const [brdError, setBrdError] = useState<string | null>(null)
 
   // AI assist
   const [aiOpen, setAiOpen] = useState(false)
@@ -210,6 +215,38 @@ export default function NewSolutionPage() {
   const goStep2 = () => {
     runProposer()
     setStep(2)
+  }
+
+  // Upload a BRD / document → extract its text into the description.
+  const uploadBrd = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBrdBusy(true)
+    setBrdError(null)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      const r = await fetch("/api/extract-doc", { method: "POST", body: fd })
+      const raw = await r.text()
+      let d: { text?: string; error?: string } | null = null
+      try {
+        d = raw ? JSON.parse(raw) : null
+      } catch {
+        d = null
+      }
+      if (!r.ok || !d || typeof d.text !== "string") {
+        throw new Error(
+          (d && d.error) ||
+            (r.status === 413 ? "Document too large." : `Upload failed (${r.status})`)
+        )
+      }
+      setDesc((prev) => (prev.trim() ? `${prev.trim()}\n\n${d!.text}` : d!.text!))
+    } catch (err) {
+      setBrdError(err instanceof Error ? err.message : "Upload failed")
+    } finally {
+      setBrdBusy(false)
+      if (brdInputRef.current) brdInputRef.current.value = ""
+    }
   }
 
   // AI assist — call the LLM compose endpoint with the intent; on open.
@@ -427,13 +464,35 @@ export default function NewSolutionPage() {
             <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Reduce inbound support by 30%" />
           </label>
           <label className="space-y-1 block">
-            <span className="text-sm font-medium">Description</span>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-sm font-medium">Description</span>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={brdInputRef}
+                  type="file"
+                  accept=".pdf,.txt,.md,text/plain,application/pdf"
+                  onChange={uploadBrd}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => brdInputRef.current?.click()}
+                  disabled={brdBusy}
+                >
+                  {brdBusy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5 mr-1.5" />}
+                  Upload BRD / document
+                </Button>
+              </div>
+            </div>
             <Textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               rows={4}
-              placeholder="Describe what the solution should do, who uses it, and what it touches. The richer this is, the better AI assist can pre-fill the rest."
+              placeholder="Describe what the solution should do, who uses it, and what it touches — or upload a BRD to fill this in. The richer this is, the better AI assist can pre-fill the rest."
             />
+            {brdError && <p className="text-xs text-red-700">{brdError}</p>}
           </label>
 
           <div className="rounded-md border bg-muted/20 p-3 flex items-center justify-between gap-3 flex-wrap">
