@@ -113,9 +113,19 @@ export async function proposeCoaching(): Promise<CoachProposal> {
   })
   const proposal = parseProposal(raw)
   proposal.feedbackConsidered = feedback.length
-  proposal.feedbackIds = feedback.map((f) => f.id).filter((x): x is string => !!x)
+  const ids = feedback.map((f) => f.id).filter((x): x is string => !!x)
+  proposal.feedbackIds = ids
+
+  // Consume this training round's feedback now: a round uses up the
+  // feedback it considered, whether or not the analyst accepts the
+  // specific prompt edits. This guarantees the next round only sees NEW
+  // feedback and never re-surfaces an already-considered (or rejected)
+  // suggestion.
+  const resolved = await resolveFeedback(ids)
+
   getLogger().info("Coach proposal", {
     feedback: feedback.length,
+    resolved,
     writer: !!proposal.writer,
     critic: !!proposal.critic,
   })

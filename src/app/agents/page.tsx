@@ -73,16 +73,9 @@ export default function AgentsPage() {
     }
   }
 
-  // Mark the proposal's source feedback resolved so the coach never
-  // re-surfaces the same suggestions (fire-and-forget).
-  const finalize = (feedbackIds: string[]) => {
-    fetch("/api/agents/coach/resolve", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ feedbackIds }),
-    }).catch(() => {})
-  }
-
+  // The feedback behind a proposal is already consumed server-side when
+  // the round runs, so a rejected/declined suggestion never reappears.
+  // Approving applies the prompt change; rejecting just drops it.
   const handleDelta = async (agentId: string, delta: AgentDelta, action: "approve" | "reject") => {
     setError(null)
     try {
@@ -97,31 +90,20 @@ export default function AgentsPage() {
         setAppliedMsg(`${agentId} updated to v${d.version}.`)
         load()
       }
-      // Remove this delta; once nothing is left to triage, resolve the
-      // feedback so it won't drive a future proposal.
       setProposal((p) => {
         if (!p) return p
         const next = {
           ...p,
           ...(agentId === "dsd-writer" ? { writer: undefined } : { critic: undefined }),
         }
-        if (!next.writer && !next.critic) {
-          finalize(p.feedbackIds)
-          setAppliedMsg((m) => m || "Proposal handled — that feedback won't be suggested again.")
-          return null
-        }
-        return next
+        return !next.writer && !next.critic ? null : next
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed")
     }
   }
 
-  const dismissProposal = () => {
-    if (proposal) finalize(proposal.feedbackIds)
-    setProposal(null)
-    setAppliedMsg("Proposal dismissed — that feedback won't be suggested again.")
-  }
+  const dismissProposal = () => setProposal(null)
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -138,9 +120,9 @@ export default function AgentsPage() {
         </div>
         <Button onClick={runCoach} disabled={proposing}>
           {proposing ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analysing feedback…</>
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Retraining…</>
           ) : (
-            <><Sparkles className="h-4 w-4 mr-2" />Suggest improvements</>
+            <><Sparkles className="h-4 w-4 mr-2" />Retrain agents</>
           )}
         </Button>
       </div>
