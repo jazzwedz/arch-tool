@@ -214,8 +214,19 @@ function sanitizeMermaidId(id: string): string {
   return id.replace(/[^a-zA-Z0-9_]/g, "_")
 }
 
+// Map (){}[] to numeric HTML entity codes so mermaid doesn't lex them as
+// structural tokens inside `-->|...|` edge labels (e.g. "Part of (GRM)"
+// would otherwise parse-error). Mermaid renders the codes back to glyphs.
 function escapeLabel(s: string): string {
-  return s.replace(/"/g, "&quot;").replace(/\n/g, " ")
+  return s
+    .replace(/"/g, "&quot;")
+    .replace(/\n/g, " ")
+    .replace(/\(/g, "#40;")
+    .replace(/\)/g, "#41;")
+    .replace(/\[/g, "#91;")
+    .replace(/\]/g, "#93;")
+    .replace(/\{/g, "#123;")
+    .replace(/\}/g, "#125;")
 }
 
 function buildMermaid(target: Component, impacted: ImpactedComponent[]): string {

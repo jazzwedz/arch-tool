@@ -56,8 +56,21 @@ function safeId(id: string): string {
   return id.replace(/[^a-zA-Z0-9_]/g, "_")
 }
 
+// Slice first, then map (){}[] to numeric HTML entity codes so mermaid
+// doesn't lex them as structural tokens inside edge labels (a label like
+// "Part of (GRM)" would otherwise parse-error). Slicing before escaping
+// avoids cutting an entity code in half.
 function escLabel(s: string): string {
-  return s.replace(/"/g, "&quot;").replace(/\n/g, " ").slice(0, 80)
+  return s
+    .slice(0, 80)
+    .replace(/"/g, "&quot;")
+    .replace(/\n/g, " ")
+    .replace(/\(/g, "#40;")
+    .replace(/\)/g, "#41;")
+    .replace(/\[/g, "#91;")
+    .replace(/\]/g, "#93;")
+    .replace(/\{/g, "#123;")
+    .replace(/\}/g, "#125;")
 }
 
 function typeClass(type: string): string {

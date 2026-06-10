@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles, Info, FileUp } from "lucide-react"
+import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles, Info, FileUp, ChevronUp, ChevronDown, ArrowDownAZ } from "lucide-react"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { ChipPicker } from "@/components/ChipPicker"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
@@ -84,6 +84,9 @@ export default function NewSolutionPage() {
   const brdInputRef = useRef<HTMLInputElement>(null)
   const [brdBusy, setBrdBusy] = useState(false)
   const [brdError, setBrdError] = useState<string | null>(null)
+  // AI is extrapolating the goal from an uploaded document (only when the
+  // goal field was empty at upload time).
+  const [goalBusy, setGoalBusy] = useState(false)
 
   // AI assist
   const [aiOpen, setAiOpen] = useState(false)
@@ -240,7 +243,34 @@ export default function NewSolutionPage() {
             (r.status === 413 ? "Document too large." : `Upload failed (${r.status})`)
         )
       }
-      setDesc((prev) => (prev.trim() ? `${prev.trim()}\n\n${d!.text}` : d!.text!))
+      const docText = d.text
+      setDesc((prev) => (prev.trim() ? `${prev.trim()}\n\n${docText}` : docText))
+      // Pre-fill the goal from the requirement ONLY when the analyst hasn't
+      // written one — never overwrite a goal they've already typed. Uses the
+      // freshest goal via the state updater so a concurrent edit still wins.
+      let goalIsEmpty = false
+      setGoal((g) => {
+        goalIsEmpty = g.trim() === ""
+        return g
+      })
+      if (goalIsEmpty) {
+        setGoalBusy(true)
+        try {
+          const gr = await fetch("/api/solutions/extrapolate-goal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: docText }),
+          })
+          const gd = await gr.json().catch(() => null)
+          if (gr.ok && gd && typeof gd.goal === "string" && gd.goal.trim()) {
+            // Guard against a race: if the analyst typed a goal while the
+            // model was thinking, keep theirs.
+            setGoal((g) => (g.trim() === "" ? gd.goal.trim() : g))
+          }
+        } finally {
+          setGoalBusy(false)
+        }
+      }
     } catch (err) {
       setBrdError(err instanceof Error ? err.message : "Upload failed")
     } finally {
@@ -413,6 +443,23 @@ export default function NewSolutionPage() {
 
   const memberIdsForFlow = assembled.members.map((m) => m.component)
 
+  // Ordering controls for the manually-added flows, mirroring the solution
+  // editor: a one-click A–Z sort and per-row up/down. Sorting groups
+  // duplicates adjacently (the analyst's reported pain) and the order is
+  // preserved into the saved flow list and the live diagram.
+  const flowSortKey = (f: SolutionFlow) =>
+    `${labelFor(f.from, byId, assembled.newComponents)}→${labelFor(f.to, byId, assembled.newComponents)}`
+  const sortAddedFlows = () =>
+    setAddedFlows((a) => [...a].sort((x, y) => flowSortKey(x).localeCompare(flowSortKey(y))))
+  const moveAddedFlow = (i: number, dir: -1 | 1) =>
+    setAddedFlows((a) => {
+      const j = i + dir
+      if (j < 0 || j >= a.length) return a
+      const next = [...a]
+      ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center gap-2">
@@ -460,7 +507,14 @@ export default function NewSolutionPage() {
             </label>
           </div>
           <label className="space-y-1 block">
-            <span className="text-sm font-medium">Goal</span>
+            <span className="text-sm font-medium flex items-center gap-1.5">
+              Goal
+              {goalBusy && (
+                <span className="text-xs font-normal text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" /> extrapolating from document…
+                </span>
+              )}
+            </span>
             <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Reduce inbound support by 30%" />
           </label>
           <label className="space-y-1 block">
@@ -679,10 +733,19 @@ export default function NewSolutionPage() {
 
           {addedFlows.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold mb-2">Proposed flows ({addedFlows.length})</h2>
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                <h2 className="text-sm font-semibold">Proposed flows ({addedFlows.length})</h2>
+                {addedFlows.length > 1 && (
+                  <Button size="sm" variant="outline" onClick={sortAddedFlows}>
+                    <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />Sort A–Z
+                  </Button>
+                )}
+              </div>
               <div className="space-y-1">
                 {addedFlows.map((f, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
+                    <button disabled={i === 0} onClick={() => moveAddedFlow(i, -1)} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Move up"><ChevronUp className="h-3.5 w-3.5" /></button>
+                    <button disabled={i === addedFlows.length - 1} onClick={() => moveAddedFlow(i, 1)} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Move down"><ChevronDown className="h-3.5 w-3.5" /></button>
                     <span>{labelFor(f.from, byId, assembled.newComponents)} ⇢ {labelFor(f.to, byId, assembled.newComponents)}</span>
                     <Badge variant="outline" className="text-[10px]">{f.role}{f.protocol ? ` · ${f.protocol}` : ""}</Badge>
                     <button onClick={() => setAddedFlows((a) => a.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-red-600">
@@ -709,7 +772,6 @@ export default function NewSolutionPage() {
             <strong>{assembled.newComponents.length}</strong> new component(s) to create ·{" "}
             <strong>{assembled.flows.length}</strong> flows
           </div>
-          <Card><CardContent className="pt-4"><MermaidPreview chart={previewChart} className="w-full" /></CardContent></Card>
 
           {/* A name is required to save. The AI-assist path can reach this
               step without one, so let the analyst fix it right here instead
@@ -743,6 +805,22 @@ export default function NewSolutionPage() {
           </div>
         </div>
       )}
+
+      {/* Persistent live preview — visible in every step so the analyst
+          sees the solution diagram update as they pick members and wire
+          flows, instead of only at the final review. Empty until members
+          exist (the builder renders a "No members yet" placeholder). */}
+      <Card>
+        <CardContent className="pt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">Live preview</span>
+            <span className="text-xs text-muted-foreground">
+              {assembled.members.length} members · {assembled.flows.length} flows
+            </span>
+          </div>
+          <MermaidPreview chart={previewChart} className="w-full" />
+        </CardContent>
+      </Card>
 
       <Dialog open={aiOpen} onOpenChange={setAiOpen}>
         <DialogContent className="max-w-lg">

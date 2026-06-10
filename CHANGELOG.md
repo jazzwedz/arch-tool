@@ -7,6 +7,26 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Live solution diagram in every composer step.** The `/solutions/new`
+  wizard previously only rendered the scoped mermaid diagram on the final
+  Review step, so analysts adjusting the auto-proposed flow had to advance
+  to Review and back to see the effect. A persistent "Live preview" panel
+  now sits below every step and updates as members and flows change
+  (pilot feedback, Gareth Evans).
+
+- **Flow ordering in the solution composer.** The Step 3 "Proposed flows"
+  list gained the same controls as the solution editor — one-click
+  **Sort A–Z** and per-row **↑/↓** reorder — so duplicates are easy to
+  spot and the sequence carries into the saved flows and the diagram.
+
+- **Goal pre-fill from an uploaded requirement.** Uploading a BRD /
+  document on the composer now also fills the **Goal** field when it is
+  empty, via a new `POST /api/solutions/extrapolate-goal` (one concise,
+  outcome-focused sentence through the LLM gateway). A goal the analyst
+  has already typed is never overwritten.
+
 ### Security
 
 - **All 4 dependabot moderate advisories cleared (`npm audit` → 0).**
@@ -18,6 +38,13 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   15.5.18 → 15.5.19 patch in the same install. Build + typecheck green.
 
 ### Fixed
+
+- **Mermaid diagrams crashed on labels with brackets (e.g. “Part of
+  (GRM)”).** Edge labels (`-->|…|`) are not quoted, so mermaid lexed the
+  `(){}[]` characters as structural tokens and threw a parse error,
+  blanking the whole diagram. Label escaping now maps those characters to
+  numeric HTML entity codes in all three builders (component, architecture,
+  blast-radius); mermaid renders them back to the literal glyph.
 
 - **AI calls failed on broken characters (“invalid high surrogate”).**
   Catalog/component data containing an unpaired UTF-16 surrogate (half an
