@@ -11,12 +11,16 @@ import { getLogger } from "./log"
 export type DsdMode = "quick" | "team"
 
 export interface DsdFeedback {
+  /** Stable id so the coach can mark it consumed. */
+  id?: string
   rating: "up" | "down"
   comment?: string
   /** Optional analyst-corrected version (gold training signal). */
   correctedText?: string
   at: string
   by?: string
+  /** True once a coach proposal built from it was approved or rejected. */
+  resolved?: boolean
 }
 
 export interface DsdArtifactMeta {
@@ -143,4 +147,36 @@ export async function addFeedback(
     `docs: feedback on DSD ${artifactId}`,
     file.sha
   )
+}
+
+/**
+ * Mark the given feedback ids resolved within one artifact (incorporated
+ * into an approved coaching change, or rejected) so the coach stops
+ * re-surfacing them. Returns true if anything changed.
+ */
+export async function resolveArtifactFeedback(
+  solutionId: string,
+  artifactId: string,
+  ids: Set<string>
+): Promise<boolean> {
+  if (!SAFE_ARTIFACT_ID.test(artifactId)) return false
+  const git = getGit()
+  const file = await git.getFile(pathFor(solutionId, artifactId))
+  const { meta, markdown } = parse(file.content)
+  const m = meta as DsdArtifactMeta
+  let changed = false
+  for (const f of m.feedback || []) {
+    if (f.id && ids.has(f.id) && !f.resolved) {
+      f.resolved = true
+      changed = true
+    }
+  }
+  if (!changed) return false
+  await git.putFile(
+    pathFor(solutionId, artifactId),
+    serialize(m, markdown),
+    `chore: resolve feedback on DSD ${artifactId}`,
+    file.sha
+  )
+  return true
 }

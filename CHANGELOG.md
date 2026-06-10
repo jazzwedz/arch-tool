@@ -19,6 +19,16 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Coach suggestions no longer repeat; proposals can be rejected.** The
+  coach used to re-read all feedback every time, so already-applied (or
+  unwanted) suggestions kept coming back. Now each feedback entry has a
+  stable id and a `resolved` flag; the coach only considers unresolved
+  feedback, and a proposal carries the feedback ids it was built from.
+  Approving **or** rejecting a suggestion (or “Dismiss all”) marks that
+  feedback resolved, so the same suggestion never reappears. Added a
+  **Reject** action per suggestion on the Agents page, plus the progress
+  modal now sits higher on the page.
+
 - **Solution composer: “Create” greyed out with no reason + risk of
   losing work.** The AI-assist path could reach the Review step without a
   name (the “Pre-fill with AI” button only needs goal + description, and

@@ -73,25 +73,54 @@ export default function AgentsPage() {
     }
   }
 
-  const apply = async (agentId: string, delta: AgentDelta) => {
+  // Mark the proposal's source feedback resolved so the coach never
+  // re-surfaces the same suggestions (fire-and-forget).
+  const finalize = (feedbackIds: string[]) => {
+    fetch("/api/agents/coach/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedbackIds }),
+    }).catch(() => {})
+  }
+
+  const handleDelta = async (agentId: string, delta: AgentDelta, action: "approve" | "reject") => {
     setError(null)
     try {
-      const r = await fetch("/api/agents/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId, ...delta }),
+      if (action === "approve") {
+        const r = await fetch("/api/agents/apply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agentId, ...delta }),
+        })
+        const d = await r.json().catch(() => null)
+        if (!r.ok) throw new Error((d && d.error) || `Failed (${r.status})`)
+        setAppliedMsg(`${agentId} updated to v${d.version}.`)
+        load()
+      }
+      // Remove this delta; once nothing is left to triage, resolve the
+      // feedback so it won't drive a future proposal.
+      setProposal((p) => {
+        if (!p) return p
+        const next = {
+          ...p,
+          ...(agentId === "dsd-writer" ? { writer: undefined } : { critic: undefined }),
+        }
+        if (!next.writer && !next.critic) {
+          finalize(p.feedbackIds)
+          setAppliedMsg((m) => m || "Proposal handled — that feedback won't be suggested again.")
+          return null
+        }
+        return next
       })
-      const d = await r.json().catch(() => null)
-      if (!r.ok) throw new Error((d && d.error) || `Failed (${r.status})`)
-      setAppliedMsg(`${agentId} updated to v${d.version}.`)
-      // Remove the approved delta from the proposal and refresh agents.
-      setProposal((p) =>
-        p ? { ...p, ...(agentId === "dsd-writer" ? { writer: undefined } : { critic: undefined }) } : p
-      )
-      load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Apply failed")
+      setError(e instanceof Error ? e.message : "Action failed")
     }
+  }
+
+  const dismissProposal = () => {
+    if (proposal) finalize(proposal.feedbackIds)
+    setProposal(null)
+    setAppliedMsg("Proposal dismissed — that feedback won't be suggested again.")
   }
 
   return (
@@ -142,11 +171,16 @@ export default function AgentsPage() {
               <p className="text-sm text-muted-foreground">No changes proposed.</p>
             )}
             {proposal.writer && (
-              <DeltaBlock title="Writer" agentId="dsd-writer" delta={proposal.writer} onApprove={apply} />
+              <DeltaBlock title="Writer" agentId="dsd-writer" delta={proposal.writer} onAction={handleDelta} />
             )}
             {proposal.critic && (
-              <DeltaBlock title="Critic" agentId="dsd-critic" delta={proposal.critic} onApprove={apply} />
+              <DeltaBlock title="Critic" agentId="dsd-critic" delta={proposal.critic} onAction={handleDelta} />
             )}
+            <div className="flex justify-end pt-1">
+              <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={dismissProposal}>
+                Dismiss all
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -222,20 +256,25 @@ function DeltaBlock({
   title,
   agentId,
   delta,
-  onApprove,
+  onAction,
 }: {
   title: string
   agentId: string
   delta: AgentDelta
-  onApprove: (agentId: string, delta: AgentDelta) => void
+  onAction: (agentId: string, delta: AgentDelta, action: "approve" | "reject") => void
 }) {
   return (
     <div className="rounded-md border p-3 space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="font-medium text-sm">{title}</span>
-        <Button size="sm" onClick={() => onApprove(agentId, delta)}>
-          <Check className="h-4 w-4 mr-1" />Approve &amp; commit
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => onAction(agentId, delta, "reject")}>
+            <X className="h-4 w-4 mr-1" />Reject
+          </Button>
+          <Button size="sm" onClick={() => onAction(agentId, delta, "approve")}>
+            <Check className="h-4 w-4 mr-1" />Approve &amp; commit
+          </Button>
+        </div>
       </div>
       {delta.lessons && (
         <div>

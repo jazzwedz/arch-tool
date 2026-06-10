@@ -6,7 +6,7 @@
 import { getLLM } from "./llm"
 import { getAgent, type Agent } from "./agents"
 import { listSolutions } from "./solutions"
-import { listDsd, type DsdFeedback } from "./dsd-store"
+import { listDsd, resolveArtifactFeedback, type DsdFeedback } from "./dsd-store"
 import { getLogger } from "./log"
 
 export interface AgentDelta {
@@ -19,6 +19,8 @@ export interface CoachProposal {
   critic?: AgentDelta
   rationale: string
   feedbackConsidered: number
+  /** Ids of the feedback this proposal was built from (to mark resolved). */
+  feedbackIds: string[]
 }
 
 interface FeedbackEntry extends DsdFeedback {
@@ -43,12 +45,51 @@ async function gatherRecentFeedback(limit: number): Promise<FeedbackEntry[]> {
     }
     for (const a of arts) {
       for (const f of a.feedback || []) {
+        if (f.resolved) continue // already incorporated or rejected — skip
         out.push({ ...f, solutionId: s.id, mode: a.mode })
       }
     }
   }
   out.sort((a, b) => (b.at || "").localeCompare(a.at || ""))
   return out.slice(0, limit)
+}
+
+/**
+ * Mark feedback ids resolved across all artifacts (called after a coach
+ * proposal is approved or rejected) so they never drive a new proposal.
+ */
+export async function resolveFeedback(ids: string[]): Promise<number> {
+  const idSet = new Set(ids.filter(Boolean))
+  if (idSet.size === 0) return 0
+  let solutions
+  try {
+    solutions = await listSolutions()
+  } catch {
+    return 0
+  }
+  let count = 0
+  for (const s of solutions) {
+    let arts
+    try {
+      arts = await listDsd(s.id)
+    } catch {
+      continue
+    }
+    for (const a of arts) {
+      const hasMatch = (a.feedback || []).some((f) => f.id && idSet.has(f.id) && !f.resolved)
+      if (!hasMatch) continue
+      try {
+        if (await resolveArtifactFeedback(s.id, a.id, idSet)) count++
+      } catch (err) {
+        getLogger().error("Failed to resolve feedback", {
+          solutionId: s.id,
+          artifactId: a.id,
+          err: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+  }
+  return count
 }
 
 export async function proposeCoaching(): Promise<CoachProposal> {
@@ -60,8 +101,9 @@ export async function proposeCoaching(): Promise<CoachProposal> {
   const feedback = await gatherRecentFeedback(40)
   if (feedback.length === 0) {
     return {
-      rationale: "No analyst feedback yet — generate some DSDs and rate them, then run coaching.",
+      rationale: "No new analyst feedback to learn from — rate some DSDs first (already-processed feedback won't reappear).",
       feedbackConsidered: 0,
+      feedbackIds: [],
     }
   }
   const llm = await getLLM()
@@ -71,6 +113,7 @@ export async function proposeCoaching(): Promise<CoachProposal> {
   })
   const proposal = parseProposal(raw)
   proposal.feedbackConsidered = feedback.length
+  proposal.feedbackIds = feedback.map((f) => f.id).filter((x): x is string => !!x)
   getLogger().info("Coach proposal", {
     feedback: feedback.length,
     writer: !!proposal.writer,
@@ -120,7 +163,7 @@ function parseProposal(text: string): CoachProposal {
     const body = fenced ? fenced[1] : text
     const start = body.indexOf("{")
     const end = body.lastIndexOf("}")
-    if (start < 0 || end < 0) return { rationale: "Coach did not return a usable proposal.", feedbackConsidered: 0 }
+    if (start < 0 || end < 0) return { rationale: "Coach did not return a usable proposal.", feedbackConsidered: 0, feedbackIds: [] }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const p = JSON.parse(body.slice(start, end + 1)) as any
     const clean = (d: unknown): AgentDelta | undefined => {
@@ -136,8 +179,9 @@ function parseProposal(text: string): CoachProposal {
       writer: clean(p.writer),
       critic: clean(p.critic),
       feedbackConsidered: 0,
+      feedbackIds: [],
     }
   } catch {
-    return { rationale: "Coach output could not be parsed.", feedbackConsidered: 0 }
+    return { rationale: "Coach output could not be parsed.", feedbackConsidered: 0, feedbackIds: [] }
   }
 }

@@ -3,6 +3,7 @@
 // Append analyst feedback to a saved DSD. This is the training signal the
 // coach later uses to improve the writer / critic agents.
 
+import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import { addFeedback, type DsdFeedback } from "@/lib/dsd-store"
 import { getCurrentUser } from "@/lib/current-user"
@@ -31,6 +32,8 @@ export async function POST(
       return NextResponse.json({ error: "rating must be 'up' or 'down'." }, { status: 400 })
     }
     const feedback: DsdFeedback = {
+      id: randomUUID(),
+      resolved: false,
       rating: body.rating,
       comment: typeof body.comment === "string" && body.comment.trim() ? body.comment.trim() : undefined,
       correctedText:

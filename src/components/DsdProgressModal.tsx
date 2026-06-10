@@ -49,7 +49,7 @@ export function DsdProgressModal({
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="max-w-xl [&>button:last-child]:hidden overflow-hidden">
+      <DialogContent className="max-w-xl top-20 translate-y-0 [&>button:last-child]:hidden overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-600 dsd-spark" />
