@@ -27,6 +27,7 @@ import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles, Info, FileUp, Chevr
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { ChipPicker } from "@/components/ChipPicker"
 import { ProcessesEditor } from "@/components/ProcessesEditor"
+import { AgentRunModal } from "@/components/AgentRunModal"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
 import { proposeSolution, type SolutionProposal } from "@/lib/solution-proposer"
 import { slugifyId } from "@/lib/component-schema"
@@ -981,7 +982,19 @@ export default function NewSolutionPage() {
         </div>
       </div>
 
-      <Dialog open={aiOpen} onOpenChange={setAiOpen}>
+      <AgentRunModal
+        open={aiLoading}
+        title="Solution composer"
+        nodes={[{ label: "Solution composer", icon: "🧠" }]}
+        stages={[
+          "Reading your intent and any source document…",
+          "Scanning the component catalog for reuse…",
+          "Selecting members and wiring the flows…",
+          "Drafting the goal, description and a starter process…",
+        ]}
+      />
+
+      <Dialog open={aiOpen && !aiLoading} onOpenChange={setAiOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

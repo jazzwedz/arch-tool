@@ -330,10 +330,11 @@ export default function AgentsPage() {
 }
 
 const ROLE_GROUPS: { role: string; label: string }[] = [
-  { role: "writer", label: "Section writers" },
-  { role: "critic", label: "Critic panel" },
-  { role: "lead", label: "Lead editor" },
+  { role: "writer", label: "DSD · section writers" },
+  { role: "critic", label: "DSD · critic panel" },
+  { role: "lead", label: "DSD · lead editor" },
   { role: "coach", label: "Coach" },
+  { role: "assistant", label: "AI assistants" },
 ]
 
 function DeltaBlock({

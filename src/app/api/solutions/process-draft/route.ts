@@ -16,6 +16,7 @@ import { sanitizeForPrompt } from "@/lib/validate"
 import { withRouteContext } from "@/lib/route-context"
 import { getLogger } from "@/lib/log"
 import { PROCESS_STEP_KINDS, PROCESS_ROLES } from "@/lib/constants"
+import { getAgent, agentInstruction } from "@/lib/agents"
 import type { ProcessActor, SolutionProcessStep, ProcessStepKind, ProcessRole } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
 
     try {
       const llm = await getLLM()
-      const prompt = buildPrompt(body, members)
+      const drafter = await getAgent("process-drafter")
+      const prompt = buildPrompt(agentInstruction(drafter), body, members)
       const raw = await llm.complete({ prompt, maxTokens: 2048 })
       const parsed = parseJsonObject(raw)
 
@@ -131,14 +133,16 @@ function parseJsonObject(text: string): Record<string, any> {
   return JSON.parse(bodyText.slice(start, end + 1))
 }
 
-function buildPrompt(body: Body, members: { id: string; name: string }[]): string {
+function buildPrompt(lead: string, body: Body, members: { id: string; name: string }[]): string {
   const memberLines = members.map((m) => `- ${m.id} (${m.name})`).join("\n")
   const flowLines = (body.flows || [])
     .map((f) => `- ${f.from} → ${f.to}${f.role ? ` (${f.role}${f.protocol ? `/${f.protocol}` : ""})` : ""}`)
     .join("\n")
   const doc = body.sourceDoc ? sanitizeForPrompt(body.sourceDoc.slice(0, MAX_DOC_CHARS)) : ""
 
-  return `You are a solution architect. Draft ONE ordered process sequence for the solution below, as actor→target steps that can render as a sequence diagram.
+  return `${lead}
+
+Draft ONE ordered process sequence for the solution below, as actor→target steps that can render as a sequence diagram.
 
 Solution:
 - Name: ${sanitizeForPrompt(body.name || "(none)")}

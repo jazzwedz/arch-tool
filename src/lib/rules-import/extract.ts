@@ -7,6 +7,7 @@
 
 import type { Component, ComponentRule } from "@/lib/types"
 import { getLLM } from "@/lib/llm"
+import { getAgent, agentInstruction } from "@/lib/agents"
 import type {
   RelevantSection,
   RuleCandidate,
@@ -40,6 +41,7 @@ function buildComponentContextShort(c: Component): string {
 export type ExtractSourceKind = "doc" | "code"
 
 function buildPrompt(
+  lead: string,
   component: Component,
   sections: RelevantSection[],
   sourceKind: ExtractSourceKind = "doc",
@@ -66,7 +68,9 @@ function buildPrompt(
 `
       : ""
 
-  return `You are an architecture analyst extracting business rules from ${sourceKind === "code" ? "source code" : "documentation"} into a structured catalog.
+  return `${lead}
+
+You are extracting business rules from ${sourceKind === "code" ? "source code" : "documentation"} into a structured catalog.
 
 ${buildComponentContextShort(component)}
 
@@ -157,7 +161,8 @@ export async function extractRuleCandidates(
 ): Promise<ExtractResult> {
   const t0 = Date.now()
   const llm = await getLLM()
-  const prompt = buildPrompt(component, sections, sourceKind, language)
+  const lead = agentInstruction(await getAgent("rules-extractor"))
+  const prompt = buildPrompt(lead, component, sections, sourceKind, language)
   const raw = await llm.complete({ prompt, maxTokens: PASS_2_MAX_TOKENS })
   const parsed = extractJson(raw)
   const candidates: RuleCandidate[] = []

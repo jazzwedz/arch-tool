@@ -7,6 +7,7 @@ import {
   LLM_DISABLED_MESSAGE,
 } from "@/lib/llm"
 import { withRouteContext } from "@/lib/route-context"
+import { getAgent, agentInstruction } from "@/lib/agents"
 import { getLogger } from "@/lib/log"
 
 export async function POST(request: Request) {
@@ -101,6 +102,15 @@ async function doPost(request: Request) {
         { status: 400 }
       )
     }
+
+    // Swap the hardcoded persona opener for the configurable doc-writer
+    // agent prompt (+ its lessons); the task scaffolding stays intact.
+    const docWriterLead = agentInstruction(await getAgent("doc-writer"))
+    const PERSONA =
+      "You are a documentation writer producing clear, professional architecture documents. Your writing must sound human and natural — never like AI-generated content."
+    prompt = prompt.startsWith(PERSONA)
+      ? docWriterLead + prompt.slice(PERSONA.length)
+      : docWriterLead + "\n\n" + prompt
 
     const generatedText = await llm.complete({ prompt, maxTokens: 4096 })
 

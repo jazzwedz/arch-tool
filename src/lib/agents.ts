@@ -22,7 +22,43 @@ import {
   COACH_AGENT_ID,
 } from "./dsd-sections"
 
-export type AgentRole = "writer" | "critic" | "coach" | "lead"
+export type AgentRole = "writer" | "critic" | "coach" | "lead" | "assistant"
+
+// Single-agent "AI assistants" behind the other AI-support moments. Each is
+// one configurable prompt (the persona/lead); the route keeps the task
+// scaffolding (JSON schema, grounded facts, audience/doctype modifiers).
+export const ASSISTANT_AGENTS: { id: string; name: string; system_prompt: string }[] = [
+  {
+    id: "solution-composer",
+    name: "Solution composer",
+    system_prompt:
+      "You are a solution architect composing a new solution by reusing components from an existing catalog. From the analyst's intent (and any source document) propose a clear, grounded skeleton — goal, description, members, flows and a starter process. Prefer reuse; never invent component ids; put anything new in newComponents.",
+  },
+  {
+    id: "rules-locator",
+    name: "Rules locator",
+    system_prompt:
+      "You are an architecture analyst reading a component's documentation or source code to locate the passages that express business rules, calculations or constraints. Identify the relevant blocks precisely; do not summarise or invent.",
+  },
+  {
+    id: "rules-extractor",
+    name: "Rules extractor",
+    system_prompt:
+      "You are an architecture analyst extracting business rules from documentation or source code into a structured catalog. Capture each rule precisely with its kind; stay strictly within what the source states — do not invent rules or values.",
+  },
+  {
+    id: "doc-writer",
+    name: "Documentation writer",
+    system_prompt:
+      "You are a documentation writer producing clear, professional architecture documents. Your writing must sound human and natural — never like AI-generated content. Clear, direct, no fluff; no marketing words. State facts plainly and stay within the provided data.",
+  },
+  {
+    id: "process-drafter",
+    name: "Process drafter",
+    system_prompt:
+      "You are a solution architect drafting ONE ordered process sequence as actor→target steps that render as a sequence diagram. Ground it in the solution's members and intent; add external actors for people/roles outside the catalog; keep it focused.",
+  },
+]
 
 export interface Agent {
   id: string
@@ -82,6 +118,17 @@ DEFAULTS[COACH_AGENT_ID] = {
   temperature: 0.3,
   version: 1,
   system_prompt: `You are a coach who improves the DSD agent team — section writers, critic lenses and the lead editor — by refining their instructions. You are given each agent's current prompt plus recent analyst feedback (ratings, comments, corrections), tagged with the section it is about. Map section feedback to the agent that owns that section, and whole-document feedback to the lead or the relevant critics. Identify recurring problems and propose concrete, minimal improvements to the right agents' system prompts and "lessons". Do not rewrite prompts wholesale; suggest targeted additions grounded in the evidence.`,
+}
+
+for (const a of ASSISTANT_AGENTS) {
+  DEFAULTS[a.id] = {
+    id: a.id,
+    name: a.name,
+    role: "assistant",
+    temperature: 0.4,
+    version: 1,
+    system_prompt: a.system_prompt,
+  }
 }
 
 export const AGENT_IDS: string[] = Object.keys(DEFAULTS)

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AgentRunModal } from "@/components/AgentRunModal"
 import {
   Select,
   SelectContent,
@@ -612,6 +613,18 @@ export default function GeneratePage() {
           )}
         </CardContent>
       </Card>
+
+      <AgentRunModal
+        open={generating}
+        title="Documentation writer"
+        nodes={[{ label: "Documentation writer", icon: "✍️" }]}
+        stages={[
+          "Reading the component and its links…",
+          "Structuring the document for the audience…",
+          "Writing clear, grounded prose…",
+          "Polishing and formatting…",
+        ]}
+      />
 
       {/* Component detail */}
       {selectionMode === "component" && selectedComponent && (

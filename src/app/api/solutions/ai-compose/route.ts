@@ -20,6 +20,7 @@ import { withRouteContext } from "@/lib/route-context"
 import { getLogger } from "@/lib/log"
 import { LINK_ROLES, LINK_PROTOCOLS, MEMBER_DISPOSITIONS, PROCESS_STEP_KINDS, PROCESS_ROLES } from "@/lib/constants"
 import { slugifyId } from "@/lib/component-schema"
+import { getAgent, agentInstruction } from "@/lib/agents"
 import type {
   LinkRole,
   LinkProtocol,
@@ -100,7 +101,9 @@ export async function POST(request: Request) {
       const compName = new Map(components.map((c) => [c.id, c.name]))
 
       const llm = await getLLM()
+      const composer = await getAgent("solution-composer")
       const prompt = buildPrompt(
+        agentInstruction(composer),
         sanitizeForPrompt(body.name || ""),
         sanitizeForPrompt(body.goal || ""),
         sanitizeForPrompt(body.description || ""),
@@ -270,13 +273,16 @@ function parseJsonObject(text: string): Record<string, any> {
 }
 
 function buildPrompt(
+  lead: string,
   name: string,
   goal: string,
   description: string,
   sourceDoc: string,
   catalog: string
 ): string {
-  return `You are a solution architect. An analyst is composing a new solution by reusing components from an existing catalog. From their intent and the catalog below, propose the solution skeleton. The name is always given; the goal and description may be missing — when so, write them yourself from the name and the source document.
+  return `${lead}
+
+From the analyst's intent and the catalog below, propose the solution skeleton. The name is always given; the goal and description may be missing — when so, write them yourself from the name and the source document.
 
 Analyst intent:
 - Name: ${name || "(none)"}

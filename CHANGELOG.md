@@ -7,13 +7,31 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-06-14
+
+### Added
+
+- **Every AI moment is a configurable agent.** Beyond the DSD team, the
+  single-agent AI features now run through editable agent prompts you can
+  tune on the Agents page (grouped under "AI assistants"):
+  - **Solution composer** (`ai-compose`)
+  - **Rules locator** + **Rules extractor** (the two rules-import passes)
+  - **Documentation writer** (component/diagram doc generation)
+  - **Process drafter** (process-sequence AI draft)
+  Each route now uses `agentInstruction(getAgent(id))` as its persona; the
+  task scaffolding (JSON schema, grounded facts, audience/doctype) stays in
+  the route. (Goal extrapolation, blast memo and Confluence pull stay plain
+  for now.)
+- **Premium "agent at work" modal for every AI moment.** A reusable
+  `AgentRunModal` brings the command-center aesthetic (neon nodes, flowing
+  data streams, console readout) to compose, rules import (two nodes),
+  doc generation and process draft — positioned high on screen.
+
 ### Changed
 
-- **Redesigned the DSD progress modal into an "agent command center."** The
-  team-mode generation now shows the full pipeline live — Facts → 4 section
-  writers → 4 critic lenses → Lead → Library — as a dark, futuristic scene
-  with neon nodes, flowing data streams, an aurora/grid backdrop, a
-  scanline, a console status readout and a progress rail. Built for demos.
+- **Redesigned the DSD progress modal into an "agent command center"** —
+  the full pipeline live (Facts → 4 writers → 4 critics → Lead → Library)
+  as a dark, futuristic scene. Both modals now sit higher on screen.
 
 ## [0.7.0] — 2026-06-14
 
@@ -943,7 +961,8 @@ First public release. Free software under MIT.
 - Architecture-questions checklist and 6-phase port plan for moving the app into a corporate environment.
 - Best-effort maintenance model documented in README.
 
-[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.7.1
 [0.7.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.7.0
 [0.6.1]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.6.1
 [0.6.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.6.0

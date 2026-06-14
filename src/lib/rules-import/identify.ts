@@ -10,6 +10,7 @@
 
 import type { Component } from "@/lib/types"
 import { getLLM } from "@/lib/llm"
+import { getAgent, agentInstruction } from "@/lib/agents"
 import type { RelevantSection } from "./types"
 
 export const SKIP_PASS_1_CHARS = 20_000
@@ -57,6 +58,7 @@ function buildComponentContext(c: Component): string {
 export type IdentifySourceKind = "doc" | "code"
 
 function buildPrompt(
+  lead: string,
   component: Component,
   docName: string,
   docText: string,
@@ -70,7 +72,9 @@ function buildPrompt(
 
   if (sourceKind === "code") {
     const langLabel = language && language !== "auto" ? language : "unspecified"
-    return `You are an architecture analyst reading source code. A team maintains a software component:
+    return `${lead}
+
+A team maintains a software component:
 
 ${buildComponentContext(component)}
 
@@ -112,7 +116,9 @@ ${safeText}
   }
 
   // Default: prose document
-  return `You are an architecture analyst. A team maintains a software component:
+  return `${lead}
+
+A team maintains a software component:
 
 ${buildComponentContext(component)}
 
@@ -178,7 +184,8 @@ export async function identifyRelevantSections(
 ): Promise<IdentifyResult> {
   const t0 = Date.now()
   const llm = await getLLM()
-  const prompt = buildPrompt(component, docName, docText, sourceKind, language)
+  const lead = agentInstruction(await getAgent("rules-locator"))
+  const prompt = buildPrompt(lead, component, docName, docText, sourceKind, language)
   const raw = await llm.complete({ prompt, maxTokens: PASS_1_MAX_TOKENS })
   const parsed = extractJson(raw)
   const sections: RelevantSection[] = []

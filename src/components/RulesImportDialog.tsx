@@ -42,6 +42,7 @@ import {
   Code as CodeIcon,
 } from "lucide-react"
 import { RULE_KINDS, RULE_KIND_LABELS } from "@/lib/constants"
+import { AgentRunModal } from "@/components/AgentRunModal"
 import type { ComponentRule, RuleKind } from "@/lib/types"
 
 type Step = "source" | "analyzing" | "review" | "error"
@@ -334,6 +335,21 @@ export function RulesImportDialog({
   }
 
   return (
+    <>
+    <AgentRunModal
+      open={step === "analyzing"}
+      title="Rules import"
+      nodes={[
+        { label: "Rules locator", icon: "🔍" },
+        { label: "Rules extractor", icon: "📐" },
+      ]}
+      stages={[
+        "Reading the source document or code…",
+        "Locating passages that carry business rules…",
+        "Extracting each rule into the structured catalog…",
+        "Preparing candidates for your review…",
+      ]}
+    />
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
@@ -443,6 +459,7 @@ export function RulesImportDialog({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   )
 }
 

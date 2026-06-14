@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { MermaidPreview } from "@/components/mermaid-preview"
+import { AgentRunModal } from "@/components/AgentRunModal"
 import { ChevronUp, ChevronDown, Plus, X, Trash2, Sparkles, Loader2 } from "lucide-react"
 import { PROCESS_STEP_KINDS, PROCESS_STEP_KIND_LABELS, PROCESS_ROLES, PROCESS_ROLE_LABELS } from "@/lib/constants"
 import { buildSolutionSequenceMermaid } from "@/lib/solution-sequence"
@@ -304,6 +305,18 @@ export function ProcessesEditor({
       <Button variant="outline" onClick={addProcess}>
         <Plus className="h-4 w-4 mr-1" />Add process
       </Button>
+
+      <AgentRunModal
+        open={aiBusyId !== null}
+        title="Process drafter"
+        nodes={[{ label: "Process drafter", icon: "📋" }]}
+        stages={[
+          "Reading the solution members and intent…",
+          "Casting the actors and external participants…",
+          "Sequencing the actor→target steps…",
+          "Tidying the draft for review…",
+        ]}
+      />
     </div>
   )
 }
