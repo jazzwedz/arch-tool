@@ -72,6 +72,8 @@ interface AiCompose {
   members: { component: string; disposition: MemberDisposition; role?: string }[]
   newComponents: { name: string; type: ComponentType; role?: string }[]
   flows: SolutionFlow[]
+  /** Optional starter "main" process sequence (applied only when empty). */
+  process?: SolutionProcess
 }
 
 export default function NewSolutionPage() {
@@ -383,6 +385,10 @@ export default function NewSolutionPage() {
         status: f.status,
       }))
     )
+
+    // Seed a starter process sequence — only when the analyst hasn't added
+    // any, so an AI re-run never clobbers hand-authored processes.
+    if (ai.process) setProcesses((prev) => (prev.length === 0 ? [ai.process as SolutionProcess] : prev))
 
     setAiOpen(false)
     setAiApplied(true)

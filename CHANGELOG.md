@@ -7,6 +7,24 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **AI pre-fill now seeds a starter process sequence.** "Pre-fill with AI"
+  (`ai-compose`) returns a main process — actors (members + externals) and
+  ordered steps — alongside the skeleton. Applied only when the solution has
+  no processes yet, so it never clobbers hand-authored ones; the analyst
+  refines it in the Processes step.
+
+### Changed
+
+- **Processes page is now a hub.** `/processes` cross-links the process
+  concept: for each business process it shows supporting components (as
+  before) plus the solutions that **deliver** it and the solutions that
+  **model it as a sequence** (linked by `deliversProcess`/name, with step
+  counts and a link to drill in). A process modelled or delivered but
+  declared by no component is flagged ("not in component catalog") as a
+  naming-consistency hint.
+
 ## [0.6.0] — 2026-06-14
 
 ### Added

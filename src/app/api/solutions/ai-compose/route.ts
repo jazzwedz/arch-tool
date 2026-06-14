@@ -18,8 +18,17 @@ import { checkRateLimit } from "@/lib/rate-limit"
 import { sanitizeForPrompt } from "@/lib/validate"
 import { withRouteContext } from "@/lib/route-context"
 import { getLogger } from "@/lib/log"
-import { LINK_ROLES, LINK_PROTOCOLS, MEMBER_DISPOSITIONS } from "@/lib/constants"
-import type { LinkRole, LinkProtocol, MemberDisposition } from "@/lib/types"
+import { LINK_ROLES, LINK_PROTOCOLS, MEMBER_DISPOSITIONS, PROCESS_STEP_KINDS } from "@/lib/constants"
+import { slugifyId } from "@/lib/component-schema"
+import type {
+  LinkRole,
+  LinkProtocol,
+  MemberDisposition,
+  ProcessActor,
+  ProcessStepKind,
+  SolutionProcess,
+  SolutionProcessStep,
+} from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
@@ -84,6 +93,7 @@ export async function POST(request: Request) {
         generatedAt: new Date().toISOString(),
       })
       const ids = new Set(components.map((c) => c.id))
+      const compName = new Map(components.map((c) => [c.id, c.name]))
 
       const llm = await getLLM()
       const prompt = buildPrompt(
@@ -143,6 +153,27 @@ export async function POST(request: Request) {
         processes: toStringArray(parsed?.delivers?.processes),
       }
 
+      // A starter "main" process sequence, grounded on the proposed members
+      // (existing ids + new components by slug). The composer applies it only
+      // when it has no processes yet, so it's safe to always return.
+      // canonicalId → display name; and a resolver mapping any candidate the
+      // model might emit (existing id, new-component slug, or new-component
+      // name) to the canonical member id.
+      const memberNames = new Map<string, string>()
+      const memberResolve = new Map<string, string>()
+      for (const m of members) {
+        memberNames.set(m.component, compName.get(m.component) || m.component)
+        memberResolve.set(m.component.toLowerCase(), m.component)
+      }
+      for (const n of newComponents) {
+        const cid = slugifyId(n.name)
+        if (!cid) continue
+        memberNames.set(cid, n.name)
+        memberResolve.set(cid.toLowerCase(), cid)
+        memberResolve.set(n.name.toLowerCase(), cid)
+      }
+      const process = coerceProcess(parsed.process, memberResolve, memberNames)
+
       // Suggested goal/description — the composer applies these only when
       // its fields are still empty, so it's safe to always return them.
       const goal = typeof parsed.goal === "string" ? parsed.goal.trim().slice(0, 240) : ""
@@ -155,7 +186,7 @@ export async function POST(request: Request) {
         flows: flows.length,
       })
 
-      return NextResponse.json({ goal, description, delivers, members, newComponents, flows })
+      return NextResponse.json({ goal, description, delivers, members, newComponents, flows, process })
     } catch (error) {
       getLogger().error("AI solution compose failed", {
         err: error instanceof Error ? error.message : "Unknown error",
@@ -170,6 +201,55 @@ export async function POST(request: Request) {
 
 function toStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim() !== "") : []
+}
+
+// Validate a proposed process sequence: member actors must reference an
+// allowed member id (existing member or new component slug); external actors
+// are free-form; steps must reference declared actors. Returns undefined
+// when nothing usable was proposed.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function coerceProcess(raw: any, memberResolve: Map<string, string>, memberNames: Map<string, string>): SolutionProcess | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const actors: ProcessActor[] = []
+  const seen = new Set<string>()
+  for (const a of Array.isArray(raw.actors) ? raw.actors : []) {
+    if (!a || typeof a !== "object") continue
+    if (a.kind === "external") {
+      const id = String(a.id || "").trim()
+      const label = String(a.label || id).trim()
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      actors.push({ id, label, kind: "external" })
+    } else {
+      const cand = String(a.component || a.id || "").trim().toLowerCase()
+      const component = memberResolve.get(cand)
+      if (!component || seen.has(component)) continue
+      seen.add(component)
+      actors.push({ id: component, label: memberNames.get(component) || component, kind: "member", component })
+    }
+  }
+  const actorIds = new Set(actors.map((a) => a.id))
+
+  const steps: SolutionProcessStep[] = []
+  for (const s of Array.isArray(raw.steps) ? raw.steps : []) {
+    if (!s || typeof s !== "object") continue
+    const from = String(s.from || "").trim()
+    if (!actorIds.has(from)) continue
+    const toRaw = s.to == null ? "" : String(s.to).trim()
+    const to = actorIds.has(toRaw) ? toRaw : undefined
+    const label = String(s.label || "").trim()
+    if (!label) continue
+    const kind: ProcessStepKind = PROCESS_STEP_KINDS.includes(s.kind as ProcessStepKind)
+      ? (s.kind as ProcessStepKind)
+      : "sync"
+    const description =
+      typeof s.description === "string" && s.description.trim() ? s.description.trim() : undefined
+    steps.push({ from, to, label, kind, description })
+  }
+  if (steps.length === 0) return undefined
+
+  const name = String(raw.name || "Main process").trim() || "Main process"
+  return { id: slugifyId(name) || "main-process", name, actors, steps }
 }
 
 // Extract the first JSON object from the model output (tolerates code
@@ -210,7 +290,17 @@ Return ONLY a JSON object, no prose, no code fence, with this exact shape:
   "delivers": { "capabilities": ["..."], "processes": ["..."] },
   "members": [ { "component": "<existing component id>", "disposition": "reuse|extend|external", "role": "what it does in this solution" } ],
   "newComponents": [ { "name": "Human Name", "type": "service|microservice|component|frontend|gateway|database|queue|library", "role": "what it does" } ],
-  "flows": [ { "from": "<member id or new component name>", "to": "<member id or new component name>", "role": "calls|serves|reads-from|writes-to|part-of|contains", "protocol": "rest|grpc|async|db|table|file|human|info|link|data", "status": "existing|proposed" } ]
+  "flows": [ { "from": "<member id or new component name>", "to": "<member id or new component name>", "role": "calls|serves|reads-from|writes-to|part-of|contains", "protocol": "rest|grpc|async|db|table|file|human|info|link|data", "status": "existing|proposed" } ],
+  "process": {
+    "name": "Main process",
+    "actors": [
+      { "id": "<member id>", "kind": "member", "component": "<member id>" },
+      { "id": "ext:user", "kind": "external", "label": "Customer" }
+    ],
+    "steps": [
+      { "from": "<actor id>", "to": "<actor id or null>", "label": "what happens", "kind": "sync|async|return|note" }
+    ]
+  }
 }
 
 Rules:
@@ -220,5 +310,6 @@ Rules:
 - Prefer reuse; mark a component "extend" only if it needs changes.
 - delivers should be the business capabilities/processes this solution provides.
 - flows describe how the parts interact; use "proposed" for to-be edges.
+- "process" is ONE ordered main sequence: actor→target steps. Member actors must use a member id (existing id, or the name of a newComponent). Add external actors (id prefixed "ext:") for people/roles outside the catalog. Each step from/to must be a declared actor; use "to": null for an internal action; kind = sync|async|return|note. Keep it short (the analyst refines it).
 - Keep it focused: only what the intent implies. Output valid JSON only.`
 }
