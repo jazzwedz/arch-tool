@@ -39,12 +39,13 @@ export async function POST(
         { status: 429 }
       )
     }
-    let mode: "quick" | "team" = "quick"
+    // Agent team is the default; quick is opt-in via the body.
+    let mode: "quick" | "team" = "team"
     try {
       const body = await request.json().catch(() => null)
-      if (body && body.mode === "team") mode = "team"
+      if (body && body.mode === "quick") mode = "quick"
     } catch {
-      // no body — default quick
+      // no body — default team
     }
     try {
       const solution = await getSolution(id)

@@ -7,6 +7,12 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Agent team is the default DSD mode.** The DSD generator now defaults to
+  the configurable, trainable writer/critic agents (Quick stays available as
+  an opt-in). Both the composer toggle and the API default flipped.
+
 ### Fixed
 
 - **AI/composer paths no longer produce retired process fields.** The

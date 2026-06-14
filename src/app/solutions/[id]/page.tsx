@@ -57,7 +57,7 @@ export default function SolutionDetailPage() {
   const [genPhase, setGenPhase] = useState<string | null>(null)
   const [genPhaseKey, setGenPhaseKey] = useState<string>("grounding")
   const [genIterations, setGenIterations] = useState<number>(0)
-  const [genMode, setGenMode] = useState<"quick" | "team">("quick")
+  const [genMode, setGenMode] = useState<"quick" | "team">("team")
   const [showDocModal, setShowDocModal] = useState(false)
   const [currentArtifactId, setCurrentArtifactId] = useState<string | null>(null)
   const [artifacts, setArtifacts] = useState<DsdArtifactMeta[]>([])
