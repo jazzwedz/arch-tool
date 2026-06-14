@@ -7,6 +7,14 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Redesigned the DSD progress modal into an "agent command center."** The
+  team-mode generation now shows the full pipeline live — Facts → 4 section
+  writers → 4 critic lenses → Lead → Library — as a dark, futuristic scene
+  with neon nodes, flowing data streams, an aurora/grid backdrop, a
+  scanline, a console status readout and a progress rail. Built for demos.
+
 ## [0.7.0] — 2026-06-14
 
 ### Added
