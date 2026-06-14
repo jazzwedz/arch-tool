@@ -27,6 +27,11 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Solution editor split into tabs.** The editor was one long form; it now
+  uses tabs — Details · Delivers · Members · Flows · Processes — matching the
+  detail page, with Save always available in the header. Much easier to
+  navigate than the single scroll.
+
 - **Processes page is now a hub.** `/processes` cross-links the process
   concept: for each business process it shows supporting components (as
   before) plus the solutions that **deliver** it and the solutions that

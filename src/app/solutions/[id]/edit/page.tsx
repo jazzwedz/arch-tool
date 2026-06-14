@@ -40,6 +40,15 @@ import type {
   LinkProtocol,
 } from "@/lib/types"
 
+type EditTab = "details" | "delivers" | "members" | "flows" | "processes"
+const EDIT_TABS: { id: EditTab; label: string }[] = [
+  { id: "details", label: "Details" },
+  { id: "delivers", label: "Delivers" },
+  { id: "members", label: "Members" },
+  { id: "flows", label: "Flows" },
+  { id: "processes", label: "Processes" },
+]
+
 export default function EditSolutionPage() {
   const params = useParams()
   const id = decodeURIComponent(String(params.id))
@@ -68,6 +77,7 @@ export default function EditSolutionPage() {
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [tab, setTab] = useState<EditTab>("details")
 
   const [addExisting, setAddExisting] = useState("")
   const [mnName, setMnName] = useState("")
@@ -232,7 +242,28 @@ export default function EditSolutionPage() {
         </div>
       )}
 
+      {/* tab nav */}
+      <div className="flex items-center gap-1 border-b overflow-x-auto">
+        {EDIT_TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 -mb-px ${
+              tab === t.id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+            {t.id === "members" && members.length > 0 && <span className="ml-1 text-xs text-muted-foreground">({members.length})</span>}
+            {t.id === "flows" && flows.length > 0 && <span className="ml-1 text-xs text-muted-foreground">({flows.length})</span>}
+            {t.id === "processes" && processes.length > 0 && <span className="ml-1 text-xs text-muted-foreground">({processes.length})</span>}
+          </button>
+        ))}
+      </div>
+
       {/* details */}
+      {tab === "details" && (
       <section className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="space-y-1 sm:col-span-2">
@@ -262,11 +293,17 @@ export default function EditSolutionPage() {
           <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} />
         </label>
       </section>
+      )}
 
-      <ChipPicker title="Delivers — capabilities" options={allCaps} selected={caps} onToggle={(v) => toggle(caps, setCaps, v)} />
-      <ChipPicker title="Delivers — processes" options={allProcs} selected={procs} onToggle={(v) => toggle(procs, setProcs, v)} empty="No processes in the catalog yet." />
+      {tab === "delivers" && (
+        <div className="space-y-4">
+          <ChipPicker title="Delivers — capabilities" options={allCaps} selected={caps} onToggle={(v) => toggle(caps, setCaps, v)} />
+          <ChipPicker title="Delivers — processes" options={allProcs} selected={procs} onToggle={(v) => toggle(procs, setProcs, v)} empty="No processes in the catalog yet." />
+        </div>
+      )}
 
       {/* members */}
+      {tab === "members" && (
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">Members ({members.length})</h2>
         <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 flex items-start gap-2">
@@ -324,8 +361,10 @@ export default function EditSolutionPage() {
           </Button>
         </div>
       </section>
+      )}
 
       {/* flows */}
+      {tab === "flows" && (
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="text-sm font-semibold">Flows ({flows.length})</h2>
@@ -371,8 +410,10 @@ export default function EditSolutionPage() {
         )}
         <FlowAdder memberIds={memberIds} label={label} onAdd={(f) => setFlows((fl) => [...fl, f])} />
       </section>
+      )}
 
       {/* process sequences */}
+      {tab === "processes" && (
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">Process sequences</h2>
         <ProcessesEditor
@@ -402,6 +443,7 @@ export default function EditSolutionPage() {
           }}
         />
       </section>
+      )}
     </div>
   )
 }
