@@ -7,6 +7,8 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-06-14
+
 ### Changed
 
 - **One unified "process" concept.** Previously "process" meant three
@@ -894,7 +896,8 @@ First public release. Free software under MIT.
 - Architecture-questions checklist and 6-phase port plan for moving the app into a corporate environment.
 - Best-effort maintenance model documented in README.
 
-[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.6.1
 [0.6.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.6.0
 [0.5.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.5.0
 [0.4.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.4.0
