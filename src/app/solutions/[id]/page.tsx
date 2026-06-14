@@ -16,6 +16,7 @@ import { GeneratedDocModal } from "@/components/GeneratedDocModal"
 import { DsdProgressModal } from "@/components/DsdProgressModal"
 import { TypeIcon } from "@/components/TypeIcon"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
+import { buildSolutionSequenceMermaid } from "@/lib/solution-sequence"
 import {
   SOLUTION_STATUS_COLORS,
   MEMBER_DISPOSITION_LABELS,
@@ -24,11 +25,12 @@ import {
 import type { Component, Solution, SolutionWithSha } from "@/lib/types"
 import type { DsdArtifactMeta } from "@/lib/dsd-store"
 
-type TabId = "overview" | "members" | "flows" | "delivers" | "risks" | "documentation"
+type TabId = "overview" | "members" | "flows" | "processes" | "delivers" | "risks" | "documentation"
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "members", label: "Members" },
   { id: "flows", label: "Flows" },
+  { id: "processes", label: "Processes" },
   { id: "delivers", label: "Delivers" },
   { id: "risks", label: "NFR & Risks" },
   { id: "documentation", label: "Documentation" },
@@ -469,6 +471,41 @@ export default function SolutionDetailPage() {
                 >
                   {f.status}
                 </Badge>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {tab === "processes" && (
+        <div className="space-y-4">
+          {(solution.processes || []).length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No process sequences. Add them in the editor to document how the solution runs
+              step by step.
+            </p>
+          )}
+          {(solution.processes || []).map((p, i) => (
+            <Card key={i}>
+              <CardContent className="pt-4 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium">{p.name}</span>
+                  {p.deliversProcess && (
+                    <Badge variant="outline" className="text-[10px]">delivers: {p.deliversProcess}</Badge>
+                  )}
+                  <Badge variant="outline" className="text-[10px]">{p.steps.length} steps</Badge>
+                </div>
+                {p.goal && <p className="text-sm text-muted-foreground">{p.goal}</p>}
+                {p.steps.length > 0 && (
+                  <MermaidPreview
+                    chart={buildSolutionSequenceMermaid(p, new Map(components.map((c) => [c.id, c.name])))}
+                    className="w-full"
+                    zoomable
+                    expandable
+                    expandTitle={p.name || "Process sequence"}
+                    height={320}
+                  />
+                )}
               </CardContent>
             </Card>
           ))}

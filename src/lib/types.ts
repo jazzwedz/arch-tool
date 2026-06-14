@@ -370,6 +370,47 @@ export interface SolutionDelivers {
   processes?: string[]
 }
 
+// ----- Process sequences -----
+// A solution can document one or more ordered process sequences (how it
+// actually runs a process), modelled as actor→target messages and rendered
+// as a mermaid sequence diagram. Structure-first: this is real data (used
+// for DSD grounding / AI), not a free-form drawing.
+
+export type ProcessStepKind = "sync" | "async" | "note" | "return"
+
+export interface ProcessActor {
+  /** Stable key referenced from steps. */
+  id: string
+  /** Display label (for member actors, falls back to the component name). */
+  label: string
+  kind: "member" | "external"
+  /** Set when kind === "member": catalog component id (should be a solution member). */
+  component?: string
+}
+
+export interface SolutionProcessStep {
+  /** Initiator — a ProcessActor.id. */
+  from: string
+  /** Recipient — a ProcessActor.id. Omitted = internal action (rendered as a note). */
+  to?: string
+  /** The message / action label. */
+  label: string
+  description?: string
+  /** Arrow style; defaults to "sync". */
+  kind?: ProcessStepKind
+}
+
+export interface SolutionProcess {
+  id: string
+  name: string
+  /** One-line purpose (optional). */
+  goal?: string
+  /** Optional link to a delivers.processes entry, by name. */
+  deliversProcess?: string
+  actors: ProcessActor[]
+  steps: SolutionProcessStep[]
+}
+
 export interface Solution {
   schema_version?: number
   id: string
@@ -382,6 +423,8 @@ export interface Solution {
   delivers?: SolutionDelivers
   members?: SolutionMember[]
   flows?: SolutionFlow[]
+  /** Ordered process sequences (see SolutionProcess). */
+  processes?: SolutionProcess[]
   nfr?: ComponentNFR
   risks?: string[]
 }

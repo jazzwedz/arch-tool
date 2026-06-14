@@ -233,6 +233,32 @@ export function buildGroundedFacts(solution: Solution, components: Component[]):
     lines.push("")
   }
 
+  // Process sequences — ordered, actor→target steps.
+  const processes = solution.processes || []
+  if (processes.length) {
+    lines.push(`## Process sequences`)
+    for (const p of processes) {
+      const actorLabel = (id: string) => {
+        const a = p.actors.find((x) => x.id === id)
+        if (!a) return id
+        return a.label || (a.component ? label(a.component) : a.id)
+      }
+      lines.push(`### ${p.name}${p.deliversProcess ? ` (delivers: ${p.deliversProcess})` : ""}`)
+      if (p.goal) lines.push(`- Goal: ${p.goal}`)
+      p.steps.forEach((s, i) => {
+        const kind = s.kind || "sync"
+        if (!s.to || kind === "note") {
+          lines.push(`${i + 1}. [${actorLabel(s.from)}] ${s.label}${s.description ? ` — ${s.description}` : ""}`)
+        } else {
+          lines.push(
+            `${i + 1}. ${actorLabel(s.from)} → ${actorLabel(s.to)} (${kind}): ${s.label}${s.description ? ` — ${s.description}` : ""}`
+          )
+        }
+      })
+      lines.push("")
+    }
+  }
+
   // Dependencies (member links pointing outside the solution)
   const deps: string[] = []
   for (const m of members) {

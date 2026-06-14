@@ -7,7 +7,30 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-14
+
 ### Added
+
+- **Process sequences on solutions.** A solution can now document one or
+  more ordered process sequences — how it actually runs a process, step by
+  step — modelled as actor→target messages and rendered as a mermaid
+  **sequence diagram** in the zoom/pan/expand preview. Structure-first:
+  the steps are real data (`Solution.processes`), not a drawing.
+  - **Actors** are members or **external** participants (user/role/system
+    not in the catalog), auto-managed from the step dropdowns.
+  - **Step kinds**: sync, async, return, and note (internal action with no
+    target renders as a `Note over`). Manual ↑/↓ ordering (order is the
+    meaning).
+  - Editable in both the **composer** (new "Processes" wizard step) and the
+    **solution editor**; rendered read-only on a new **Processes** tab of
+    the solution detail page.
+  - Each process can optionally **link to a delivered process** by name, or
+    stand alone.
+  - **AI draft** (`POST /api/solutions/process-draft`) proposes a sequence
+    from the solution's intent, members, flows and any uploaded source
+    document — grounded, the analyst edits.
+  - Feeds **DSD generation**: process sequences are added to the grounded
+    facts, so the generated document gets an accurate process chapter.
 
 - **Readable live preview at scale — zoom, pan, expand.** The solution
   composer's live diagram was fit-to-width, so labels shrank as components
@@ -816,7 +839,8 @@ First public release. Free software under MIT.
 - Architecture-questions checklist and 6-phase port plan for moving the app into a corporate environment.
 - Best-effort maintenance model documented in README.
 
-[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.6.0
 [0.5.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.5.0
 [0.4.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.4.0
 [0.3.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.3.0

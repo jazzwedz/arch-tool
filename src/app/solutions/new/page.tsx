@@ -26,6 +26,7 @@ import {
 import { ArrowLeft, Loader2, AlertCircle, Plus, X, Sparkles, Info, FileUp, ChevronUp, ChevronDown, ArrowDownAZ } from "lucide-react"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { ChipPicker } from "@/components/ChipPicker"
+import { ProcessesEditor } from "@/components/ProcessesEditor"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
 import { proposeSolution, type SolutionProposal } from "@/lib/solution-proposer"
 import { slugifyId } from "@/lib/component-schema"
@@ -42,6 +43,7 @@ import type {
   MemberDisposition,
   SolutionFlow,
   SolutionMember,
+  SolutionProcess,
   Solution,
   LinkRole,
   LinkProtocol,
@@ -114,6 +116,7 @@ export default function NewSolutionPage() {
   const [gapState, setGapState] = useState<Record<string, GapState>>({})
   const [existingFlowOn, setExistingFlowOn] = useState<Record<string, boolean>>({})
   const [addedFlows, setAddedFlows] = useState<SolutionFlow[]>([])
+  const [processes, setProcesses] = useState<SolutionProcess[]>([])
   const [proposal, setProposal] = useState<SolutionProposal | null>(null)
 
   // Manually added brand-new components (beyond the proposer's gaps).
@@ -165,6 +168,7 @@ export default function NewSolutionPage() {
       if (Array.isArray(d.manualNew)) setManualNew(d.manualNew)
       if (d.existingFlowOn) setExistingFlowOn(d.existingFlowOn)
       if (Array.isArray(d.addedFlows)) setAddedFlows(d.addedFlows)
+      if (Array.isArray(d.processes)) setProcesses(d.processes)
       if (d.sourceDoc && typeof d.sourceDoc.text === "string") setSourceDoc(d.sourceDoc)
       if (typeof d.aiApplied === "boolean") setAiApplied(d.aiApplied)
       if (typeof d.step === "number") setStep(d.step)
@@ -187,14 +191,14 @@ export default function NewSolutionPage() {
         JSON.stringify({
           step, name, goal, owner, desc, selCaps, selProcs,
           proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows,
-          sourceDoc, aiApplied,
+          processes, sourceDoc, aiApplied,
         })
       )
     } catch {
       // quota / serialization issue — non-fatal
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, name, goal, owner, desc, selCaps, selProcs, proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows, sourceDoc, aiApplied])
+  }, [step, name, goal, owner, desc, selCaps, selProcs, proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows, processes, sourceDoc, aiApplied])
 
   const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
 
@@ -466,6 +470,7 @@ export default function NewSolutionPage() {
         delivers: { capabilities: selCaps, processes: selProcs },
         members: assembled.members,
         flows: assembled.flows,
+        processes,
       }
       const r = await fetch("/api/solutions", {
         method: "POST",
@@ -526,7 +531,7 @@ export default function NewSolutionPage() {
           Start over
         </Button>
         <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-          {["Intent", "Skeleton", "Flows", "Review"].map((label, i) => (
+          {["Intent", "Skeleton", "Flows", "Processes", "Review"].map((label, i) => (
             <span
               key={label}
               className={`px-2 py-1 rounded ${step === i + 1 ? "bg-primary text-primary-foreground" : "bg-muted"}`}
@@ -850,18 +855,70 @@ export default function NewSolutionPage() {
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
-            <Button onClick={() => setStep(4)}>Review →</Button>
+            <Button onClick={() => setStep(4)}>Processes →</Button>
           </div>
         </div>
       )}
 
-      {/* STEP 4 — review */}
+      {/* STEP 4 — process sequences */}
       {step === 4 && (
+        <div className="space-y-5">
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 flex items-start gap-2">
+            <Info className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Optional — document how the solution runs a process, step by step (actor →
+              target). Renders as a sequence diagram and grounds the generated DSD. You can
+              also add these later from the solution editor.
+            </span>
+          </div>
+          <ProcessesEditor
+            processes={processes}
+            onChange={setProcesses}
+            members={assembled.members.map((m) => ({
+              id: m.component,
+              name: labelFor(m.component, byId, assembled.newComponents),
+            }))}
+            deliversProcesses={selProcs}
+            onAiDraft={async (processName) => {
+              const r = await fetch("/api/solutions/process-draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  processName,
+                  name,
+                  goal,
+                  description: desc,
+                  members: assembled.members.map((m) => ({
+                    id: m.component,
+                    name: labelFor(m.component, byId, assembled.newComponents),
+                  })),
+                  flows: assembled.flows.map((f) => ({ from: f.from, to: f.to, role: f.role, protocol: f.protocol })),
+                  sourceDoc: sourceDoc?.text || undefined,
+                }),
+              })
+              const d = await r.json().catch(() => null)
+              if (!r.ok) {
+                setCreateError((d && d.error) || "AI draft failed")
+                return null
+              }
+              return d
+            }}
+          />
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => setStep(3)}>← Back</Button>
+            <Button onClick={() => setStep(5)}>Review →</Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 5 — review */}
+      {step === 5 && (
         <div className="space-y-4">
           <div className="text-sm text-muted-foreground">
             <strong>{assembled.members.length}</strong> members ·{" "}
             <strong>{assembled.newComponents.length}</strong> new component(s) to create ·{" "}
-            <strong>{assembled.flows.length}</strong> flows
+            <strong>{assembled.flows.length}</strong> flows ·{" "}
+            <strong>{processes.length}</strong> process(es)
           </div>
 
           {/* A name is required to save. The AI-assist path can reach this
@@ -889,7 +946,7 @@ export default function NewSolutionPage() {
             </div>
           )}
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep(3)} disabled={creating}>← Back</Button>
+            <Button variant="outline" onClick={() => setStep(4)} disabled={creating}>← Back</Button>
             <Button onClick={create} disabled={creating || name.trim() === ""}>
               {creating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating…</> : "Create solution"}
             </Button>

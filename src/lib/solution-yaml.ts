@@ -18,6 +18,7 @@ export function normaliseSolutionForSave(solution: Solution): Solution {
   const raw = JSON.parse(JSON.stringify(solution)) as Record<string, any>
   if (Array.isArray(raw.members) && raw.members.length === 0) delete raw.members
   if (Array.isArray(raw.flows) && raw.flows.length === 0) delete raw.flows
+  if (Array.isArray(raw.processes) && raw.processes.length === 0) delete raw.processes
   if (Array.isArray(raw.risks) && raw.risks.length === 0) delete raw.risks
   if (raw.delivers) {
     const d = raw.delivers

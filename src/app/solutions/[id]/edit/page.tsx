@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft, Loader2, AlertCircle, Plus, X, Save, Info, ArrowDownAZ, Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-react"
 import { ChipPicker } from "@/components/ChipPicker"
 import { MermaidPreview } from "@/components/mermaid-preview"
+import { ProcessesEditor } from "@/components/ProcessesEditor"
 import { buildSolutionMermaid } from "@/lib/architecture-mermaid"
 import { slugifyId } from "@/lib/component-schema"
 import {
@@ -32,6 +33,7 @@ import type {
   MemberDisposition,
   SolutionFlow,
   SolutionMember,
+  SolutionProcess,
   SolutionStatus,
   SolutionWithSha,
   LinkRole,
@@ -57,6 +59,7 @@ export default function EditSolutionPage() {
   const [procs, setProcs] = useState<string[]>([])
   const [members, setMembers] = useState<SolutionMember[]>([])
   const [flows, setFlows] = useState<SolutionFlow[]>([])
+  const [processes, setProcesses] = useState<SolutionProcess[]>([])
   // brand-new components added during this edit (id -> name/type)
   const [pendingNew, setPendingNew] = useState<Record<string, { name: string; type: ComponentType }>>({})
   // preserved untouched fields
@@ -95,6 +98,7 @@ export default function EditSolutionPage() {
         setProcs(s.delivers?.processes || [])
         setMembers(s.members || [])
         setFlows(s.flows || [])
+        setProcesses(s.processes || [])
         setNfr(s.nfr)
         setRisks(s.risks)
       })
@@ -167,6 +171,7 @@ export default function EditSolutionPage() {
         delivers: { capabilities: caps, processes: procs },
         members,
         flows,
+        processes,
         nfr,
         risks,
         sha,
@@ -365,6 +370,37 @@ export default function EditSolutionPage() {
           </div>
         )}
         <FlowAdder memberIds={memberIds} label={label} onAdd={(f) => setFlows((fl) => [...fl, f])} />
+      </section>
+
+      {/* process sequences */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold">Process sequences</h2>
+        <ProcessesEditor
+          processes={processes}
+          onChange={setProcesses}
+          members={members.map((m) => ({ id: m.component, name: label(m.component) }))}
+          deliversProcesses={procs}
+          onAiDraft={async (processName) => {
+            const r = await fetch("/api/solutions/process-draft", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                processName,
+                name,
+                goal,
+                description: desc,
+                members: members.map((m) => ({ id: m.component, name: label(m.component) })),
+                flows: flows.map((f) => ({ from: f.from, to: f.to, role: f.role, protocol: f.protocol })),
+              }),
+            })
+            const d = await r.json().catch(() => null)
+            if (!r.ok) {
+              setSaveError((d && d.error) || "AI draft failed")
+              return null
+            }
+            return d
+          }}
+        />
       </section>
     </div>
   )

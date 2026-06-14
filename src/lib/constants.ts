@@ -294,7 +294,16 @@ export const LINK_ROLE_COLORS: Record<LinkRole, string> = {
 
 // -------------------------- Solutions --------------------------
 
-import type { SolutionStatus, MemberDisposition } from "./types"
+import type { SolutionStatus, MemberDisposition, ProcessStepKind } from "./types"
+
+export const PROCESS_STEP_KINDS: ProcessStepKind[] = ["sync", "async", "note", "return"]
+
+export const PROCESS_STEP_KIND_LABELS: Record<ProcessStepKind, string> = {
+  sync: "Sync call",
+  async: "Async",
+  note: "Note / internal",
+  return: "Return",
+}
 
 export const SOLUTION_STATUSES: SolutionStatus[] = [
   "draft",
