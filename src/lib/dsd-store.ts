@@ -17,10 +17,23 @@ export interface DsdFeedback {
   comment?: string
   /** Optional analyst-corrected version (gold training signal). */
   correctedText?: string
+  /** Section group this feedback is about (a writer agentId). Omitted =
+   *  whole-document feedback. Lets the coach train the exact agent. */
+  section?: string
   at: string
   by?: string
   /** True once a coach proposal built from it was approved or rejected. */
   resolved?: boolean
+}
+
+/** A section group of a DSD (one writer agent's output). `body` is only
+ *  used in-memory during generation; the persisted artifact stores just
+ *  id+title (the full text already lives in the markdown body). */
+export interface DsdSection {
+  /** Writer group agentId (e.g. dsd-writer-architecture). */
+  id: string
+  title: string
+  body?: string
 }
 
 export interface DsdArtifactMeta {
@@ -33,6 +46,8 @@ export interface DsdArtifactMeta {
   /** team mode: which agent versions produced it. */
   agentVersions?: Record<string, number>
   iterations?: number
+  /** team mode: the section groups (writer outputs) for per-section feedback. */
+  sections?: DsdSection[]
   feedback?: DsdFeedback[]
 }
 

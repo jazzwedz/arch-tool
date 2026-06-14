@@ -93,9 +93,10 @@ export default function SolutionDetailPage() {
 
   const PHASE_LABEL: Record<string, string> = {
     grounding: "Reading the solution & components…",
-    drafting: "Drafting the document…",
-    reviewing: "Reviewing it against the data…",
-    revising: "Revising…",
+    drafting: "Section writers drafting…",
+    reviewing: "Critic panel reviewing…",
+    revising: "Writers revising…",
+    consolidating: "Lead editor consolidating…",
     done: "Done",
   }
 
@@ -186,7 +187,8 @@ export default function SolutionDetailPage() {
   const submitDsdFeedback = async (
     rating: "up" | "down",
     comment: string,
-    correctedText: string
+    correctedText: string,
+    section?: string
   ): Promise<string | void> => {
     if (!currentArtifactId) return "No saved document to rate."
     try {
@@ -195,7 +197,7 @@ export default function SolutionDetailPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rating, comment, correctedText }),
+          body: JSON.stringify({ rating, comment, correctedText, section }),
         }
       )
       const d = await r.json().catch(() => null)
@@ -657,6 +659,10 @@ export default function SolutionDetailPage() {
             ? {
                 onSubmit: submitDsdFeedback,
                 existingCount: artifacts.find((a) => a.id === currentArtifactId)?.feedback?.length || 0,
+                sections: (artifacts.find((a) => a.id === currentArtifactId)?.sections || []).map((s) => ({
+                  id: s.id,
+                  title: s.title,
+                })),
               }
             : undefined
         }

@@ -21,8 +21,16 @@ import { MermaidPreview } from "@/components/mermaid-preview"
 
 export interface DocFeedback {
   /** Submit analyst feedback. Returns an error string or void. */
-  onSubmit: (rating: "up" | "down", comment: string, correctedText: string) => Promise<string | void>
+  onSubmit: (
+    rating: "up" | "down",
+    comment: string,
+    correctedText: string,
+    section?: string
+  ) => Promise<string | void>
   existingCount?: number
+  /** Section groups (writer agentIds) for targeted feedback. Omitted/empty =
+   *  whole-document feedback only (e.g. quick-mode docs). */
+  sections?: { id: string; title: string }[]
 }
 
 interface Props {
@@ -52,6 +60,7 @@ export function GeneratedDocModal({ open, onOpenChange, title, badge, markdown, 
   const [fbRating, setFbRating] = useState<"up" | "down" | null>(null)
   const [fbComment, setFbComment] = useState("")
   const [fbCorrection, setFbCorrection] = useState("")
+  const [fbSection, setFbSection] = useState("")
   const [fbBusy, setFbBusy] = useState(false)
   const [fbDone, setFbDone] = useState(false)
   const [fbError, setFbError] = useState<string | null>(null)
@@ -62,7 +71,7 @@ export function GeneratedDocModal({ open, onOpenChange, title, badge, markdown, 
     setFbBusy(true)
     setFbError(null)
     try {
-      const err = await feedback.onSubmit(rating, fbComment, fbCorrection)
+      const err = await feedback.onSubmit(rating, fbComment, fbCorrection, fbSection || undefined)
       if (err) {
         setFbError(err)
       } else {
@@ -169,7 +178,23 @@ export function GeneratedDocModal({ open, onOpenChange, title, badge, markdown, 
 
         {feedback && fbOpen && (
           <div className="px-6 py-3 border-b bg-amber-50/60 shrink-0 space-y-2">
-            <div className="text-sm font-medium">How is this document? Your feedback trains the writer &amp; critic.</div>
+            <div className="text-sm font-medium">How is this document? Your feedback trains the agent team.</div>
+            {feedback.sections && feedback.sections.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">About:</span>
+                <select
+                  value={fbSection}
+                  onChange={(e) => setFbSection(e.target.value)}
+                  className="h-8 rounded-md border bg-white px-2 text-sm"
+                >
+                  <option value="">Whole document</option>
+                  {feedback.sections.map((s) => (
+                    <option key={s.id} value={s.id}>{s.title}</option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-muted-foreground">— picking a section trains that specific writer</span>
+              </div>
+            )}
             <Textarea
               value={fbComment}
               onChange={(e) => setFbComment(e.target.value)}

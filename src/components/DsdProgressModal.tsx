@@ -13,21 +13,23 @@ import {
 } from "@/components/ui/dialog"
 import { Sparkles } from "lucide-react"
 
-type Phase = "grounding" | "drafting" | "reviewing" | "revising" | "saving" | "done" | string
+type Phase = "grounding" | "drafting" | "reviewing" | "revising" | "consolidating" | "saving" | "done" | string
 
 const STEPS: { key: Phase; label: string; icon: string }[] = [
   { key: "grounding", label: "Gathering facts", icon: "📚" },
-  { key: "drafting", label: "Writer drafting", icon: "✍️" },
-  { key: "reviewing", label: "Critic reviewing", icon: "🔎" },
-  { key: "revising", label: "Writer revising", icon: "✏️" },
+  { key: "drafting", label: "Writers drafting", icon: "✍️" },
+  { key: "reviewing", label: "Critics reviewing", icon: "🔎" },
+  { key: "revising", label: "Writers revising", icon: "✏️" },
+  { key: "consolidating", label: "Lead consolidating", icon: "🧩" },
   { key: "saving", label: "Saving", icon: "💾" },
 ]
 
 const FRIENDLY: Record<string, string> = {
   grounding: "Reading the solution and pulling the verified facts…",
-  drafting: "The Writer is composing the document from the facts…",
-  reviewing: "The Critic is checking it against the data…",
-  revising: "The Writer is fixing what the Critic flagged…",
+  drafting: "The section writers are composing their chapters from the facts…",
+  reviewing: "The critic panel is checking the draft from every angle…",
+  revising: "The writers are fixing what the critics flagged…",
+  consolidating: "The lead editor is stitching it into one coherent document…",
   saving: "Filing it into your DSD library…",
   done: "Done!",
 }
@@ -42,7 +44,7 @@ export function DsdProgressModal({
   iterations?: number
 }) {
   const activeIndex = phase === "done" ? STEPS.length : STEPS.findIndex((s) => s.key === phase)
-  const writerActive = phase === "drafting" || phase === "revising"
+  const writerActive = phase === "drafting" || phase === "revising" || phase === "consolidating"
   const criticActive = phase === "reviewing"
   const flow: "none" | "toCritic" | "toWriter" =
     phase === "reviewing" ? "toCritic" : phase === "revising" ? "toWriter" : "none"
@@ -59,7 +61,7 @@ export function DsdProgressModal({
 
         {/* agents scene */}
         <div className="relative flex items-center justify-between gap-4 py-6">
-          <Agent emoji="✍️" name="Writer" active={writerActive} />
+          <Agent emoji="✍️" name="Writers" active={writerActive} />
 
           {/* connector with flowing dots */}
           <div className="flex-1 relative h-10">
@@ -71,7 +73,7 @@ export function DsdProgressModal({
             )}
           </div>
 
-          <Agent emoji="🔎" name="Critic" active={criticActive} />
+          <Agent emoji="🔎" name="Critics" active={criticActive} />
         </div>
 
         {/* stepper */}

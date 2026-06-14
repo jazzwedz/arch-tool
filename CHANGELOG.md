@@ -7,11 +7,36 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-14
+
+### Added
+
+- **Multi-agent DSD generation (a real agent team).** Team mode is now a
+  section-specialised pipeline instead of one writer:
+  - **Section writers** — four specialised, trainable writers (Business,
+    Architecture, NFR & Risk, Rules & Roadmap), each drafting its chapters
+    in parallel with the full token budget for depth.
+  - **Critic panel** — four lenses (grounding, completeness, clarity,
+    consistency) review the draft in parallel; their issues are routed back
+    to the owning writer for a targeted revise.
+  - **Lead editor** — a guarded consolidation pass smooths flow and
+    consistency across sections (discarded if it would drop content).
+  - Quick mode is unchanged (single writer → critic → revise).
+- **Targeted agent training.** Analyst feedback can now be tagged with the
+  **section** it is about, so the coach trains the exact writer that owns it
+  (whole-document feedback still trains the lead / critics). Feedback bar
+  gained a section selector.
+- **Golden exemplars.** An analyst's corrected section becomes a few-shot
+  exemplar for that writer on the next run — the strongest training signal.
+- **Expanded, grouped Agents page.** The roster (4 writers · 4 critics ·
+  lead · coach) is listed by role; the coach proposal now applies per-agent
+  deltas you approve individually. Per-agent prompt + lessons editing
+  (from v0.6) works across the whole team.
+
 ### Changed
 
-- **Agent team is the default DSD mode.** The DSD generator now defaults to
-  the configurable, trainable writer/critic agents (Quick stays available as
-  an opt-in). Both the composer toggle and the API default flipped.
+- **Agent team is the default DSD mode** (Quick stays an opt-in) — both the
+  composer toggle and the API default.
 
 ### Fixed
 
@@ -19,8 +44,7 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   composer stopped seeding `component.processes` on gap components, and the
   AI-compose return type / proposal summary dropped `delivers.processes` —
   so no AI import or generation path writes the retired process tags any
-  more (they remain read-only for Confluence/export back-compat). The AI
-  proposal summary now also notes the seeded starter process.
+  more (they remain read-only for Confluence/export back-compat).
 
 ## [0.6.1] — 2026-06-14
 
@@ -911,7 +935,8 @@ First public release. Free software under MIT.
 - Architecture-questions checklist and 6-phase port plan for moving the app into a corporate environment.
 - Best-effort maintenance model documented in README.
 
-[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/jazzwedz/arch-tool/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.7.0
 [0.6.1]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.6.1
 [0.6.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.6.0
 [0.5.0]: https://github.com/jazzwedz/arch-tool/releases/tag/v0.5.0

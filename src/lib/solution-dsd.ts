@@ -17,12 +17,19 @@ import { getLLM } from "./llm"
 import { buildSolutionMermaid } from "./architecture-mermaid"
 import type { Component, Solution } from "./types"
 import { getLogger } from "./log"
-import { saveDsd, newArtifactId, type DsdMode } from "./dsd-store"
+import { saveDsd, newArtifactId, listDsd, type DsdMode, type DsdSection } from "./dsd-store"
 import { getAgent, agentInstruction } from "./agents"
+import {
+  WRITER_GROUPS,
+  CRITIC_LENSES,
+  LEAD_AGENT_ID,
+  type WriterGroup,
+  type CriticLens,
+} from "./dsd-sections"
 
 // ----------------------------- job store -----------------------------
 
-export type DsdPhase = "grounding" | "drafting" | "reviewing" | "revising" | "saving" | "done" | "error"
+export type DsdPhase = "grounding" | "drafting" | "reviewing" | "revising" | "consolidating" | "saving" | "done" | "error"
 
 export interface DsdJob {
   status: "running" | "done" | "error"
@@ -73,6 +80,13 @@ function setPhase(id: string, phase: DsdPhase, extra?: Partial<DsdJob>) {
   jobs.set(id, { ...cur, ...extra, status: "running", phase, updatedAt: Date.now() })
 }
 
+interface DsdResult {
+  markdown: string
+  iterations: number
+  sections?: DsdSection[]
+  agentVersions?: Record<string, number>
+}
+
 async function runDsd(
   id: string,
   solution: Solution,
@@ -80,49 +94,16 @@ async function runDsd(
   mode: DsdMode
 ): Promise<void> {
   const facts = buildGroundedFacts(solution, components)
-  const llm = await getLLM()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const llm: any = await getLLM()
 
-  // Team mode swaps the hardcoded writer/critic guidance for the
-  // configurable agent prompts (+ their learned lessons). Quick mode
-  // leaves the instructions undefined → the built-in defaults are used,
-  // so its behaviour is unchanged.
-  let writerInstruction: string | undefined
-  let criticInstruction: string | undefined
-  const agentVersions: Record<string, number> = {}
-  if (mode === "team") {
-    const [writer, critic] = await Promise.all([getAgent("dsd-writer"), getAgent("dsd-critic")])
-    writerInstruction = agentInstruction(writer)
-    criticInstruction = agentInstruction(critic)
-    agentVersions.writer = writer.version
-    agentVersions.critic = critic.version
-  }
-
-  setPhase(id, "drafting")
-  let draft = await llm.complete({
-    prompt: draftPrompt(solution, facts, writerInstruction),
-    maxTokens: 4096,
-  })
-
-  let iterations = 0
-  for (let i = 0; i < 2; i++) {
-    setPhase(id, "reviewing", { iterations })
-    const review = await llm.complete({
-      prompt: criticPrompt(facts, draft, criticInstruction),
-      maxTokens: 1500,
-    })
-    const verdict = parseVerdict(review)
-    if (verdict.ok || verdict.issues.length === 0) break
-    iterations++
-    setPhase(id, "revising", { iterations })
-    draft = await llm.complete({
-      prompt: revisePrompt(facts, draft, verdict.issues, writerInstruction),
-      maxTokens: 4096,
-    })
-  }
+  const result = mode === "team"
+    ? await runTeamDsd(id, solution, facts, llm)
+    : await runQuickDsd(id, solution, facts, llm)
 
   // Persist the artifact to the DSD library (best-effort: even if the
   // save fails the markdown is still returned so the user sees it).
-  setPhase(id, "saving", { iterations })
+  setPhase(id, "saving", { iterations: result.iterations })
   const artifactId = newArtifactId()
   try {
     await saveDsd(
@@ -133,17 +114,20 @@ async function runDsd(
         mode,
         model: llm.model,
         createdAt: new Date().toISOString(),
-        ...(mode === "team" ? { agentVersions } : {}),
-        iterations,
+        ...(result.agentVersions ? { agentVersions: result.agentVersions } : {}),
+        // Persist only id+title — the section text already lives in the
+        // markdown body; storing bodies here would duplicate the whole doc.
+        ...(result.sections ? { sections: result.sections.map((s) => ({ id: s.id, title: s.title })) } : {}),
+        iterations: result.iterations,
         feedback: [],
       },
-      draft
+      result.markdown
     )
     jobs.set(id, {
       status: "done",
       phase: "done",
-      markdown: draft,
-      iterations,
+      markdown: result.markdown,
+      iterations: result.iterations,
       artifactId,
       updatedAt: Date.now(),
     })
@@ -152,9 +136,169 @@ async function runDsd(
       id,
       err: e instanceof Error ? e.message : String(e),
     })
-    jobs.set(id, { status: "done", phase: "done", markdown: draft, iterations, updatedAt: Date.now() })
+    jobs.set(id, { status: "done", phase: "done", markdown: result.markdown, iterations: result.iterations, updatedAt: Date.now() })
   }
-  getLogger().info("DSD job done", { id, mode, iterations })
+  getLogger().info("DSD job done", { id, mode, iterations: result.iterations })
+}
+
+// ----- quick mode: single writer → critic → revise (built-in prompts) -----
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function runQuickDsd(id: string, solution: Solution, facts: string, llm: any): Promise<DsdResult> {
+  setPhase(id, "drafting")
+  let draft: string = await llm.complete({ prompt: draftPrompt(solution, facts), maxTokens: 4096 })
+  let iterations = 0
+  for (let i = 0; i < 2; i++) {
+    setPhase(id, "reviewing", { iterations })
+    const review = await llm.complete({ prompt: criticPrompt(facts, draft), maxTokens: 1500 })
+    const verdict = parseVerdict(review)
+    if (verdict.ok || verdict.issues.length === 0) break
+    iterations++
+    setPhase(id, "revising", { iterations })
+    draft = await llm.complete({ prompt: revisePrompt(facts, draft, verdict.issues), maxTokens: 4096 })
+  }
+  return { markdown: draft, iterations }
+}
+
+// ----- team mode: specialised section writers (parallel) → critic panel
+// (parallel) → targeted per-section revise → lead consolidation -----
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function runTeamDsd(id: string, solution: Solution, facts: string, llm: any): Promise<DsdResult> {
+  const [writers, critics, lead] = await Promise.all([
+    Promise.all(WRITER_GROUPS.map((g) => getAgent(g.agentId))),
+    Promise.all(CRITIC_LENSES.map((c) => getAgent(c.agentId))),
+    getAgent(LEAD_AGENT_ID),
+  ])
+  const agentVersions: Record<string, number> = {}
+  for (const a of [...writers, ...critics, lead]) agentVersions[a.id] = a.version
+
+  const exemplars = await gatherExemplars(solution.id)
+
+  // 1. Draft each section group in parallel.
+  setPhase(id, "drafting")
+  const sections: DsdSection[] = await Promise.all(
+    WRITER_GROUPS.map(async (g, i) => {
+      const body: string = await llm.complete({
+        prompt: sectionWriterPrompt(g, facts, agentInstruction(writers[i]), exemplars.get(g.agentId)),
+        maxTokens: 2200,
+      })
+      return { id: g.agentId, title: g.name, body: body.trim() }
+    })
+  )
+
+  // 2. Critic panel reviews the assembled draft (parallel); issues are
+  //    tagged with the writer group that owns them.
+  setPhase(id, "reviewing")
+  const assembled1 = sections.map((s) => s.body || "").join("\n\n")
+  const verdicts = await Promise.all(
+    CRITIC_LENSES.map((c, i) =>
+      llm
+        .complete({ prompt: criticLensPrompt(c, facts, assembled1, agentInstruction(critics[i])), maxTokens: 1200 })
+        .then((r: string) => parseVerdict(r))
+        .catch(() => ({ ok: true, issues: [] as { section: string; problem: string }[] }))
+    )
+  )
+  const issuesByGroup = new Map<string, { section: string; problem: string }[]>()
+  for (const v of verdicts) {
+    for (const iss of v.issues) {
+      const gid = mapIssueToGroup(iss.section)
+      if (!gid) continue
+      const arr = issuesByGroup.get(gid) || []
+      arr.push(iss)
+      issuesByGroup.set(gid, arr)
+    }
+  }
+
+  // 3. Revise only the groups with issues (parallel, one round).
+  let iterations = 0
+  if (issuesByGroup.size > 0) {
+    iterations = 1
+    setPhase(id, "revising", { iterations })
+    await Promise.all(
+      WRITER_GROUPS.map(async (g, i) => {
+        const issues = issuesByGroup.get(g.agentId)
+        if (!issues || issues.length === 0) return
+        const sec = sections.find((s) => s.id === g.agentId)
+        if (!sec) return
+        const revised: string = await llm.complete({
+          prompt: reviseSectionPrompt(g, facts, sec.body || "", issues, agentInstruction(writers[i])),
+          maxTokens: 2200,
+        })
+        sec.body = revised.trim()
+      })
+    )
+  }
+
+  // 4. Deterministic assembly, then a guarded lead consolidation pass.
+  setPhase(id, "consolidating", { iterations })
+  const assembled = assembleDoc(solution, sections)
+  let markdown = assembled
+  try {
+    const polished: string = (
+      await llm.complete({ prompt: leadPrompt(agentInstruction(lead), assembled), maxTokens: 8192 })
+    ).trim()
+    if (isPolishSafe(polished, assembled)) markdown = polished
+  } catch {
+    // keep the deterministic assembly
+  }
+
+  return { markdown, sections, iterations, agentVersions }
+}
+
+// Most recent analyst correction per section group, used as a golden
+// few-shot exemplar so writers match the depth/style the analyst wants.
+async function gatherExemplars(solutionId: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  try {
+    const arts = await listDsd(solutionId) // newest first, includes feedback
+    for (const a of arts) {
+      for (const f of a.feedback || []) {
+        if (f.section && f.correctedText && !map.has(f.section)) map.set(f.section, f.correctedText)
+      }
+    }
+  } catch {
+    // no exemplars — fine
+  }
+  return map
+}
+
+const ALL_CHAPTER_TITLES = WRITER_GROUPS.flatMap((g) => g.chapters.map((c) => c.title))
+
+// Resolve a critic's issue tag to a writer group id (it may return the
+// group id directly, or a chapter title).
+function mapIssueToGroup(section: string | undefined): string | undefined {
+  if (!section) return undefined
+  const s = section.trim().toLowerCase()
+  const byId = WRITER_GROUPS.find((g) => g.agentId.toLowerCase() === s)
+  if (byId) return byId.agentId
+  const byChapter = WRITER_GROUPS.find((g) =>
+    g.chapters.some((c) => s.includes(c.title.toLowerCase()) || c.title.toLowerCase().includes(s))
+  )
+  return byChapter?.agentId
+}
+
+function assembleDoc(solution: Solution, sections: DsdSection[]): string {
+  const toc = ["1. Version History", ...ALL_CHAPTER_TITLES].map((t) => `- ${t}`).join("\n")
+  const ordered = WRITER_GROUPS.map((g) => sections.find((s) => s.id === g.agentId)?.body || "").filter(Boolean)
+  return [
+    `# ${solution.name} — Detailed Solution Description`,
+    ``,
+    `## Table of Contents`,
+    toc,
+    ``,
+    `## 1. Version History`,
+    `| Version | Date | Author | Changes |`,
+    `|---------|------|--------|---------|`,
+    `| 1.0 | ${new Date().toISOString().slice(0, 10)} | Auto-generated (agent team) | Initial version |`,
+    ``,
+    ordered.join("\n\n"),
+  ].join("\n")
+}
+
+// Guard against a lead pass that truncated or dropped content: keep the
+// polish only if it is long enough and still contains every chapter.
+function isPolishSafe(polished: string, assembled: string): boolean {
+  if (polished.length < assembled.length * 0.8) return false
+  return ALL_CHAPTER_TITLES.every((t) => polished.includes(t))
 }
 
 // --------------------------- grounded facts ---------------------------
@@ -430,6 +574,82 @@ CURRENT DRAFT:
 ${draft}
 
 Output only the full corrected Markdown document.`
+}
+
+// ----- team-mode prompts -----
+
+function sectionWriterPrompt(group: WriterGroup, facts: string, instruction: string, exemplar?: string): string {
+  const chapters = group.chapters.map((c) => `## ${c.title}\n${c.guidance}`).join("\n\n")
+  const ex = exemplar
+    ? `\nAn analyst-approved example of the depth and style they want for this part — match it, but use THIS solution's facts (do not copy its content):\n"""\n${exemplar}\n"""\n`
+    : ""
+  return `${instruction}
+
+Write ONLY your assigned chapters of a Detailed Solution Description, grounded STRICTLY in the verified facts. Output each chapter with its exact "## N. Title" heading, in order, and nothing else — no document title, no other chapters.
+
+YOUR CHAPTERS:
+${chapters}
+${ex}
+VERIFIED FACTS:
+${facts}
+
+Output only the Markdown for your chapters.`
+}
+
+function criticLensPrompt(lens: CriticLens, facts: string, draft: string, instruction: string): string {
+  const groups = WRITER_GROUPS.map((g) => `- ${g.agentId}: ${g.chapters.map((c) => c.title).join("; ")}`).join("\n")
+  return `${instruction}
+
+Review the DSD draft below through your lens only. For each real problem, return an issue tagged with the writer GROUP id that owns the affected chapter.
+
+WRITER GROUPS (use the id as "section"):
+${groups}
+
+VERIFIED FACTS:
+${facts}
+
+DRAFT:
+${draft}
+
+Return ONLY JSON, no prose:
+{ "ok": boolean, "issues": [ { "section": "<group id>", "problem": "what is wrong and how to fix" } ] }
+"ok" is true when there are no problems in your lens.`
+}
+
+function reviseSectionPrompt(
+  group: WriterGroup,
+  facts: string,
+  body: string,
+  issues: { section: string; problem: string }[],
+  instruction: string
+): string {
+  const issueList = issues.map((i, n) => `${n + 1}. ${i.problem}`).join("\n")
+  const chapters = group.chapters.map((c) => c.title).join(", ")
+  return `${instruction}
+
+Revise your chapters (${chapters}) to fix the listed issues. Keep everything correct; change only what the issues require. Stay strictly within the verified facts. Output each chapter with its exact "## N. Title" heading and nothing else. ${STYLE}
+
+ISSUES TO FIX:
+${issueList}
+
+VERIFIED FACTS:
+${facts}
+
+YOUR CURRENT CHAPTERS:
+${body}
+
+Output only the corrected Markdown for your chapters.`
+}
+
+function leadPrompt(instruction: string, assembled: string): string {
+  return `${instruction}
+
+Polish the assembled DSD below into one coherent document: improve flow, transitions and terminology consistency, and remove duplication ACROSS sections. Do NOT add or remove facts, chapters or the architecture diagram, and keep every chapter with its exact "## N. Title" heading. Return the FULL document.
+
+DOCUMENT:
+${assembled}
+
+Output only the full polished Markdown document.`
 }
 
 interface Verdict {

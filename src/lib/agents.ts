@@ -1,16 +1,28 @@
-// Agent definitions for the DSD agent-team (writer / critic / coach).
+// Agent definitions for the DSD agent-team.
 //
-// Agents are configuration, not code (mirrors xplainit-agents' data-driven
-// model): stored as agents/<id>.yaml in the data repo so the coach can
-// "train" them by committing improved prompts — versioned + auditable in
-// git. When a file is absent the built-in default is used, so the feature
-// works before anyone has committed an agent file.
+// The team is a roster of specialised, trainable agents (stored as
+// agents/<id>.yaml in the data repo so the coach can "train" them by
+// committing improved prompts — versioned + auditable in git):
+//   - one writer per DSD section group (business / architecture / nfr-risk
+//     / rules-roadmap),
+//   - a panel of critic lenses (grounding / completeness / clarity /
+//     consistency),
+//   - a lead that consolidates the assembled draft,
+//   - a coach that turns analyst feedback into prompt improvements.
+// When a file is absent the built-in default is used, so the feature works
+// before anyone has committed an agent file.
 
 import yaml from "js-yaml"
 import { getGit } from "./git"
 import { getLogger } from "./log"
+import {
+  WRITER_GROUPS,
+  CRITIC_LENSES,
+  LEAD_AGENT_ID,
+  COACH_AGENT_ID,
+} from "./dsd-sections"
 
-export type AgentRole = "writer" | "critic" | "coach"
+export type AgentRole = "writer" | "critic" | "coach" | "lead"
 
 export interface Agent {
   id: string
@@ -25,34 +37,63 @@ export interface Agent {
   lessons?: string
 }
 
-export const AGENT_IDS = ["dsd-writer", "dsd-critic", "dsd-coach"] as const
-export type AgentId = (typeof AGENT_IDS)[number]
+const STYLE =
+  "Write like a knowledgeable colleague — clear, direct, no fluff. Short sentences. No marketing words (leverage, robust, seamless, synergy, holistic, empower, streamline). State facts plainly. Stay strictly within the verified facts you are given; do not invent components, flows, capabilities or values."
 
-const DEFAULTS: Record<AgentId, Agent> = {
-  "dsd-writer": {
-    id: "dsd-writer",
-    name: "DSD Writer",
+const DEFAULTS: Record<string, Agent> = {}
+
+// Writer per section group.
+for (const g of WRITER_GROUPS) {
+  DEFAULTS[g.agentId] = {
+    id: g.agentId,
+    name: g.name,
     role: "writer",
     temperature: 0.4,
     version: 1,
-    system_prompt: `You are a solution architect writing a Detailed Solution Description (DSD) in Markdown. Write like a knowledgeable colleague — clear, direct, no fluff. Short sentences. No marketing words (leverage, robust, seamless, synergy, holistic, empower, streamline). State facts plainly. Stay strictly within the verified facts you are given; do not invent components, flows, capabilities or values.`,
-  },
-  "dsd-critic": {
-    id: "dsd-critic",
-    name: "DSD Critic",
+    system_prompt: `You are a solution architect writing the part of a Detailed Solution Description focused on ${g.focus}. ${STYLE}`,
+  }
+}
+
+// Critic per lens.
+for (const c of CRITIC_LENSES) {
+  DEFAULTS[c.agentId] = {
+    id: c.agentId,
+    name: c.name,
     role: "critic",
     temperature: 0.2,
     version: 1,
-    system_prompt: `You are a strict reviewer of Detailed Solution Description drafts. You check a draft against the verified facts it must be based on and find ONLY real problems: invented components/flows/values, contradictions with the facts, missing required chapters, or claims (NFR / risks / rules) the facts do not support. Be strict about inventions and omissions, lenient about style.`,
-  },
-  "dsd-coach": {
-    id: "dsd-coach",
-    name: "DSD Coach",
-    role: "coach",
-    temperature: 0.3,
-    version: 1,
-    system_prompt: `You are a coach who improves two agents — a DSD Writer and a DSD Critic — by refining their instructions. You are given their current prompts plus recent generated DSDs together with the critic's findings and the analysts' feedback (ratings, comments, corrections). Identify recurring problems and propose concrete, minimal improvements to the writer's and critic's system prompts and "lessons" so the next documents are better. Do not rewrite prompts wholesale; suggest targeted additions/edits grounded in the evidence.`,
-  },
+    system_prompt: `You are a strict reviewer of a Detailed Solution Description draft. Your lens: ${c.focus} Find ONLY real problems through this lens; do not restate problems outside it. Be specific about where and how to fix.`,
+  }
+}
+
+DEFAULTS[LEAD_AGENT_ID] = {
+  id: LEAD_AGENT_ID,
+  name: "Lead editor",
+  role: "lead",
+  temperature: 0.3,
+  version: 1,
+  system_prompt: `You are the lead editor assembling a Detailed Solution Description from sections written by specialist writers. Stitch the sections into one coherent document: consistent terminology, no duplication across sections, smooth transitions. Fix only flow and consistency — do not add facts, and keep every section's content. ${STYLE}`,
+}
+
+DEFAULTS[COACH_AGENT_ID] = {
+  id: COACH_AGENT_ID,
+  name: "DSD Coach",
+  role: "coach",
+  temperature: 0.3,
+  version: 1,
+  system_prompt: `You are a coach who improves the DSD agent team — section writers, critic lenses and the lead editor — by refining their instructions. You are given each agent's current prompt plus recent analyst feedback (ratings, comments, corrections), tagged with the section it is about. Map section feedback to the agent that owns that section, and whole-document feedback to the lead or the relevant critics. Identify recurring problems and propose concrete, minimal improvements to the right agents' system prompts and "lessons". Do not rewrite prompts wholesale; suggest targeted additions grounded in the evidence.`,
+}
+
+export const AGENT_IDS: string[] = Object.keys(DEFAULTS)
+/** Loose alias kept for call sites that pass a known id. */
+export type AgentId = string
+
+export function isAgentId(id: string): boolean {
+  return Object.prototype.hasOwnProperty.call(DEFAULTS, id)
+}
+
+export function defaultAgent(id: string): Agent | undefined {
+  return DEFAULTS[id]
 }
 
 function pathFor(id: string): string {
@@ -60,17 +101,19 @@ function pathFor(id: string): string {
 }
 
 export async function getAgent(id: AgentId): Promise<Agent> {
+  const def = DEFAULTS[id]
   const git = getGit()
   try {
     const file = await git.getFile(pathFor(id))
     const parsed = yaml.load(file.content, { schema: yaml.JSON_SCHEMA }) as Partial<Agent>
     if (parsed && typeof parsed.system_prompt === "string") {
-      return { ...DEFAULTS[id], ...parsed, id, role: DEFAULTS[id].role } as Agent
+      return { ...def, ...parsed, id, role: def?.role || (parsed.role as AgentRole) } as Agent
     }
   } catch {
     // not committed yet — fall back to the built-in default
   }
-  return DEFAULTS[id]
+  if (!def) throw new Error(`Unknown agent: ${id}`)
+  return def
 }
 
 export interface AgentWithSha extends Agent {
@@ -78,17 +121,19 @@ export interface AgentWithSha extends Agent {
 }
 
 export async function getAgentWithSha(id: AgentId): Promise<AgentWithSha> {
+  const def = DEFAULTS[id]
   const git = getGit()
   try {
     const file = await git.getFile(pathFor(id))
     const parsed = yaml.load(file.content, { schema: yaml.JSON_SCHEMA }) as Partial<Agent>
     if (parsed && typeof parsed.system_prompt === "string") {
-      return { ...DEFAULTS[id], ...parsed, id, role: DEFAULTS[id].role, sha: file.sha }
+      return { ...def, ...parsed, id, role: def?.role || (parsed.role as AgentRole), sha: file.sha }
     }
   } catch {
     // fall through
   }
-  return { ...DEFAULTS[id] }
+  if (!def) throw new Error(`Unknown agent: ${id}`)
+  return { ...def }
 }
 
 export async function listAgents(): Promise<Agent[]> {
@@ -111,9 +156,7 @@ export function agentInstruction(a: Agent): string {
 
 // ----- coach watermark -----
 // A single timestamp: feedback at or before it has already been used by a
-// training round, so the coach only ever considers strictly newer
-// feedback. Robust (no per-feedback bookkeeping) and immune to legacy
-// feedback that predates the id field.
+// training round, so the coach only ever considers strictly newer feedback.
 
 const COACH_STATE_PATH = "agents/_coach-state.yaml"
 

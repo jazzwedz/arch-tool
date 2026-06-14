@@ -22,7 +22,7 @@ export async function POST(
     if (!isValidName(id)) {
       return NextResponse.json({ error: "Invalid solution id" }, { status: 400 })
     }
-    let body: { rating?: string; comment?: string; correctedText?: string }
+    let body: { rating?: string; comment?: string; correctedText?: string; section?: string }
     try {
       body = await request.json()
     } catch {
@@ -40,6 +40,7 @@ export async function POST(
         typeof body.correctedText === "string" && body.correctedText.trim()
           ? body.correctedText.trim()
           : undefined,
+      section: typeof body.section === "string" && body.section.trim() ? body.section.trim() : undefined,
       at: new Date().toISOString(),
       by: getCurrentUser(request),
     }

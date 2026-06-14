@@ -135,18 +135,19 @@ export default function AgentsPage() {
         setAppliedMsg(`${agentId} updated to v${d.version}.`)
         load()
       }
+      // Drop this agent's delta; clear the proposal once none remain.
       setProposal((p) => {
         if (!p) return p
-        const next = {
-          ...p,
-          ...(agentId === "dsd-writer" ? { writer: undefined } : { critic: undefined }),
-        }
-        return !next.writer && !next.critic ? null : next
+        const deltas = { ...p.deltas }
+        delete deltas[agentId]
+        return Object.keys(deltas).length === 0 ? null : { ...p, deltas }
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed")
     }
   }
+
+  const agentName = (id: string) => agents.find((a) => a.id === id)?.name || id
 
   const dismissProposal = () => setProposal(null)
 
@@ -159,8 +160,9 @@ export default function AgentsPage() {
             Agents
           </h1>
           <p className="text-muted-foreground mt-1">
-            The DSD writer, critic and coach. Edit a prompt directly, or let the coach turn
-            analyst feedback into prompt improvements you approve. Every change is a new version.
+            The DSD agent team — section writers, critic lenses, a lead editor and the coach.
+            Edit a prompt directly, or let the coach turn analyst feedback into prompt
+            improvements you approve. Every change is a new version.
           </p>
         </div>
         <Button onClick={runCoach} disabled={proposing}>
@@ -194,15 +196,12 @@ export default function AgentsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {proposal.rationale && <p className="text-sm text-muted-foreground">{proposal.rationale}</p>}
-            {!proposal.writer && !proposal.critic && (
+            {Object.keys(proposal.deltas).length === 0 && (
               <p className="text-sm text-muted-foreground">No changes proposed.</p>
             )}
-            {proposal.writer && (
-              <DeltaBlock title="Writer" agentId="dsd-writer" delta={proposal.writer} onAction={handleDelta} />
-            )}
-            {proposal.critic && (
-              <DeltaBlock title="Critic" agentId="dsd-critic" delta={proposal.critic} onAction={handleDelta} />
-            )}
+            {Object.entries(proposal.deltas).map(([agentId, delta]) => (
+              <DeltaBlock key={agentId} title={agentName(agentId)} agentId={agentId} delta={delta} onAction={handleDelta} />
+            ))}
             <div className="flex justify-end pt-1">
               <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={dismissProposal}>
                 Dismiss all
@@ -217,8 +216,14 @@ export default function AgentsPage() {
           <Loader2 className="h-4 w-4 animate-spin" />Loading agents…
         </div>
       ) : (
-        <div className="space-y-3">
-          {agents.map((a) => (
+        <div className="space-y-6">
+          {ROLE_GROUPS.map(({ role, label }) => {
+            const group = agents.filter((a) => a.role === role)
+            if (group.length === 0) return null
+            return (
+              <div key={role} className="space-y-3">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</h2>
+                {group.map((a) => (
             <Card key={a.id}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2 flex-wrap">
@@ -314,12 +319,22 @@ export default function AgentsPage() {
                 )}
               </CardContent>
             </Card>
-          ))}
+                ))}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
   )
 }
+
+const ROLE_GROUPS: { role: string; label: string }[] = [
+  { role: "writer", label: "Section writers" },
+  { role: "critic", label: "Critic panel" },
+  { role: "lead", label: "Lead editor" },
+  { role: "coach", label: "Coach" },
+]
 
 function DeltaBlock({
   title,
