@@ -83,12 +83,13 @@ export default function GuidePage() {
             title="Put the detail on the component"
             body={
               <>
-                This is the important one. A solution only{" "}
-                <strong>wires components together</strong>. The real detail —
-                business logic, rules, calculations, NFRs, capabilities,
-                processes — lives <strong>on the component itself</strong>. Open
-                the component and add it there (you can even import rules from a
-                document or code with AI).
+                This is the important one. A solution{" "}
+                <strong>wires components together</strong> and models how they
+                run a process (the Processes tab). The component-level detail —
+                business logic, rules, calculations, NFRs, capabilities — lives{" "}
+                <strong>on the component itself</strong>. Open the component and
+                add it there (you can even import rules from a document or code
+                with AI).
               </>
             }
           />
@@ -114,7 +115,7 @@ export default function GuidePage() {
             icon={<ComponentIcon className="h-5 w-5 text-indigo-600" />}
             title="Components"
             what="The building blocks — services, databases, frontends, queues, contexts…"
-            why="Each one is the single source of truth for its links to others, its capabilities, processes, business rules and NFRs. Everything else is built on top of these."
+            why="Each one is the single source of truth for its links to others, its capabilities, business rules and NFRs. Everything else is built on top of these."
           />
           <StructureCard
             href="/solutions"
@@ -127,8 +128,8 @@ export default function GuidePage() {
             href="/processes"
             icon={<Workflow className="h-5 w-5 text-emerald-600" />}
             title="Processes"
-            what="A cross-cutting view of every business process in the repo."
-            why="See at a glance which components support each process and in what role (owner, participant, trigger…). Great for impact analysis and 'what-supports-what' questions."
+            what="A cross-cutting index of every process modelled across solutions."
+            why="A process is an editable step-by-step sequence on a solution. This page derives, for each one, its participants (with roles) and which solutions model it — great for 'what-runs-what' questions."
           />
           <StructureCard
             href="/diagrams"

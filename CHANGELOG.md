@@ -7,6 +7,28 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **One unified "process" concept.** Previously "process" meant three
+  overlapping things — component tags, a solution's `delivers.processes`
+  chips, and the new sequences — which was confusing. Now a process **is**
+  the editable sequence on a solution; everything else is derived:
+  - `ProcessActor` gained an optional **role** (owner / participant /
+    trigger / listener), edited in the sequence's new **Participants** row.
+    The AI drafts roles too.
+  - **`/processes`** is now a read-only index **derived from the
+    sequences**: each process name → participants (with roles) → the
+    solutions that model it.
+  - Removed the old surfaces: the component **Processes** block (editor +
+    detail + its maturity dimension) and the solution **Delivers →
+    processes** chips, plus the per-sequence "delivers" link. Capabilities
+    remain the proposer's delivers axis (process-based proposal is now
+    emergent from sequences).
+  - **Back-compat:** the `component.processes` / `delivers.processes`
+    fields stay in the model and are still read by Confluence sync and
+    catalog export, so existing YAML keeps working — they're just no longer
+    edited or shown as a separate concept.
+
 ### Fixed
 
 - **Process step with an unset "from" silently dropped from the diagram.**

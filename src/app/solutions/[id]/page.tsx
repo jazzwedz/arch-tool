@@ -490,12 +490,18 @@ export default function SolutionDetailPage() {
               <CardContent className="pt-4 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium">{p.name}</span>
-                  {p.deliversProcess && (
-                    <Badge variant="outline" className="text-[10px]">delivers: {p.deliversProcess}</Badge>
-                  )}
                   <Badge variant="outline" className="text-[10px]">{p.steps.length} steps</Badge>
                 </div>
                 {p.goal && <p className="text-sm text-muted-foreground">{p.goal}</p>}
+                {p.actors.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {p.actors.map((a) => (
+                      <Badge key={a.id} variant="outline" className="text-[10px]">
+                        {a.label}{a.role ? ` · ${a.role}` : ""}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
                 {p.steps.length > 0 && (
                   <MermaidPreview
                     chart={buildSolutionSequenceMermaid(p, new Map(components.map((c) => [c.id, c.name])))}
@@ -526,17 +532,9 @@ export default function SolutionDetailPage() {
                 )}
               </div>
             </div>
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Processes</h3>
-              <div className="flex flex-wrap gap-1">
-                {(solution.delivers?.processes || []).map((p) => (
-                  <Badge key={p} variant="outline">{p}</Badge>
-                ))}
-                {(solution.delivers?.processes?.length ?? 0) === 0 && (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )}
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Processes a solution runs are modelled on the <strong>Processes</strong> tab.
+            </p>
           </CardContent>
         </Card>
       )}

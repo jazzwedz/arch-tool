@@ -18,17 +18,21 @@ import { checkRateLimit } from "@/lib/rate-limit"
 import { sanitizeForPrompt } from "@/lib/validate"
 import { withRouteContext } from "@/lib/route-context"
 import { getLogger } from "@/lib/log"
-import { LINK_ROLES, LINK_PROTOCOLS, MEMBER_DISPOSITIONS, PROCESS_STEP_KINDS } from "@/lib/constants"
+import { LINK_ROLES, LINK_PROTOCOLS, MEMBER_DISPOSITIONS, PROCESS_STEP_KINDS, PROCESS_ROLES } from "@/lib/constants"
 import { slugifyId } from "@/lib/component-schema"
 import type {
   LinkRole,
   LinkProtocol,
   MemberDisposition,
   ProcessActor,
+  ProcessRole,
   ProcessStepKind,
   SolutionProcess,
   SolutionProcessStep,
 } from "@/lib/types"
+
+const asRole = (v: unknown): ProcessRole | undefined =>
+  PROCESS_ROLES.includes(v as ProcessRole) ? (v as ProcessRole) : undefined
 
 export const dynamic = "force-dynamic"
 
@@ -150,7 +154,6 @@ export async function POST(request: Request) {
 
       const delivers = {
         capabilities: toStringArray(parsed?.delivers?.capabilities),
-        processes: toStringArray(parsed?.delivers?.processes),
       }
 
       // A starter "main" process sequence, grounded on the proposed members
@@ -219,13 +222,13 @@ function coerceProcess(raw: any, memberResolve: Map<string, string>, memberNames
       const label = String(a.label || id).trim()
       if (!id || seen.has(id)) continue
       seen.add(id)
-      actors.push({ id, label, kind: "external" })
+      actors.push({ id, label, kind: "external", role: asRole(a.role) })
     } else {
       const cand = String(a.component || a.id || "").trim().toLowerCase()
       const component = memberResolve.get(cand)
       if (!component || seen.has(component)) continue
       seen.add(component)
-      actors.push({ id: component, label: memberNames.get(component) || component, kind: "member", component })
+      actors.push({ id: component, label: memberNames.get(component) || component, kind: "member", component, role: asRole(a.role) })
     }
   }
   const actorIds = new Set(actors.map((a) => a.id))
@@ -287,15 +290,15 @@ Return ONLY a JSON object, no prose, no code fence, with this exact shape:
 {
   "goal": "one concise, outcome-focused sentence (max ~20 words)",
   "description": "2-4 sentences describing what the solution does, who uses it, and what it touches",
-  "delivers": { "capabilities": ["..."], "processes": ["..."] },
+  "delivers": { "capabilities": ["..."] },
   "members": [ { "component": "<existing component id>", "disposition": "reuse|extend|external", "role": "what it does in this solution" } ],
   "newComponents": [ { "name": "Human Name", "type": "service|microservice|component|frontend|gateway|database|queue|library", "role": "what it does" } ],
   "flows": [ { "from": "<member id or new component name>", "to": "<member id or new component name>", "role": "calls|serves|reads-from|writes-to|part-of|contains", "protocol": "rest|grpc|async|db|table|file|human|info|link|data", "status": "existing|proposed" } ],
   "process": {
     "name": "Main process",
     "actors": [
-      { "id": "<member id>", "kind": "member", "component": "<member id>" },
-      { "id": "ext:user", "kind": "external", "label": "Customer" }
+      { "id": "<member id>", "kind": "member", "component": "<member id>", "role": "owner|participant|trigger|listener" },
+      { "id": "ext:user", "kind": "external", "label": "Customer", "role": "trigger" }
     ],
     "steps": [
       { "from": "<actor id>", "to": "<actor id or null>", "label": "what happens", "kind": "sync|async|return|note" }
@@ -308,8 +311,8 @@ Rules:
 - members[].component MUST be an exact id from the catalog. Do not invent ids.
 - Put anything that does not exist yet in newComponents (not members).
 - Prefer reuse; mark a component "extend" only if it needs changes.
-- delivers should be the business capabilities/processes this solution provides.
+- delivers.capabilities are the business capabilities this solution provides.
 - flows describe how the parts interact; use "proposed" for to-be edges.
-- "process" is ONE ordered main sequence: actor→target steps. Member actors must use a member id (existing id, or the name of a newComponent). Add external actors (id prefixed "ext:") for people/roles outside the catalog. Each step from/to must be a declared actor; use "to": null for an internal action; kind = sync|async|return|note. Keep it short (the analyst refines it).
+- "process" is ONE ordered main sequence: actor→target steps. Member actors must use a member id (existing id, or the name of a newComponent). Add external actors (id prefixed "ext:") for people/roles outside the catalog. Give each actor a "role" (owner/participant/trigger/listener). Each step from/to must be a declared actor; use "to": null for an internal action; kind = sync|async|return|note. Keep it short (the analyst refines it).
 - Keep it focused: only what the intent implies. Output valid JSON only.`
 }

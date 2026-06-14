@@ -43,6 +43,9 @@ export interface UIBlocksConfig {
     capabilities?: boolean
     /** @deprecated v2 Phase 2: Inputs & Outputs collapsed into links[]; the card is gone. */
     data?: boolean
+    /** @deprecated v0.6: component-level process tags retired — a process is
+     *  now the editable sequence on a solution. Field kept so existing
+     *  config.yaml entries keep validating. */
     processes?: boolean
   }
   rules?: { section?: boolean }
@@ -113,13 +116,6 @@ export const BLOCK_METAS: BlockMeta[] = [
     field: "capabilities",
     label: "Capabilities",
     description: "Business capabilities the component plays a role in.",
-  },
-  {
-    tab: "properties",
-    group: "business",
-    field: "processes",
-    label: "Processes",
-    description: "Business processes the component participates in.",
   },
   {
     tab: "rules",

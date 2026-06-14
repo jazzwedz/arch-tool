@@ -15,8 +15,8 @@ import { checkRateLimit } from "@/lib/rate-limit"
 import { sanitizeForPrompt } from "@/lib/validate"
 import { withRouteContext } from "@/lib/route-context"
 import { getLogger } from "@/lib/log"
-import { PROCESS_STEP_KINDS } from "@/lib/constants"
-import type { ProcessActor, SolutionProcessStep, ProcessStepKind } from "@/lib/types"
+import { PROCESS_STEP_KINDS, PROCESS_ROLES } from "@/lib/constants"
+import type { ProcessActor, SolutionProcessStep, ProcessStepKind, ProcessRole } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
@@ -74,17 +74,18 @@ export async function POST(request: Request) {
       for (const a of Array.isArray(parsed.actors) ? parsed.actors : []) {
         if (!a || typeof a !== "object") continue
         const kind = a.kind === "external" ? "external" : "member"
+        const role = PROCESS_ROLES.includes(a.role as ProcessRole) ? (a.role as ProcessRole) : undefined
         if (kind === "member") {
           const component = String(a.component || a.id || "").trim()
           if (!memberIds.has(component) || seen.has(component)) continue
           seen.add(component)
-          actors.push({ id: component, label: memberName.get(component) || component, kind: "member", component })
+          actors.push({ id: component, label: memberName.get(component) || component, kind: "member", component, role })
         } else {
           const id = String(a.id || "").trim()
           const label = String(a.label || id).trim()
           if (!id || seen.has(id)) continue
           seen.add(id)
-          actors.push({ id, label, kind: "external" })
+          actors.push({ id, label, kind: "external", role })
         }
       }
       const actorIds = new Set(actors.map((a) => a.id))
@@ -154,8 +155,8 @@ ${doc ? `\nSource requirement document (context):\n${doc}\n` : ""}
 Return ONLY a JSON object, no prose, no code fence, with this shape:
 {
   "actors": [
-    { "id": "<member id>", "kind": "member", "component": "<member id>" },
-    { "id": "ext:user", "kind": "external", "label": "Customer" }
+    { "id": "<member id>", "kind": "member", "component": "<member id>", "role": "owner|participant|trigger|listener" },
+    { "id": "ext:user", "kind": "external", "label": "Customer", "role": "trigger" }
   ],
   "steps": [
     { "from": "<actor id>", "to": "<actor id or null>", "label": "what happens", "description": "optional detail", "kind": "sync|async|note|return" }
@@ -164,6 +165,7 @@ Return ONLY a JSON object, no prose, no code fence, with this shape:
 
 Rules:
 - Member actors MUST use an exact member id from the list above (id === component).
+- Give each actor a "role": owner / participant / trigger / listener.
 - Add external actors (kind "external", id prefixed "ext:") for people/roles/systems not in the members — processes often start with a user.
 - Steps are ORDERED. Each from/to must be an actor id you declared.
 - Use "to": null for an internal action (rendered as a note).

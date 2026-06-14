@@ -27,8 +27,6 @@ import {
   SCALING_MODELS,
   CAPABILITY_ROLES,
   CAPABILITY_ROLE_LABELS,
-  PROCESS_ROLES,
-  PROCESS_ROLE_LABELS,
   RULE_KINDS,
   RULE_KIND_LABELS,
   RULE_KIND_HINTS,
@@ -41,15 +39,12 @@ import type {
   CapabilityRole,
   ComponentType,
   ComponentProcess,
-  ProcessRole,
   ComponentRule,
   RuleKind,
 } from "@/lib/types"
-import { Plus, Trash2, Info, ChevronUp, ChevronDown, AlertTriangle, X, ArrowDownAZ, Eye, EyeOff } from "lucide-react"
+import { Plus, Trash2, Info, ChevronUp, ChevronDown, AlertTriangle, ArrowDownAZ, Eye, EyeOff } from "lucide-react"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { buildRelationshipsMermaid } from "@/lib/component-mermaid"
-import { Badge } from "@/components/ui/badge"
-import { TypeIcon } from "@/components/TypeIcon"
 import {
   Dialog,
   DialogContent,
@@ -125,13 +120,6 @@ const emptyCapability: ComponentCapability = {
   description: "",
 }
 
-const emptyProcess: ComponentProcess = {
-  name: "",
-  role: "participant",
-  activity: "",
-  description: "",
-}
-
 const emptyRule: ComponentRule = {
   name: "",
   kind: "formula",
@@ -197,8 +185,6 @@ export function ComponentForm({
   const showNfr = visible("nfr") && isBlockVisible(uiBlocks, "technical", "nfr")
   const showCapabilities =
     visible("capabilities") && isBlockVisible(uiBlocks, "business", "capabilities")
-  const showProcesses =
-    visible("processes") && isBlockVisible(uiBlocks, "business", "processes")
   const showRules = visible("rules") && isBlockVisible(uiBlocks, "rules", "section")
   // Fresh catalog snapshot, fetched once per form mount. Used by both
   // the relationship Target Component picker and the interface target
@@ -339,19 +325,6 @@ export function ComponentForm({
       ...prev,
       capabilities: (prev.capabilities || []).map((cap, i) =>
         i === index ? { ...cap, [field]: value } : cap
-      ),
-    }))
-  }
-
-  const updateProcess = (
-    index: number,
-    field: keyof ComponentProcess,
-    value: string
-  ) => {
-    setForm((prev) => ({
-      ...prev,
-      processes: (prev.processes || []).map((p, i) =>
-        i === index ? { ...p, [field]: value } : p
       ),
     }))
   }
@@ -1089,112 +1062,6 @@ export function ComponentForm({
 
       )}
 
-
-      {/* Processes */}
-      {showProcesses && (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Processes
-            <Tooltip>
-              <TooltipTrigger className="cursor-help">
-                <Info className="h-4 w-4 text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs text-left">
-                <p className="font-semibold mb-1">Business processes this component participates in.</p>
-                <ul className="text-xs space-y-0.5">
-                  <li><strong>Owner</strong> — runs the whole process</li>
-                  <li><strong>Participant</strong> — performs one or more activities</li>
-                  <li><strong>Listener</strong> — observes events from the process</li>
-                  <li><strong>Trigger</strong> — initiates the process</li>
-                </ul>
-              </TooltipContent>
-            </Tooltip>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {(form.processes || []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No processes defined.
-            </p>
-          ) : (
-            (form.processes || []).map((p, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-[1fr,auto,1fr,1.2fr,auto] gap-2 items-start"
-              >
-                <Input
-                  placeholder="Process name (e.g. Customer Onboarding)"
-                  value={p.name}
-                  onChange={(e) => updateProcess(i, "name", e.target.value)}
-                  className="h-9"
-                />
-                <Select
-                  value={p.role}
-                  onValueChange={(v) =>
-                    updateProcess(i, "role", v as ProcessRole)
-                  }
-                >
-                  <SelectTrigger className="h-9 w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROCESS_ROLES.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {PROCESS_ROLE_LABELS[r]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="Activity (what it does here)"
-                  value={p.activity || ""}
-                  onChange={(e) => updateProcess(i, "activity", e.target.value)}
-                  className="h-9"
-                />
-                <Input
-                  placeholder="Description (optional)"
-                  value={p.description || ""}
-                  onChange={(e) =>
-                    updateProcess(i, "description", e.target.value)
-                  }
-                  className="h-9"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={() =>
-                    updateField(
-                      "processes",
-                      (form.processes || []).filter((_, idx) => idx !== i)
-                    )
-                  }
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            ))
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              updateField("processes", [
-                ...(form.processes || []),
-                { ...emptyProcess },
-              ])
-            }
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add process
-          </Button>
-        </CardContent>
-      </Card>
-
-      )}
 
       {/* Rules & Calculations */}
       {showRules && (

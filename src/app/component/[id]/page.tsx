@@ -17,8 +17,6 @@ import {
   DATA_CLASSIFICATION_LABELS,
   CAPABILITY_ROLE_LABELS,
   CAPABILITY_ROLE_COLORS,
-  PROCESS_ROLE_LABELS,
-  PROCESS_ROLE_COLORS,
   RULE_KIND_LABELS,
   RULE_KIND_COLORS,
 } from "@/lib/constants"
@@ -1676,79 +1674,6 @@ export default function ComponentDetailPage() {
                 <div className="mt-4 border-t pt-3">
                   <MermaidPreview chart={buildCapabilitiesMermaid(component)} />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Processes — rendered whenever the Settings flag is on so the
-            empty state can hand off to the Edit dialog. */}
-        {tab === "properties" && isBlockVisible(uiBlocks, "business", "processes") && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                Processes
-                <Tooltip>
-                  <TooltipTrigger className="cursor-help">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs text-left">
-                    <p className="font-semibold mb-1">Business processes this component participates in.</p>
-                    <ul className="text-xs space-y-0.5">
-                      <li><strong>Owner</strong> — runs the whole process</li>
-                      <li><strong>Participant</strong> — performs activities</li>
-                      <li><strong>Listener</strong> — observes events</li>
-                      <li><strong>Trigger</strong> — initiates the process</li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-                </CardTitle>
-                <BlockEditDialog
-                  componentId={component.id}
-                  block="processes"
-                  onSaved={refreshComponent}
-                />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {(!component.processes || component.processes.length === 0) ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No processes yet — use{" "}
-                  <span className="font-medium">Edit</span> to add the first row.
-                </p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-muted-foreground">
-                    <tr>
-                      <th className="text-left font-medium pb-2">Process</th>
-                      <th className="text-left font-medium pb-2 w-32">Role</th>
-                      <th className="text-left font-medium pb-2">Activity</th>
-                      <th className="text-left font-medium pb-2">Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {component.processes.map((p, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="py-2 font-medium">{p.name}</td>
-                        <td className="py-2">
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${PROCESS_ROLE_COLORS[p.role] || ""}`}
-                          >
-                            {PROCESS_ROLE_LABELS[p.role] || p.role}
-                          </Badge>
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {p.activity || "—"}
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {p.description || "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               )}
             </CardContent>
           </Card>

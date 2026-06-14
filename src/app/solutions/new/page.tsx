@@ -86,7 +86,6 @@ export default function NewSolutionPage() {
   const [owner, setOwner] = useState("")
   const [desc, setDesc] = useState("")
   const [selCaps, setSelCaps] = useState<string[]>([])
-  const [selProcs, setSelProcs] = useState<string[]>([])
 
   // BRD / document upload → prefill description
   const brdInputRef = useRef<HTMLInputElement>(null)
@@ -163,7 +162,6 @@ export default function NewSolutionPage() {
       if (typeof d.owner === "string") setOwner(d.owner)
       if (typeof d.desc === "string") setDesc(d.desc)
       if (Array.isArray(d.selCaps)) setSelCaps(d.selCaps)
-      if (Array.isArray(d.selProcs)) setSelProcs(d.selProcs)
       if (d.proposal) setProposal(d.proposal)
       if (d.memberState) setMemberState(d.memberState)
       if (d.gapState) setGapState(d.gapState)
@@ -191,7 +189,7 @@ export default function NewSolutionPage() {
       localStorage.setItem(
         DRAFT_KEY,
         JSON.stringify({
-          step, name, goal, owner, desc, selCaps, selProcs,
+          step, name, goal, owner, desc, selCaps,
           proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows,
           processes, sourceDoc, aiApplied,
         })
@@ -200,7 +198,7 @@ export default function NewSolutionPage() {
       // quota / serialization issue — non-fatal
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, name, goal, owner, desc, selCaps, selProcs, proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows, processes, sourceDoc, aiApplied])
+  }, [step, name, goal, owner, desc, selCaps, proposal, memberState, gapState, manualNew, existingFlowOn, addedFlows, processes, sourceDoc, aiApplied])
 
   const byId = useMemo(() => new Map(components.map((c) => [c.id, c])), [components])
 
@@ -208,11 +206,6 @@ export default function NewSolutionPage() {
   const allCaps = useMemo(() => {
     const s = new Set<string>(BUSINESS_CAPABILITIES as readonly string[])
     for (const c of components) for (const cap of c.capabilities || []) if (cap.name) s.add(cap.name)
-    return Array.from(s).sort((a, b) => a.localeCompare(b))
-  }, [components])
-  const allProcs = useMemo(() => {
-    const s = new Set<string>()
-    for (const c of components) for (const p of c.processes || []) if (p.name) s.add(p.name)
     return Array.from(s).sort((a, b) => a.localeCompare(b))
   }, [components])
 
@@ -227,7 +220,9 @@ export default function NewSolutionPage() {
   // Run the deterministic proposer and seed selections.
   const runProposer = () => {
     const p = proposeSolution(
-      { name, capabilities: selCaps, processes: selProcs },
+      // Processes are no longer a delivers axis — a process is now the
+      // editable sequence. The proposer ranks members by capabilities only.
+      { name, capabilities: selCaps, processes: [] },
       components
     )
     setProposal(p)
@@ -355,7 +350,6 @@ export default function NewSolutionPage() {
       setDesc((dd) => (dd.trim() ? dd : ai.description!.trim()))
 
     setSelCaps(ai.delivers.capabilities || [])
-    setSelProcs(ai.delivers.processes || [])
 
     const members = (ai.members || []).map((m) => ({
       component: m.component,
@@ -473,7 +467,7 @@ export default function NewSolutionPage() {
         owner,
         description: desc ? { description: desc } : {},
         goal: goal || undefined,
-        delivers: { capabilities: selCaps, processes: selProcs },
+        delivers: { capabilities: selCaps },
         members: assembled.members,
         flows: assembled.flows,
         processes,
@@ -670,12 +664,11 @@ export default function NewSolutionPage() {
           )}
 
           <ChipPicker title="Delivers — capabilities" options={allCaps} selected={selCaps} onToggle={(v) => toggle(selCaps, setSelCaps, v)} />
-          <ChipPicker title="Delivers — processes" options={allProcs} selected={selProcs} onToggle={(v) => toggle(selProcs, setSelProcs, v)} empty="No processes declared in the catalog yet." />
 
           <div className="flex justify-end">
             <Button
               onClick={goStep2}
-              disabled={name.trim() === "" || (!aiApplied && selCaps.length === 0 && selProcs.length === 0)}
+              disabled={name.trim() === "" || (!aiApplied && selCaps.length === 0)}
             >
               {aiApplied ? "Continue to skeleton →" : "Propose skeleton →"}
             </Button>
@@ -884,7 +877,6 @@ export default function NewSolutionPage() {
               id: m.component,
               name: labelFor(m.component, byId, assembled.newComponents),
             }))}
-            deliversProcesses={selProcs}
             onAiDraft={async (processName) => {
               const r = await fetch("/api/solutions/process-draft", {
                 method: "POST",

@@ -386,6 +386,8 @@ export interface ProcessActor {
   kind: "member" | "external"
   /** Set when kind === "member": catalog component id (should be a solution member). */
   component?: string
+  /** Role this participant plays in the process (drives the derived registry). */
+  role?: ProcessRole
 }
 
 export interface SolutionProcessStep {

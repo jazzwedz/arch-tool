@@ -14,13 +14,14 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { MermaidPreview } from "@/components/mermaid-preview"
 import { ChevronUp, ChevronDown, Plus, X, Trash2, Sparkles, Loader2 } from "lucide-react"
-import { PROCESS_STEP_KINDS, PROCESS_STEP_KIND_LABELS } from "@/lib/constants"
+import { PROCESS_STEP_KINDS, PROCESS_STEP_KIND_LABELS, PROCESS_ROLES, PROCESS_ROLE_LABELS } from "@/lib/constants"
 import { buildSolutionSequenceMermaid } from "@/lib/solution-sequence"
 import { slugifyId } from "@/lib/component-schema"
 import type {
   SolutionProcess,
   SolutionProcessStep,
   ProcessActor,
+  ProcessRole,
 } from "@/lib/types"
 
 export interface ProcessMember {
@@ -35,13 +36,11 @@ export function ProcessesEditor({
   processes,
   onChange,
   members,
-  deliversProcesses = [],
   onAiDraft,
 }: {
   processes: SolutionProcess[]
   onChange: (next: SolutionProcess[]) => void
   members: ProcessMember[]
-  deliversProcesses?: string[]
   /** When provided, each process gets an AI-draft button. Returns the
    *  drafted actors + steps for the given process name (or null). */
   onAiDraft?: (processName: string) => Promise<{ actors: ProcessActor[]; steps: SolutionProcessStep[] } | null>
@@ -95,6 +94,17 @@ export function ProcessesEditor({
   }
   const removeStep = (i: number, si: number) =>
     setProcess(i, { steps: processes[i].steps.filter((_, k) => k !== si) })
+
+  const setActorRole = (i: number, actorId: string, role: string) =>
+    setProcess(i, {
+      actors: processes[i].actors.map((a) =>
+        a.id === actorId ? { ...a, role: (role || undefined) as ProcessRole | undefined } : a
+      ),
+    })
+  // Drop an actor; steps that referenced it fall back to "— choose actor —"
+  // (from) or internal (to), made explicit by the selects.
+  const removeActor = (i: number, actorId: string) =>
+    setProcess(i, { actors: processes[i].actors.filter((a) => a.id !== actorId) })
 
   // Resolve a from/to dropdown selection into an actor id (adding the actor
   // if needed), and write it to the step — all in one update to avoid races.
@@ -194,19 +204,6 @@ export function ProcessesEditor({
                   className="h-8 w-64 font-medium"
                   placeholder="Process name"
                 />
-                {deliversProcesses.length > 0 && (
-                  <select
-                    className="h-8 rounded-md border bg-background px-2 text-xs text-muted-foreground"
-                    value={p.deliversProcess || ""}
-                    onChange={(e) => setProcess(i, { deliversProcess: e.target.value || undefined })}
-                    title="Optionally link to a delivered process"
-                  >
-                    <option value="">(standalone)</option>
-                    {deliversProcesses.map((d) => (
-                      <option key={d} value={d}>delivers: {d}</option>
-                    ))}
-                  </select>
-                )}
                 <div className="ml-auto flex items-center gap-2">
                   {onAiDraft && (
                     <Button size="sm" variant="outline" disabled={aiBusyId === p.id} onClick={() => runAi(i)}>
@@ -219,6 +216,30 @@ export function ProcessesEditor({
                   </Button>
                 </div>
               </div>
+
+              {/* participants + roles — drive the derived /processes registry */}
+              {p.actors.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">Participants:</span>
+                  {p.actors.map((a) => (
+                    <span key={a.id} className="inline-flex items-center gap-1 rounded border bg-muted/20 pl-2 pr-1 py-0.5 text-xs">
+                      <span className={a.kind === "external" ? "italic" : ""}>{a.label}</span>
+                      <select
+                        className="h-6 rounded border bg-background px-1 text-[11px]"
+                        value={a.role || ""}
+                        onChange={(e) => setActorRole(i, a.id, e.target.value)}
+                        title="Role in this process"
+                      >
+                        <option value="">role…</option>
+                        {PROCESS_ROLES.map((r) => (
+                          <option key={r} value={r}>{PROCESS_ROLE_LABELS[r]}</option>
+                        ))}
+                      </select>
+                      <button onClick={() => removeActor(i, a.id)} className="text-muted-foreground hover:text-red-600" title="Remove participant"><X className="h-3 w-3" /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* steps */}
               <div className="space-y-2">

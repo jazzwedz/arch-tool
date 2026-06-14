@@ -30,7 +30,6 @@ import {
 import type {
   Component,
   ComponentType,
-  MemberDisposition,
   SolutionFlow,
   SolutionMember,
   SolutionProcess,
@@ -65,7 +64,6 @@ export default function EditSolutionPage() {
   const [goal, setGoal] = useState("")
   const [desc, setDesc] = useState("")
   const [caps, setCaps] = useState<string[]>([])
-  const [procs, setProcs] = useState<string[]>([])
   const [members, setMembers] = useState<SolutionMember[]>([])
   const [flows, setFlows] = useState<SolutionFlow[]>([])
   const [processes, setProcesses] = useState<SolutionProcess[]>([])
@@ -105,7 +103,6 @@ export default function EditSolutionPage() {
         setGoal(s.goal || "")
         setDesc(s.description?.description || "")
         setCaps(s.delivers?.capabilities || [])
-        setProcs(s.delivers?.processes || [])
         setMembers(s.members || [])
         setFlows(s.flows || [])
         setProcesses(s.processes || [])
@@ -122,11 +119,6 @@ export default function EditSolutionPage() {
   const allCaps = useMemo(() => {
     const s = new Set<string>(BUSINESS_CAPABILITIES as readonly string[])
     for (const c of components) for (const cap of c.capabilities || []) if (cap.name) s.add(cap.name)
-    return Array.from(s).sort((a, b) => a.localeCompare(b))
-  }, [components])
-  const allProcs = useMemo(() => {
-    const s = new Set<string>()
-    for (const c of components) for (const p of c.processes || []) if (p.name) s.add(p.name)
     return Array.from(s).sort((a, b) => a.localeCompare(b))
   }, [components])
 
@@ -178,7 +170,7 @@ export default function EditSolutionPage() {
         owner,
         description: desc ? { description: desc } : {},
         goal: goal || undefined,
-        delivers: { capabilities: caps, processes: procs },
+        delivers: { capabilities: caps },
         members,
         flows,
         processes,
@@ -298,7 +290,6 @@ export default function EditSolutionPage() {
       {tab === "delivers" && (
         <div className="space-y-4">
           <ChipPicker title="Delivers — capabilities" options={allCaps} selected={caps} onToggle={(v) => toggle(caps, setCaps, v)} />
-          <ChipPicker title="Delivers — processes" options={allProcs} selected={procs} onToggle={(v) => toggle(procs, setProcs, v)} empty="No processes in the catalog yet." />
         </div>
       )}
 
@@ -420,7 +411,6 @@ export default function EditSolutionPage() {
           processes={processes}
           onChange={setProcesses}
           members={members.map((m) => ({ id: m.component, name: label(m.component) }))}
-          deliversProcesses={procs}
           onAiDraft={async (processName) => {
             const r = await fetch("/api/solutions/process-draft", {
               method: "POST",

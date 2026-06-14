@@ -15,7 +15,7 @@
 import { randomUUID } from "crypto"
 import { getLLM } from "./llm"
 import { buildSolutionMermaid } from "./architecture-mermaid"
-import type { Component, Solution, SolutionMember } from "./types"
+import type { Component, Solution } from "./types"
 import { getLogger } from "./log"
 import { saveDsd, newArtifactId, type DsdMode } from "./dsd-store"
 import { getAgent, agentInstruction } from "./agents"
@@ -191,12 +191,11 @@ export function buildGroundedFacts(solution: Solution, components: Component[]):
   }
   lines.push("")
 
-  // Capability / process mapping + gaps
+  // Capability mapping + gaps
   const caps = solution.delivers?.capabilities || []
-  const procs = solution.delivers?.processes || []
-  if (caps.length || procs.length) {
-    lines.push(`## Capability & process mapping`)
-    const findCovering = (name: string, kind: "capability" | "process") => {
+  if (caps.length) {
+    lines.push(`## Capability mapping`)
+    const findCovering = (name: string) => {
       const hits: string[] = []
       for (const m of members) {
         const c = byId.get(m.component)
@@ -205,20 +204,15 @@ export function buildGroundedFacts(solution: Solution, components: Component[]):
           if (m.disposition === "new") hits.push(`${m.component} (new)`)
           continue
         }
-        const arr = kind === "capability" ? c.capabilities || [] : c.processes || []
-        if (arr.some((x) => x.name?.toLowerCase() === name.toLowerCase()))
+        if ((c.capabilities || []).some((x) => x.name?.toLowerCase() === name.toLowerCase()))
           hits.push(`${c.name}${m.disposition === "new" ? " (new)" : ""}`)
         else if (m.disposition === "new") hits.push(`${c.name} (new)`)
       }
       return hits
     }
     for (const cap of caps) {
-      const hits = findCovering(cap, "capability")
+      const hits = findCovering(cap)
       lines.push(`- Capability "${cap}" → ${hits.length ? hits.join(", ") : "GAP — no member provides it (needs a new component)"}`)
-    }
-    for (const p of procs) {
-      const hits = findCovering(p, "process")
-      lines.push(`- Process "${p}" → ${hits.length ? hits.join(", ") : "GAP — no member supports it (needs a new component)"}`)
     }
     lines.push("")
   }
@@ -243,8 +237,14 @@ export function buildGroundedFacts(solution: Solution, components: Component[]):
         if (!a) return id
         return a.label || (a.component ? label(a.component) : a.id)
       }
-      lines.push(`### ${p.name}${p.deliversProcess ? ` (delivers: ${p.deliversProcess})` : ""}`)
+      lines.push(`### ${p.name}`)
       if (p.goal) lines.push(`- Goal: ${p.goal}`)
+      if (p.actors.length) {
+        const parts = p.actors
+          .map((a) => `${a.label}${a.role ? ` (${a.role})` : ""}`)
+          .join(", ")
+        lines.push(`- Participants: ${parts}`)
+      }
       p.steps.forEach((s, i) => {
         const kind = s.kind || "sync"
         if (!s.to || kind === "note") {
