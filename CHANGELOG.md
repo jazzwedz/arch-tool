@@ -7,6 +7,15 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **AI/composer paths no longer produce retired process fields.** The
+  composer stopped seeding `component.processes` on gap components, and the
+  AI-compose return type / proposal summary dropped `delivers.processes` —
+  so no AI import or generation path writes the retired process tags any
+  more (they remain read-only for Confluence/export back-compat). The AI
+  proposal summary now also notes the seeded starter process.
+
 ## [0.6.1] — 2026-06-14
 
 ### Changed

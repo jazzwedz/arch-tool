@@ -68,7 +68,7 @@ interface AiCompose {
   // Applied only when the corresponding field is still empty.
   goal?: string
   description?: string
-  delivers: { capabilities: string[]; processes: string[] }
+  delivers: { capabilities: string[] }
   members: { component: string; disposition: MemberDisposition; role?: string }[]
   newComponents: { name: string; type: ComponentType; role?: string }[]
   flows: SolutionFlow[]
@@ -413,7 +413,8 @@ export default function NewSolutionPage() {
         tags: [],
         description: {},
         capabilities: g.kind === "capability" ? [{ name: g.value, role: "owner" }] : [],
-        processes: g.kind === "process" ? [{ name: g.value, role: "owner" }] : [],
+        // Processes are no longer a component-level tag — a process is the
+        // editable sequence on the solution. Never seed component.processes.
       })
     }
     // Manually added new components.
@@ -1010,10 +1011,11 @@ export default function NewSolutionPage() {
             <div className="space-y-2 text-sm">
               <p>AI proposes:</p>
               <ul className="list-disc pl-5 space-y-0.5">
-                <li>{aiResult.delivers.capabilities.length} capabilities, {aiResult.delivers.processes.length} processes</li>
+                <li>{aiResult.delivers.capabilities.length} capabilities</li>
                 <li>{aiResult.members.length} existing component(s) to reuse/extend</li>
                 <li>{aiResult.newComponents.length} new component(s) to create</li>
                 <li>{aiResult.flows.length} flow(s)</li>
+                {aiResult.process && <li>1 starter process sequence</li>}
               </ul>
               {aiResult.members.length === 0 && aiResult.newComponents.length === 0 && (
                 <p className="text-xs text-muted-foreground">
