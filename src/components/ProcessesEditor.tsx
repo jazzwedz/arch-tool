@@ -71,8 +71,17 @@ export function ProcessesEditor({
         }
 
   const addStep = (i: number) => {
-    const p = processes[i]
-    setProcess(i, { steps: [...p.steps, { from: p.actors[0]?.id || "", to: undefined, label: "", kind: "sync" }] })
+    let p = processes[i]
+    // Default `from` to a real, resolvable actor — never "" (a native select
+    // silently shows the first option for an unmatched value, so an empty
+    // from would masquerade as the first member and then drop from the
+    // diagram). Seed the first member as an actor if none exist yet.
+    let from = p.actors[0]?.id || ""
+    if (!from && members[0]) {
+      p = ensureMember(p, members[0].id)
+      from = members[0].id
+    }
+    setProcess(i, { actors: p.actors, steps: [...p.steps, { from, to: undefined, label: "", kind: "sync" }] })
   }
   const setStep = (i: number, si: number, patch: Partial<SolutionProcessStep>) =>
     setProcess(i, { steps: processes[i].steps.map((s, k) => (k === si ? { ...s, ...patch } : s)) })
@@ -146,6 +155,7 @@ export function ProcessesEditor({
       onChange={(e) => selectActor(i, si, field, e.target.value)}
     >
       {field === "to" && <option value={INTERNAL}>— internal (note)</option>}
+      {field === "from" && <option value="">— choose actor —</option>}
       <optgroup label="Members">
         {members.map((m) => (
           <option key={m.id} value={m.id}>{m.name}</option>

@@ -7,6 +7,16 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Process step with an unset "from" silently dropped from the diagram.**
+  A new step defaulted its `from` to `""` when no actors existed yet; a
+  native `<select>` shows the first option for an unmatched value, so the
+  dropdown looked like it pointed at the first member while the step was
+  actually unset — and the sequence builder skipped it. New steps now
+  default to a real member (added as an actor), and the "from" select shows
+  an explicit "— choose actor —" placeholder instead of masquerading.
+
 ### Added
 
 - **AI pre-fill now seeds a starter process sequence.** "Pre-fill with AI"
