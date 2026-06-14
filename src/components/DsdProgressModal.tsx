@@ -73,7 +73,7 @@ export function DsdProgressModal({
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden border-0 bg-transparent shadow-none [&>button:last-child]:hidden">
+      <DialogContent className="max-w-3xl top-16 translate-y-0 p-0 overflow-hidden border-0 bg-transparent shadow-none [&>button:last-child]:hidden">
         <div className="dsd-stage relative overflow-hidden rounded-xl">
           <div className="dsd-grid" />
           <div className="dsd-aurora" />
